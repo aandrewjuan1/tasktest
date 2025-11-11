@@ -14,10 +14,12 @@
         "laravel/tinker": "^2.10.1",
         "laravel/workos": "^0.1.0",
         "livewire/flux": "^2.1.1",
-        "livewire/volt": "^1.7.0"
+        "livewire/volt": "^1.7.0",
+        "prism-php/prism": "^0.98.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
+        "laravel/boost": "^1.7",
         "laravel/pail": "^1.2.2",
         "laravel/pint": "^1.24",
         "laravel/sail": "^1.41",

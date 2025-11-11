@@ -1,0 +1,207 @@
+---
+alwaysApply: true
+---
+
+# TaskLyst — Cursor IDE Context File
+
+**Purpose:**
+This file provides a concise, structured context for Cursor IDE to load as project context / system prompt / reference for an LLM-powered assistant while developing **TaskLyst** — a web-based task management system with an LLM-powered intelligent assistant for task prioritization and predictive scheduling, utilizing **Livewire 3 components** for interactive UI and **Prism Laravel package** for connecting into Hermes 3 with Ollama.
+
+---
+
+## Quick summary
+
+**Project name:** TaskLyst
+**Description:** Web-based task management for students. Features an AI assistant (Ollama + Hermes 3) that helps prioritize tasks, generate schedules, import Brightspace items, and produce smart reminders and productivity insights.
+**Primary tech stack (implementation notes):** Laravel 12 backend, **Livewire 3 components** (UI interactions), Tailwind CSS for styling, **Prism Laravel package** for Hermes 3 + Ollama integration, Brightspace integration for calendar import.
+
+---
+
+## Main pages / UI areas
+
+* **Dashboard** — Overview, productivity widgets, AI insights (Livewire 3 components)
+* **Tasks** — Daily task list (add/edit/delete, categories, attachments) using Livewire 3 components
+* **Calendar** — Weekly (drag-and-drop) + daily/monthly views, sync with Brightspace (Livewire 3-powered)
+* **Notifications (Notif)** — In-app and email reminders, AI summaries (Livewire 3 interactive alerts)
+* **Profile** — User profile & Brightspace connection settings (Livewire 3 form components)
+
+---
+
+## Core features (short)
+
+1. **User Accounts & Profile**
+
+   * Student registration & secure authentication
+   * Profile fields: name, course, year level, optional Brightspace credentials (or OAuth link)
+2. **Task Management**
+
+   * CRUD tasks with subject, type (assignment/quiz/exam/project), priority, notes, attachments
+   * Status: To-Do, In-Progress, Completed
+   * Visual progress tracker (completion percentage) via Livewire 3 components
+3. **Calendar & Scheduling**
+
+   * Brightspace calendar synchronization (auto-import assignments/quizzes/deadlines)
+   * Daily / Weekly / Monthly views
+   * Drag-and-drop re-scheduling using Livewire 3 components
+4. **AI-powered Assistant**
+
+   * Ollama + Hermes 3-backed chatbot
+   * Connected via **Prism Laravel package**
+   * Natural-language task creation and prioritization
+   * Predictive scheduling based on free slots and user patterns
+5. **Notifications**
+
+   * Email + in-app reminders, smart AI-generated summaries
+6. **Productivity Insights**
+
+   * Completed vs pending, weekly/monthly trends, AI recommendations
+7. **Security & Privacy**
+
+   * Secure authentication, session management
+   * Data encryption in transit and at rest (where applicable)
+   * Option for local-only/private AI processing via Ollama
+
+---
+
+## Data models (suggested JSON schemas)
+
+Use these as a reference for Cursor context and example payloads.
+
+### User (example)
+
+```json
+{
+  "id": "uuid",
+  "email": "student@school.edu",
+  "name": "Full Name",
+  "course": "BS Computer Science",
+  "year_level": "3",
+  "time_zone": "Asia/Manila",
+  "preferences": {
+    "work_hours": {"start": "18:00", "end": "22:00"},
+    "notifications": {"email": true, "in_app": true}
+  }
+}
+```
+
+### Task
+
+```json
+{
+  "id": "uuid",
+  "title": "Math Homework Chapter 4",
+  "description": "Problems 1-20",
+  "subject": "Math",
+  "type": "assignment",
+  "priority": "high", // low | medium | high
+  "status": "to-do", // to-do | in-progress | completed
+  "deadline": "2025-05-22T23:59:00+08:00",
+  "estimated_minutes": 90,
+  "attachments": [{"id":"uuid","name":"worksheet.pdf"}],
+  "created_at": "2025-05-01T12:00:00+08:00",
+  "updated_at": "2025-05-03T14:20:00+08:00"
+}
+```
+
+### CalendarEvent (for sync)
+
+```json
+{
+  "id": "brightspace-event-123",
+  "source": "brightspace",
+  "title": "Quiz: History",
+  "start": "2025-05-15T09:00:00+08:00",
+  "end": "2025-05-15T10:00:00+08:00",
+  "link": "https://brightspace.example/quiz/123",
+  "related_task_id": null
+}
+```
+
+### Notification
+
+```json
+{
+  "id": "uuid",
+  "user_id": "uuid",
+  "type": "email|in_app|summary",
+  "payload": "You have 2 deadlines tomorrow and 1 quiz this weekend.",
+  "sent_at": null
+}
+```
+
+---
+
+## API skeleton (example endpoints)
+
+* `POST /api/auth/register` — register student
+* `POST /api/auth/login` — login (returns JWT/session)
+* `GET /api/tasks` — list tasks (query by date/priority/status)
+* `POST /api/tasks` — create task
+* `PUT /api/tasks/:id` — update task
+* `DELETE /api/tasks/:id` — delete task
+* `GET /api/calendar/sync/brightspace` — trigger Brightspace sync
+* `POST /api/ai/prompt` — send user message to Ollama/Hermes 3 via **Prism Laravel package**
+* `GET /api/insights` — productivity stats
+* `POST /api/notifications/send` — send scheduled notifications
+
+---
+
+## AI assistant — system prompt & behavior (use as Cursor IDE context)
+
+```
+You are TaskLyst Assistant — a context-aware study & task management helper for college students. Use the user's profile, calendar, and task list to:
+- Create tasks from natural language
+- Prioritize tasks by urgency, estimated workload, and user study patterns
+- Propose schedule blocks that respect the user's declared work hours and existing calendar events
+- When asked, give concise actionable plans (e.g., break a 3-hour task into 3 focused 50-min sessions)
+- Provide friendly reminders and brief productivity insights
+Constraints:
+- Do not access external services unless called via the platform API.
+- Always present dates in the user's time zone (Asia/Manila for this project default).
+- Respect user privacy: if Brightspace credentials are missing, suggest how to connect.
+- Prefer using **Livewire 3 components** when generating UI or interactive elements.
+- Use **Prism Laravel package** for Hermes 3 + Ollama connections.
+```
+
+**Example LLM prompts to include in context:**
+
+* `"Plan my study schedule for this week given these tasks..."`
+* `"Add Math homework due Friday"`
+* `"Prioritize my tasks for tomorrow"`
+
+**Assistant persona:** helpful, concise, supportive, study-focused; avoids judgmental language.
+
+---
+
+## Brightspace integration notes
+
+* Prefer Brightspace/D2L APIs or calendar export (iCal) for importing assignments and deadlines.
+* Provide an OAuth flow or token-based connection in Profile settings.
+* Imported items should become `CalendarEvent` objects linked to suggested `Task` objects (user may accept/import them as tasks).
+
+---
+
+## Ollama + Hermes 3 integration notes
+
+* Use local Ollama instance when privacy-first option is selected.
+* The assistant endpoint (`/api/ai/prompt`) should funnel messages to Ollama + Hermes 3 via **Prism Laravel package** with context: user profile, active tasks for the relevant time window, recent activity (last 7 days), and calendar free slots.
+* Keep context window minimal and relevant. Provide a short system prompt (see above) plus up to ~10 most relevant tasks/events.
+
+---
+
+## Privacy & Security
+
+* Encrypt user-sensitive data at rest (e.g., OAuth tokens for Brightspace).
+* Allow users to opt into local-only AI processing (Ollama) and disable cloud-based models.
+* Use secure session management and CSRF protection on all routes.
+
+---
+
+## Developer hints & Cursor usage tips
+
+* Paste this file into Cursor IDE's project context or system prompt area so the in-editor assistant understands TaskLyst domain.
+* When asking the assistant to generate code or migration files, include the target framework (Laravel 12) and desired conventions (UUID PKs, timestamps, Eloquent models).
+* Keep prompts short + reference the specific schema snippets above for stable outputs.
+* Specify that **Livewire 3 components** should be used for interactive UI elements and **Prism Laravel package** for Hermes 3 + Ollama integration when generating code or UI templates.
+
+---
