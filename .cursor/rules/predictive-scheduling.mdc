@@ -1,0 +1,328 @@
+---
+description: TaskLyst Predictive Scheduling Module - Historical pattern analysis and ML-based task completion forecasting (Core logic focus)
+globs:
+  - app/Services/PredictiveSchedulingService.php
+  - app/Services/Schemas/PredictiveSchedulingSchema.php
+  - app/Models/TaskHistory.php
+  - app/Models/WeeklySchedule.php
+alwaysApply: false
+---
+
+# TaskLyst - Predictive Scheduling Module
+
+## Module Overview
+
+This module implements **predictive scheduling with historical pattern analysis**. The engine learns from past task completion data to forecast realistic completion times, expose bottlenecks before they happen, and produce achievable weekly schedules.
+
+### Core Capabilities
+
+1. **Time Forecasting**: Predict actual completion time based on historical patterns
+2. **Bottleneck Detection**: Identify scheduling conflicts and overload risks before they occur
+3. **Pattern Recognition**: Learn from user's past completion patterns
+4. **Workload Prediction**: Forecast capacity needs and burnout risks
+
+### Learning Loop
+
+```
+Task Completion → TaskHistory (logging)
+                        ↓
+              Historical Analysis
+                        ↓
+              Pattern Recognition
+                        ↓
+              Generate Predictions
+                        ↓
+         Return to Frontend
+                        ↓
+    Frontend Updates Database
+```
+
+### System Flow
+
+```
+User Completes Task → Frontend Logs to TaskHistory
+                            ↓
+User Requests Schedule → Frontend Calls Service
+                            ↓
+               PredictiveSchedulingService
+                            ↓
+               Analyze Historical Patterns
+                            ↓
+               Generate Insights & Predictions
+                            ↓
+               Return Structured Data
+                            ↓
+            ┌───────────────┴──────────────┐
+            ↓                              ↓
+    Frontend Displays           Frontend Creates Schedule
+    - Forecasted times          - WeeklySchedule records
+    - Bottleneck warnings       - Conflict-free blocks
+    - Overload risk             - Peak hours optimized
+```
+
+## File Structure
+
+```
+app/Services/
+├── PredictiveSchedulingService.php     # Core historical analysis logic
+└── Schemas/
+    └── PredictiveSchedulingSchema.php  # Output definition (if using LLM)
+app/Models/
+├── TaskHistory.php                     # Historical completion data
+└── WeeklySchedule.php                  # Schedule blocks model
+```
+
+---
+
+## Core Component: PredictiveSchedulingService
+
+**File**: `app/Services/PredictiveSchedulingService.php`
+
+**Purpose**: Analyze historical task data and surface forecasting insights that guide realistic scheduling decisions.
+
+### Public API
+
+**Method Signatures:**
+- `getHistoricalInsights(int $userId): array`
+- `predictTaskCompletion(Task $task, int $userId = null): int`
+- `detectBottlenecks(WeeklySchedule $schedule): array`
+- `generateWeeklySchedule(array $tasks, int $userId): array`
+
+**Method Contracts:**
+- `getHistoricalInsights(...)`
+  - **Input**: Authenticated user id
+  - **Output**: Aggregate metrics (average completion time, peak periods, consistency scores) for dashboard-level insights.
+- `predictTaskCompletion(...)`
+  - **Input**: Task model (optionally user scoped)
+  - **Output**: Estimated duration (minutes) bounded between 15 minutes and 8 hours.
+- `detectBottlenecks(...)`
+  - **Input**: WeeklySchedule instance or hydrated structure
+  - **Output**: Array of conflict/overload warnings with time windows and severity indicators.
+- `generateWeeklySchedule(...)`
+  - **Input**: Array of task descriptors plus user id
+  - **Output**: Proposed schedule blocks (start/end times, block types, linked tasks) optimized for focus windows and availability.
+
+### Implementation Requirements
+
+- Analyze TaskHistory completions from the last 90 days to stay performant and relevant.
+- Weight recent completions higher than older data when calculating predictions.
+- Produce conflict-free schedule suggestions; respect existing WeeklySchedule entries to avoid overlaps.
+- Provide burnout safeguards: insert breaks/buffer blocks when consecutive workload exceeds thresholds.
+- Enforce cold-start defaults (1 hour per task, Monday–Friday 8a–5p) when historical data is insufficient.
+- Remain stateless—no database writes; return data structures for upstream layers to persist or present.
+- Gracefully handle missing/invalid input by returning empty schedules and descriptive warnings.
+
+### Analytical Patterns
+
+- **Stateless**: All methods are pure; consumers decide how to persist results.
+- **Recency Weighting**: Use exponential decay or linear weighting favoring the most recent 30 days.
+- **Bounded Durations**: Clamp predictions between 15 minutes minimum and 8 hours maximum.
+- **Availability Alignment**: Honor user-defined working hours/working days when generating schedules.
+- **Performance**: Pre-filter queries by user id and completion date to avoid scanning historical archives.
+
+---
+
+## Supporting Schema: PredictiveSchedulingSchema
+
+**File**: `app/Services/Schemas/PredictiveSchedulingSchema.php`
+
+**Purpose**: Define structured outputs (if an LLM or downstream consumer needs typed responses).
+
+### Schema Expectations
+
+- Root object describes forecast payloads including:
+  - `forecast_times` — map of task identifiers to predicted durations.
+  - `bottlenecks` — array of objects with `period`, `type`, and `description`.
+  - `warnings` — array of human-readable advisory strings.
+  - `confidence` — decimal between 0 and 1 summarizing prediction reliability.
+- Use descriptive property names and provide `requiredFields` for critical data.
+- Keep schema versioned to support future iterations without breaking consumers.
+
+---
+
+## Data Model: TaskHistory
+
+**File**: `app/Models/TaskHistory.php`
+**Purpose**: Store completed task data for predictive learning
+
+### Database Schema
+
+- `id` (primary key)
+- `user_id` (foreign key → users.id)
+- `task_id` (foreign key → tasks.id)
+- `completed_at` (timestamp)
+- `completion_time` (integer minutes)
+- `scheduled_start` (timestamp, nullable)
+- `scheduled_end` (timestamp, nullable)
+- `actual_start` (timestamp, nullable)
+- `actual_end` (timestamp, nullable)
+
+### Model Definition
+
+- Each TaskHistory belongs to one User and to one Task
+- Fillable: task_id, completed_at, completion_time, scheduled_start, scheduled_end, actual_start, actual_end
+- Only user_id scope may access row
+
+### Usage Pattern
+
+- Frontend logs task completion to TaskHistory after every finished task
+
+---
+
+## Data Model: WeeklySchedule
+
+**File**: `app/Models/WeeklySchedule.php`
+**Purpose**: Store scheduled time blocks with conflict prevention
+
+### Database Schema
+
+- `id` (primary key)
+- `user_id` (foreign key → users.id)
+- `block_type` (enum: work, focus_time, break, meeting, buffer)
+- `start_time` (timestamp)
+- `end_time` (timestamp)
+- `task_id` (nullable foreign key → tasks.id)
+- `label` (string, optional)
+
+### Block Types
+
+- work: General task work period
+- focus_time: Deep focus block (high productivity)
+- break: Scheduled rest
+- meeting: Calendar event
+- buffer: Transition period
+
+### Model Definition
+
+- Each WeeklySchedule belongs to one User, optionally to a Task
+- Required: block_type, start_time, end_time
+- Fillable: block_type, start_time, end_time, task_id, label
+- Uniqueness: Schedule blocks cannot overlap for a user
+
+### Usage Pattern
+
+- Frontend creates proposed weekly blocks using prediction
+- Validates for conflicts before saving with user's calendar
+
+---
+
+## Integration with Frontend
+
+### Service Invocation Pattern
+
+1. Collect pending/open tasks (id, title, estimated duration, deadlines, context) scoped to authenticated user.
+2. Fetch recent TaskHistory entries (<= 90 days) for the same user.
+3. Gather user scheduling preferences (working hours, working days, preferred focus windows).
+4. Call `PredictiveSchedulingService` methods:
+   - Use `predictTaskCompletion()` for per-task forecasts or `generateWeeklySchedule()` for weekly plans.
+   - Use `detectBottlenecks()` to validate existing WeeklySchedule drafts before persistence.
+5. Interpret returned structures and surface warnings, confidence scores, and proposed blocks to the UI.
+
+### Schedule Generation Workflow
+
+- Build proposed WeeklySchedule entries client-side based on returned recommendations.
+- Provide interactive adjustments for users (accept/reject/reschedule blocks).
+- Upon confirmation, persist new/updated WeeklySchedule records via Eloquent transactions.
+- After each task completion, log TaskHistory data to continuously improve predictions.
+
+### Prediction Output Reference
+
+- `forecast_times`: associative array keyed by task id with minute durations.
+- `bottlenecks`: objects containing `period`, `type` (`conflict`, `overload`, `insufficient data`), `description`.
+- `warnings`: array of strings to display in UI banners/tooltips.
+- `confidence`: float (0–1) for establishing UI confidence meters or fallback messaging.
+
+---
+
+## Security Considerations
+
+### User Data Isolation
+
+- Always scope TaskHistory and WeeklySchedule queries by `user_id`.
+- Reject or ignore predictions referencing tasks or schedules that belong to another user.
+- Ensure frontend validation prevents mixing data across accounts or teams.
+
+### Input Validation
+
+- Verify required fields (task ids, estimated durations, working hours) before invoking the service.
+- Clamp predicted durations to permissible ranges before displaying or persisting.
+- Treat warnings about insufficient data as recoverable errors and communicate a fallback plan.
+
+### Error Handling
+
+- The service returns arrays or empty structures—never throw upstream.
+- Log exceptions with context (`user_id`, task counts) for debugging.
+- Surface generic error messages to users while preserving detailed logs for developers.
+
+---
+
+## Testing Strategy
+
+### Service Unit Tests
+
+- Cover each public method with simulated data sets (dense history, sparse history, cold start).
+- Verify `predictTaskCompletion()` respects bounds and weights recent completions.
+- Assert `detectBottlenecks()` identifies overlaps and consecutive high-work periods.
+- Confirm `generateWeeklySchedule()` outputs non-overlapping blocks within working hours.
+- Mock TaskHistory repositories to isolate logic and avoid database dependencies.
+
+### Model & Integration Tests
+
+- Validate TaskHistory and WeeklySchedule relationships and fillable fields.
+- Ensure `WeeklySchedule` enforces non-overlapping constraints per user.
+- Smoke-test integration flow: create sample tasks, generate schedule, persist recommendations.
+
+### Edge Case Coverage
+
+- Cold start users (0–2 historical entries) produce default schedules.
+- Heavy workloads spanning weekends trigger warnings or buffer insertions.
+- Invalid input (missing estimated duration, null deadlines) yields warnings without exceptions.
+
+---
+
+## Performance Optimization
+
+### Database Indexing
+- Index `(user_id, completed_at)` on TaskHistory for rapid history lookups.
+- Index `(user_id, start_time)` on WeeklySchedule for conflict scans.
+
+### Caching Strategies
+- Cache recent prediction results per user for 60 minutes to reduce recomputation.
+- Invalidate caches when new TaskHistory entries are recorded or schedule blocks change.
+
+### Query Optimization
+- Select only required columns from TaskHistory (completion time, completed_at).
+- Apply date range filters (rolling 90 days) to avoid full-table scans.
+- Batch load WeeklySchedule blocks when scanning for bottlenecks to prevent N+1 queries.
+
+---
+
+## Usage Example Flow
+
+1. **Frontend collects open tasks** (status pending/in-progress) scoped to current user.
+2. **Fetch historical completions** via TaskHistory query limited to last 90 days.
+3. **Invoke service methods** to compute forecasts and generate weekly plan.
+4. **Render results**: Display forecast times, warnings, and confidence meters; prefill editable schedule blocks.
+5. **Persist schedule**: After user confirmation, save WeeklySchedule blocks and log adjustments.
+6. **Continuous learning**: On task completion, append TaskHistory records to improve future predictions.
+
+---
+
+## Critical Reminders
+
+1. Learning quality improves significantly after ~10 logged completions.
+2. Always fall back to cold-start defaults when data is sparse.
+3. Maintain the feedback loop—log every completion to TaskHistory.
+4. Never allow overlapping schedule blocks for a single user.
+5. Highlight overload/burnout risks when consecutive high-work days appear.
+6. Keep predictions within 15 minutes–8 hours to prevent unrealistic expectations.
+7. Communicate low-confidence results with explicit warnings in the UI.
+
+---
+
+## Separation of Concerns
+
+- **This Module (Backend):** Prediction logic, historical analysis, data models
+- **Frontend/UI/UX:** Present suggestions, warnings, allow user scheduling
+- **Integration Point:** Service provides predictions and warnings; frontend visualizes and persists schedule
+- **Framework Rules:** Refer to Laravel Boosts for all implementation and code standards
