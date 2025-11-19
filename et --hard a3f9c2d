@@ -1,0 +1,35 @@
+[33mcommit 3e5d59543a31d52186fa6a2a0c2f5ad5e5208109[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m)[m
+Author: Andrew <aandrewjuan1@gmail.com>
+Date:   Wed Nov 19 13:57:38 2025 +0800
+
+    feat: added rules
+
+[33mcommit 984859545cd27205cbafdcc5198717f4b7f40c81[m
+Author: Andrew <aandrewjuan1@gmail.com>
+Date:   Sun Nov 16 12:19:38 2025 +0800
+
+    feat: installed laravel reverb
+
+[33mcommit b607a220265845a7cbc7c8f9501239bbba3514a1[m
+Author: Andrew <aandrewjuan1@gmail.com>
+Date:   Thu Nov 13 19:38:40 2025 +0800
+
+    feat: added mdc
+
+[33mcommit 84ff495a171f19b744934a0b459857d8e5abc875[m
+Author: Andrew <aandrewjuan1@gmail.com>
+Date:   Tue Nov 11 22:00:14 2025 +0800
+
+    feat: added another layer to check if the user has eac email
+
+[33mcommit b61e331937870f777bec502d781e310f349e9596[m
+Author: Andrew <aandrewjuan1@gmail.com>
+Date:   Tue Nov 11 19:41:06 2025 +0800
+
+    idk
+
+[33mcommit 8396a5597bcd7c1aefa90c2c515da2e0de7ab56b[m
+Author: Andrew <aandrewjuan1@gmail.com>
+Date:   Thu Nov 6 19:54:55 2025 +0800
+
+    first commit
