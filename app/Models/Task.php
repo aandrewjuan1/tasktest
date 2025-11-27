@@ -25,6 +25,7 @@ class Task extends Model
         'start_date',
         'end_date',
         'project_id',
+        'event_id',
         'completed_at',
     ];
 
@@ -46,6 +47,11 @@ class Task extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function event(): BelongsTo
+    {
+        return $this->belongsTo(Event::class);
     }
 
     public function tags(): BelongsToMany
