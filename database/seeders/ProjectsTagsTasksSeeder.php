@@ -54,6 +54,12 @@ class ProjectsTagsTasksSeeder extends Seeder
 
         $this->command->info("Created {$projects->count()} projects");
 
+        foreach ($projects as $project) {
+            $project->tags()->attach(
+                $tags->random(rand(1, 3))->pluck('id')
+            );
+        }
+
         // Create tasks for the user
         $this->command->info('Creating tasks...');
 

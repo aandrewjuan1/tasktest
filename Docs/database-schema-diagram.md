@@ -49,6 +49,7 @@ projects
 **Relationships:**
 - `belongsTo` → user
 - `hasMany` → tasks
+- `morphToMany` → tags (via taggables)
 
 ---
 
@@ -77,7 +78,7 @@ tasks
 - `belongsTo` → user
 - `belongsTo` → project
 - `belongsTo` → event
-- `belongsToMany` → tags (via tag_task)
+- `morphToMany` → tags (via taggables)
 - `hasOne` → recurring_task
 - `hasMany` → pomodoro_sessions
 - `morphMany` → reminders
@@ -164,7 +165,7 @@ events
 - `belongsTo` → user
 - `belongsTo` → recurring_event
 - `hasMany` → tasks
-- `belongsToMany` → tags (via tag_events)
+- `morphToMany` → tags (via taggables)
 - `morphMany` → reminders
 
 ### 🔄 Recurring Events
@@ -246,25 +247,17 @@ tags
 └── updated_at
 ```
 **Relationships:**
-- `belongsToMany` → tasks (via tag_task)
-- `belongsToMany` → events (via tag_events)
+- `morphedByMany` → tasks (via taggables)
+- `morphedByMany` → events (via taggables)
+- `morphedByMany` → projects (via taggables)
 
-### 🔗 Tag-Task Pivot
+### 🔗 Taggables Pivot
 ```
-tag_task
+taggables
 ├── id (PK)
 ├── tag_id (FK → tags)
-├── task_id (FK → tasks)
-├── created_at
-└── updated_at
-```
-
-### 🔗 Tag-Event Pivot
-```
-tag_events
-├── id (PK)
-├── tag_id (FK → tags)
-├── event_id (FK → events)
+├── taggable_id (morph)
+├── taggable_type (Task, Event, Project)
 ├── created_at
 └── updated_at
 ```
@@ -459,7 +452,7 @@ USER (1) ───────────────── (Many) PROJECT
   │
   ├────────────────────── (Many) TASK
   │                          │
-  │                          ├─── (Many) TAG (via tag_task)
+  │                          ├─── (Many) TAG (via polymorphic taggables)
   │                          │
   │                          ├─── (1) RECURRING_TASK
   │                          │      │
@@ -473,7 +466,11 @@ USER (1) ───────────────── (Many) PROJECT
   │                          │
   │                          ├─── (Many) TASK
   │                          │
-  │                          ├─── (Many) TAG (via tag_events)
+  │                          ├─── (Many) TAG (via polymorphic taggables)
+  │
+  ├────────────────────── (Many) PROJECT
+  │                          │
+  │                          ├─── (Many) TAG (via polymorphic taggables)
   │                          │
   │                          └─── (1) RECURRING_EVENT
   │                                 │
@@ -534,7 +531,7 @@ Both tasks and events support recurring patterns with:
 | **Projects** | 1 | Project organization |
 | **Tasks** | 4 | Tasks with recurring patterns |
 | **Events** | 4 | Calendar events with recurring patterns |
-| **Tags** | 3 | Tagging system with pivots |
+| **Tags** | 2 | Tags with polymorphic assignments |
 | **Pomodoro** | 2 | Time tracking sessions and settings |
 | **Notifications** | 3 | Reminders, notifications, preferences |
 | **System** | 5 | Cache, jobs, failed jobs |

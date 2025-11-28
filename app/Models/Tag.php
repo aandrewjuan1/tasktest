@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
 
 class Tag extends Model
 {
@@ -14,13 +14,18 @@ class Tag extends Model
         'name',
     ];
 
-    public function tasks(): BelongsToMany
+    public function tasks(): MorphToMany
     {
-        return $this->belongsToMany(Task::class);
+        return $this->morphedByMany(Task::class, 'taggable');
     }
 
-    public function events(): BelongsToMany
+    public function events(): MorphToMany
     {
-        return $this->belongsToMany(Event::class);
+        return $this->morphedByMany(Event::class, 'taggable');
+    }
+
+    public function projects(): MorphToMany
+    {
+        return $this->morphedByMany(Project::class, 'taggable');
     }
 }
