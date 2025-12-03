@@ -56,6 +56,30 @@ class User extends Authenticatable
     }
 
     /**
+     * Assistant conversations owned by the user.
+     */
+    public function assistantConversations(): HasMany
+    {
+        return $this->hasMany(AssistantConversation::class);
+    }
+
+    /**
+     * Assistant interactions logged by the user.
+     */
+    public function assistantInteractions(): HasMany
+    {
+        return $this->hasMany(AssistantInteraction::class);
+    }
+
+    /**
+     * Assistant feedback provided by the user.
+     */
+    public function assistantFeedback(): HasMany
+    {
+        return $this->hasMany(AssistantFeedback::class);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

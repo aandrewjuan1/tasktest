@@ -382,6 +382,121 @@ notification_preferences
 
 ---
 
+## LLM Assistant System
+
+### 🤖 Assistant Conversations
+```
+assistant_conversations
+├── id (PK)
+├── user_id (FK → users)
+├── title
+├── context_snapshot (json)
+├── started_at (timestamp)
+├── last_message_at (timestamp)
+├── is_active (boolean)
+├── created_at
+├── updated_at
+└── deleted_at (soft delete)
+```
+**Relationships:**
+- `belongsTo` → user
+- `hasMany` → assistant_messages
+
+### 💬 Assistant Messages
+```
+assistant_messages
+├── id (PK)
+├── conversation_id (FK → assistant_conversations)
+├── role (enum: user, assistant, system)
+├── content (text)
+├── tool_calls (json)
+├── metadata (json)
+├── created_at
+└── updated_at
+```
+**Relationships:**
+- `belongsTo` → assistant_conversation
+- `hasMany` → assistant_tool_executions
+- `morphMany` → assistant_feedback
+
+### 📊 Assistant Interactions
+```
+assistant_interactions
+├── id (PK)
+├── user_id (FK → users)
+├── interaction_type (enum: smart_prioritize, smart_schedule,
+│                           chat, summary, automation)
+├── entity_type (polymorphic)
+├── entity_id (polymorphic)
+├── prompt_snapshot (json)
+├── response_data (json)
+├── reasoning_snippet (text)
+├── model_used
+├── tokens_used
+├── latency_ms
+├── created_at
+└── updated_at
+```
+**Relationships:**
+- `belongsTo` → user
+- `morphTo` → entity (Task, Event, Project, etc.)
+- `hasMany` → assistant_tool_executions
+- `morphMany` → assistant_feedback
+
+### 🔧 Assistant Tool Executions
+```
+assistant_tool_executions
+├── id (PK)
+├── message_id (FK → assistant_messages, nullable)
+├── interaction_id (FK → assistant_interactions, nullable)
+├── tool_name
+├── input_parameters (json)
+├── output_result (json)
+├── execution_status (enum: pending, success, failed)
+├── error_message (text)
+├── executed_at (timestamp)
+├── created_at
+└── updated_at
+```
+**Relationships:**
+- `belongsTo` → assistant_message
+- `belongsTo` → assistant_interaction
+
+### 👍 Assistant Feedback
+```
+assistant_feedback
+├── id (PK)
+├── user_id (FK → users)
+├── feedbackable_type (polymorphic)
+├── feedbackable_id (polymorphic)
+├── rating (enum: thumbs_up, thumbs_down, neutral)
+├── feedback_text (text)
+├── improvement_suggestion (text)
+├── created_at
+└── updated_at
+```
+**Relationships:**
+- `belongsTo` → user
+- `morphTo` → feedbackable (AssistantMessage or AssistantInteraction)
+
+### 📋 Assistant Schemas
+```
+assistant_schemas
+├── id (PK)
+├── schema_name (unique)
+├── schema_type (enum: prioritization, scheduling, summary,
+│                      action_confirmation, tool_definition)
+├── json_schema (json)
+├── version
+├── is_active (boolean)
+├── created_at
+└── updated_at
+```
+**Relationships:**
+- None (registry table)
+
+---
+
 ## System Tables (Laravel Standard)
 
 ### 💾 Sessions
@@ -484,7 +599,19 @@ USER (1) ───────────────── (Many) PROJECT
   │
   ├────────────────────── (1) POMODORO_SETTINGS
   │
-  └────────────────────── (1) NOTIFICATION_PREFERENCES
+  ├────────────────────── (1) NOTIFICATION_PREFERENCES
+  │
+  ├────────────────────── (Many) ASSISTANT_CONVERSATION
+  │                          │
+  │                          └─── (Many) ASSISTANT_MESSAGE
+  │                                  │
+  │                                  └─── (Many) ASSISTANT_TOOL_EXECUTION
+  │
+  ├────────────────────── (Many) ASSISTANT_INTERACTION (polymorphic: Task/Event/Project)
+  │                          │
+  │                          └─── (Many) ASSISTANT_TOOL_EXECUTION
+  │
+  └────────────────────── (Many) ASSISTANT_FEEDBACK (polymorphic: Message/Interaction)
 ```
 
 ---
@@ -501,6 +628,9 @@ Both tasks and events support recurring patterns with:
 ### 🏷️ Polymorphic Relationships
 - **Reminders**: Can be attached to Tasks or Events
 - **Notifications**: Can reference any notifiable entity
+- **Tags**: Can be attached to Tasks, Events, or Projects
+- **Assistant Interactions**: Can reference Tasks, Events, or Projects
+- **Assistant Feedback**: Can be attached to Messages or Interactions
 
 ### 📊 Cascade Deletion Strategy
 - User deletion → cascades to all user-owned entities
@@ -508,6 +638,9 @@ Both tasks and events support recurring patterns with:
 - Event deletion → nullifies associated tasks (sets event_id to null)
 - Task/Event deletion → cascades to related recurring patterns, instances, and exceptions
 - Tag deletion → removes pivot table entries
+- Conversation deletion → cascades to messages and tool executions (soft delete enabled)
+- Message deletion → cascades to tool executions
+- Interaction deletion → cascades to tool executions
 
 ### 🎯 Status Tracking
 - **Tasks**: `to_do`, `doing`, `done`
@@ -534,11 +667,12 @@ Both tasks and events support recurring patterns with:
 | **Tags** | 2 | Tags with polymorphic assignments |
 | **Pomodoro** | 2 | Time tracking sessions and settings |
 | **Notifications** | 3 | Reminders, notifications, preferences |
+| **LLM Assistant** | 6 | Conversations, messages, interactions, tools, feedback, schemas |
 | **System** | 5 | Cache, jobs, failed jobs |
-| **Total** | **24** | Complete database tables |
+| **Total** | **30** | Complete database tables |
 
 ---
 
-*Generated on: 2025-11-27*
+*Generated on: 2025-11-28*
 *Laravel Version: 12*
 *Database: MySQL/PostgreSQL compatible*

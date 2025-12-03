@@ -1,14 +1,14 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Auth;
 use App\Models\User as AppUser;
 use Illuminate\Auth\Events\Registered;
-use Laravel\WorkOS\WorkOS as WorkOSFacade;
-use WorkOS\UserManagement;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Route;
 use Laravel\WorkOS\Http\Requests\AuthKitAuthenticationRequest;
 use Laravel\WorkOS\Http\Requests\AuthKitLoginRequest;
 use Laravel\WorkOS\Http\Requests\AuthKitLogoutRequest;
+use Laravel\WorkOS\WorkOS as WorkOSFacade;
+use WorkOS\UserManagement;
 
 Route::get('login', function (AuthKitLoginRequest $request) {
     return $request->redirect();
