@@ -87,18 +87,6 @@ test('user cannot update another user task', function () {
     expect($task->fresh()->title)->toBe('Other User Task');
 });
 
-test('user can delete their task', function () {
-    $user = User::factory()->create();
-    $task = Task::factory()->for($user)->create();
-
-    $this->actingAs($user);
-
-    Volt::test('tasks.index')
-        ->call('deleteTask', $task->id);
-
-    expect(Task::find($task->id))->toBeNull();
-});
-
 test('user cannot delete another user task', function () {
     $user = User::factory()->create();
     $otherUser = User::factory()->create();
@@ -110,6 +98,7 @@ test('user cannot delete another user task', function () {
         ->call('deleteTask', $task->id);
 
     expect(Task::find($task->id))->not->toBeNull();
+    expect(Task::withTrashed()->find($task->id)->trashed())->toBeFalse();
 });
 
 test('user can toggle task completion', function () {
@@ -344,4 +333,45 @@ test('update task status in kanban view', function () {
         ->call('updateTaskStatus', $task->id, 'doing');
 
     expect($task->fresh()->status)->toBe('doing');
+});
+
+test('user can restore a soft deleted task', function () {
+    $user = User::factory()->create();
+    $task = Task::factory()->for($user)->create(['title' => 'Restorable Task']);
+
+    $task->delete();
+
+    expect(Task::find($task->id))->toBeNull();
+    expect(Task::withTrashed()->find($task->id)->trashed())->toBeTrue();
+
+    $task->restore();
+
+    expect(Task::find($task->id))->not->toBeNull();
+    expect(Task::find($task->id)->trashed())->toBeFalse();
+});
+
+test('user can force delete a task permanently', function () {
+    $user = User::factory()->create();
+    $task = Task::factory()->for($user)->create(['title' => 'Permanently Deleted Task']);
+
+    $taskId = $task->id;
+    $task->forceDelete();
+
+    expect(Task::find($taskId))->toBeNull();
+    expect(Task::withTrashed()->find($taskId))->toBeNull();
+});
+
+test('soft deleted tasks can be queried with withTrashed', function () {
+    $user = User::factory()->create();
+
+    $activeTask = Task::factory()->for($user)->create(['title' => 'Active']);
+    $deletedTask = Task::factory()->for($user)->create(['title' => 'Deleted']);
+    $deletedTask->delete();
+
+    $allTasks = Task::withTrashed()->where('user_id', $user->id)->get();
+    $onlyDeleted = Task::onlyTrashed()->where('user_id', $user->id)->get();
+
+    expect($allTasks)->toHaveCount(2);
+    expect($onlyDeleted)->toHaveCount(1);
+    expect($onlyDeleted->first()->title)->toBe('Deleted');
 });
