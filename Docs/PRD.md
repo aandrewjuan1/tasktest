@@ -6,7 +6,7 @@ This document outlines the requirements for **TASKLYST**: a web-based task manag
 
 ## Overview
 
-**TASKLYST** allows users to manage tasks, projects, schedules, notifications, pomodoro sessions, and assistant-driven automations through a cohesive workspace. Livewire + Flux UI provide the interactive experience, while Prism-powered AI services deliver contextual insights such as smart prioritization, scheduling, and conversational support.
+**TASKLYST** allows users to manage tasks, projects, events, notifications, pomodoro sessions, and assistant-driven automations through a cohesive workspace. Livewire + Flux UI provide the interactive experience, while Prism-powered AI services deliver contextual insights such as smart prioritization, scheduling, and conversational support.
 
 ---
 
@@ -18,11 +18,10 @@ This document outlines the requirements for **TASKLYST**: a web-based task manag
 - Widgets reuse underlying module data (tasks, projects, scheduling, notifications) and refresh via Livewire polling or broadcast events.
 
 ### Workspace
-- Unified space to manage tasks, events, and projects with Kanban and list views, drag-and-drop status changes, inline edits, and quick filters using Flux UI fields.
+- Unified space to manage tasks, events, and projects with drag-and-drop status changes, inline edits, and quick filters.
+- Three types to view: lists, kanban boards, weekly with timegrids.
 - Creation and edit forms expose recurrence, reminders, tags, pomodoro links, and Smart Prioritize/Smart Schedule triggers.
 - Provides bulk actions, tag filters, project grouping, and in-context assistant suggestions across item types.
-- Weekly view (time grid) that combines tasks, events, and projects into a timezone-aware schedule, supporting drag-to-move/resize interactions, inline reminder/tag management, and Reverb-powered real-time updates.
-- Calendar view offering a monthly perspective of tasks, events, and projects, integrating Smart Schedule recommendations and displaying proposed holds directly in the grid.
 
 ### Analytics
 - Focused on project progress, task completion trends, pomodoro productivity, and notification engagement.
