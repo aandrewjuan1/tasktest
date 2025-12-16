@@ -538,7 +538,7 @@ Output: JSON with prioritized project list and reasoning
 Send minimal context + structured prompt to Hermes 3 and receive structured recommendations.
 
 ### Implementation Note (PrismPHP Structured Output)
-If you implement the LLM call using PrismPHP, prefer **structured output with an explicit schema** (i.e., use Prism’s structured JSON mode + a schema) so the model is constrained to the expected shape. This should align with the same intent/entity schemas used in Phase 2 and validated by the response parser.
+If you implement the LLM call using PrismPHP, prefer **structured output with an explicit schema** (i.e., use Prism’s structured JSON mode + a schema) so the model is constrained to the expected shape. This should align with the same intent/entity schemas used in Phase 2 and validated by the response parser. In practice, this means using Prism's structured API (for example, `Prism::structured()->using(...)->schema(...)->asStructured()`) and **never trusting free‑form JSON** from the model without schema validation.
 
 ### What Happens
 1. **Format Request**
@@ -794,14 +794,14 @@ If user modifies recommendation:
 Before any database change:
 
 1. **Syntax Validation**
-   - **Tasks**: Dates valid format, times within work hours, durations reasonable (>0, <12 hours typically)
-   - **Events**: DateTime valid format, timezone valid, end_datetime > start_datetime
-   - **Projects**: Dates valid format, end_date >= start_date
+   - **Tasks**: Dates valid format, times within work hours, durations reasonable (>0, <12 hours typically) — all computed and verified in backend code, not by the LLM
+   - **Events**: DateTime valid format, timezone valid, end_datetime > start_datetime — overlaps and gaps are calculated in backend code only
+   - **Projects**: Dates valid format, end_date >= start_date — any roll‑up timeline math is done in backend code
 
 2. **Business Logic Validation**
-   - **Tasks**: No scheduling conflicts with events or other tasks, dependencies met, user capacity not exceeded, deadline respected
-   - **Events**: No overlapping events (configurable), no conflicts with tasks, timezone handling correct
-   - **Projects**: Milestone dates within project range, task dependencies respected, timeline realistic
+   - **Tasks**: No scheduling conflicts with events or other tasks, dependencies met, user capacity not exceeded, deadline respected — conflicts and capacity checks are fully deterministic rules, not delegated to the LLM
+   - **Events**: No overlapping events (configurable), no conflicts with tasks, timezone handling correct — all overlap detection and timezone math is done in backend code
+   - **Projects**: Milestone dates within project range, task dependencies respected, timeline realistic — project‑level constraints are enforced by backend rules, with LLM used only for ranking and suggestion
 
 3. **Cross-Entity Validation**
    - Event/task conflicts (if task has scheduled time)
@@ -1180,6 +1180,17 @@ Rule-based fallback logic:
 - [ ] Implement error handling
 - [ ] Add request logging (with entity_type)
 - [ ] Setup performance monitoring per entity type
+- [ ] Use Prism (or equivalent) structured output mode with explicit JSON schema per intent/entity
+- [ ] Reject or fallback on any response that fails schema validation (never silently accept malformed JSON)
+
+### Testing “Golden Paths” (End‑to‑End)
+- [ ] Define at least 2–3 **canonical scenarios** per core intent (e.g., `schedule_task`, `prioritize_tasks`, `schedule_event`)
+- [ ] For each scenario, fix:
+  - [ ] Input utterance (user message)
+  - [ ] Expected context payload (Phase 2)
+  - [ ] Expected structured LLM output shape (fields + types, not exact wording)
+  - [ ] Expected backend validation behavior and final database changes
+- [ ] Automate these as end‑to‑end tests so future changes to prompts, schemas, or context preparation cannot silently break the pipeline
 
 ### Phase 5: Display Layer
 - [ ] Design recommendation card UI (entity-specific)
