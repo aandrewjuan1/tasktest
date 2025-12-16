@@ -43,6 +43,7 @@ projects
 ├── description
 ├── start_date
 ├── end_date
+├── deleted_at
 ├── created_at
 └── updated_at
 ```
@@ -71,6 +72,7 @@ tasks
 ├── start_date
 ├── end_date
 ├── completed_at
+├── deleted_at
 ├── created_at
 └── updated_at
 ```
@@ -158,6 +160,7 @@ events
 ├── location
 ├── color
 ├── status (enum: scheduled, cancelled, completed, tentative)
+├── deleted_at
 ├── created_at
 └── updated_at
 ```
@@ -498,6 +501,9 @@ Both tasks and events support recurring patterns with:
 - **Instances**: Generated occurrences of the recurring pattern
 - **Exceptions**: Override or cancel specific instances
 
+### 🗑️ Soft Deletes
+- Projects, tasks, and events use soft deletes (`deleted_at`); relationships honor null-on-delete where defined.
+
 ### 🏷️ Polymorphic Relationships
 - **Reminders**: Can be attached to Tasks or Events
 - **Notifications**: Can reference any notifiable entity
@@ -542,4 +548,4 @@ Both tasks and events support recurring patterns with:
 
 *Generated on: 2025-11-28*
 *Laravel Version: 12*
-*Database: MySQL/PostgreSQL compatible*
+*Database: SQLite (local) / MySQL/PostgreSQL compatible*

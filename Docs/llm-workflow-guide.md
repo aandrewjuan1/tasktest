@@ -5,20 +5,22 @@
 
 ## Core Workflow Overview
 
+The user communicates with the system through a chatbot interface (conversational UI), so all requests and responses flow through that chat surface.
+
 ```
-User Natural Language Input
+User Natural Language Input (via Chatbot UI)
     ↓
 Intent Classification + Entity Detection (Fast - No LLM)
     ↓
 Route to Appropriate Handler (Task/Event/Project)
     ↓
-Context Preparation (Minimal, Surgical)
+Context Retrieval + Preparation (Minimal, Surgical, Structured)
     ↓
 LLM Inference (Hermes 3 3B)
     ↓
 Structured Output (JSON with Reasoning)
     ↓
-Display to User (Explainable Recommendations)
+Chatbot Response to User (Explainable Recommendations + Actions)
     ↓
 User Action (Accept/Modify/Reject)
     ↓
@@ -126,7 +128,11 @@ Before intent classification, detect which entity type the user is referring to:
 Gather **only the necessary data** to help Hermes 3 make an informed decision. More context = slower + more tokens + higher hallucination risk.
 
 ### What Happens
-Query the database for relevant information tailored to the detected intent.
+1. **Retrieve**: query the database for relevant information tailored to the detected intent.
+2. **Structure**: transform that raw data into a small, predictable, machine-readable payload (typically JSON) using an intent + entity-specific schema.
+3. **Inject**: include that structured context payload in the LLM request (alongside the system prompt and the user’s chat message).
+
+This ensures the LLM sees consistent fields (instead of ad-hoc text dumps), which improves parsing reliability and reduces hallucinations.
 
 ### Context Structure by Intent and Entity Type
 
@@ -368,6 +374,7 @@ Each intent gets a **specific, tailored system prompt** (not generic).
    - Response format (JSON only, no markdown)
    - Required fields
    - No extra text before/after JSON
+   - Must conform to the provided JSON schema for the detected intent + entity type (field names, types, required/optional fields)
 
 5. **Tone & Behavior**
    - Be concise
@@ -508,6 +515,7 @@ Output: JSON with prioritized project list and reasoning
 
 ### Prompt Best Practices
 - ✅ Be specific about output format
+- ✅ Include/attach a JSON schema (or an explicit schema-like field list) and instruct Hermes 3 to output **only** JSON that conforms to it
 - ✅ Provide step-by-step reasoning framework
 - ✅ Include user context inline
 - ✅ Set temperature to 0.3 (low creativity, high consistency)
@@ -529,6 +537,9 @@ Output: JSON with prioritized project list and reasoning
 ### Purpose
 Send minimal context + structured prompt to Hermes 3 and receive structured recommendations.
 
+### Implementation Note (PrismPHP Structured Output)
+If you implement the LLM call using PrismPHP, prefer **structured output with an explicit schema** (i.e., use Prism’s structured JSON mode + a schema) so the model is constrained to the expected shape. This should align with the same intent/entity schemas used in Phase 2 and validated by the response parser.
+
 ### What Happens
 1. **Format Request**
    - System prompt (role + analysis framework)
@@ -542,8 +553,8 @@ Send minimal context + structured prompt to Hermes 3 and receive structured reco
    - Timeout: 30 seconds
 
 3. **Parse Response**
-   - Extract JSON from response (handle markdown code blocks)
-   - Validate structure
+   - Extract JSON from response (handle markdown code blocks if the model misbehaves)
+   - Validate against the intent/entity JSON schema (types + required fields)
    - Handle parsing errors gracefully
 
 4. **Log Interaction**
@@ -644,7 +655,7 @@ Hermes 3 should always return structured JSON with entity type support:
 ## Phase 5: Structured Output Display
 
 ### Purpose
-Show the user **both the recommendation AND the reasoning** in a transparent, understandable format.
+Show the user **both the recommendation AND the reasoning** in a transparent, understandable format, rendered directly in the chatbot interface (with clear action buttons for Accept / Modify / Reject).
 
 ### Display Components
 
