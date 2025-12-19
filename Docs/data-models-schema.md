@@ -17,6 +17,8 @@ erDiagram
     User ||--o{ PomodoroSession : "has many"
     User ||--o{ Reminder : "has many"
     User ||--o{ Notification : "has many"
+    User ||--o{ Collaboration : "has many"
+    User ||--o{ Message : "has many"
 
     %% Task Relationships
     Task }o--|| User : "belongs to"
@@ -27,6 +29,8 @@ erDiagram
     Task }o--o{ Tag : "morphToMany"
     Task }o--o{ Reminder : "morphMany"
     Task }o--o{ Notification : "morphMany"
+    Task }o--o{ Collaboration : "morphMany"
+    Task }o--o{ Message : "morphMany"
 
     %% Event Relationships
     Event }o--|| User : "belongs to"
@@ -34,6 +38,8 @@ erDiagram
     Event }o--o{ Tag : "morphToMany"
     Event }o--o{ Reminder : "morphMany"
     Event }o--o{ Notification : "morphMany"
+    Event }o--o{ Collaboration : "morphMany"
+    Event }o--o{ Message : "morphMany"
 
     %% Project Relationships
     Project }o--|| User : "belongs to"
@@ -41,6 +47,8 @@ erDiagram
     Project }o--o{ Tag : "morphToMany"
     Project }o--o{ Reminder : "morphMany"
     Project }o--o{ Notification : "morphMany"
+    Project }o--o{ Collaboration : "morphMany"
+    Project }o--o{ Message : "morphMany"
 
     %% Recurring Task Relationships
     RecurringTask }o--|| Task : "belongs to"
@@ -83,6 +91,18 @@ erDiagram
     Notification }o--o| Task : "notifiable"
     Notification }o--o| Event : "notifiable"
     Notification }o--o| Project : "notifiable"
+
+    %% Collaboration Polymorphic
+    Collaboration }o--|| User : "belongs to"
+    Collaboration }o--o| Task : "collaboratable"
+    Collaboration }o--o| Event : "collaboratable"
+    Collaboration }o--o| Project : "collaboratable"
+
+    %% Message Polymorphic
+    Message }o--|| User : "belongs to"
+    Message }o--o| Task : "messageable"
+    Message }o--o| Event : "messageable"
+    Message }o--o| Project : "messageable"
 
     %% User Model
     User {
@@ -336,6 +356,28 @@ erDiagram
         datetime created_at
         datetime updated_at
     }
+
+    %% Collaboration Model
+    Collaboration {
+        integer id PK
+        varchar collaboratable_type
+        integer collaboratable_id
+        integer user_id FK
+        varchar permission
+        datetime created_at
+        datetime updated_at
+    }
+
+    %% Message Model
+    Message {
+        integer id PK
+        varchar messageable_type
+        integer messageable_id
+        integer user_id FK
+        text content
+        datetime created_at
+        datetime updated_at
+    }
 ```
 
 ## Core Models
@@ -376,10 +418,17 @@ events(): HasMany
 pomodoroSessions(): HasMany
 reminders(): HasMany
 notifications(): HasMany
+collaborations(): HasMany
+messages(): HasMany
 
 // Has One
 pomodoroSettings(): HasOne
 notificationPreferences(): HasOne
+
+// Morph To Many
+collaboratedTasks(): MorphToMany
+collaboratedEvents(): MorphToMany
+collaboratedProjects(): MorphToMany
 ```
 
 #### Fillable Attributes
@@ -454,9 +503,12 @@ pomodoroSessions(): HasMany
 // Morph Many
 reminders(): MorphMany
 notifications(): MorphMany
+collaborations(): MorphMany
+messages(): MorphMany
 
 // Morph To Many
 tags(): MorphToMany
+collaborators(): MorphToMany
 ```
 
 #### Fillable Attributes
@@ -484,6 +536,14 @@ tags(): MorphToMany
 #### Traits
 
 - `SoftDeletes` - Enables soft deletion
+
+#### Collaboration Methods
+
+- `isCollaborator(User $user): bool` - Check if user is a collaborator
+- `getCollaboratorPermission(User $user): ?string` - Get user's permission level
+- `canUserEdit(User $user): bool` - Check if user can edit (owner or edit permission)
+- `canUserComment(User $user): bool` - Check if user can comment (owner or comment/edit permission)
+- `canUserView(User $user): bool` - Check if user can view (owner or any collaborator)
 
 ---
 
@@ -537,9 +597,12 @@ tasks(): HasMany
 // Morph Many
 reminders(): MorphMany
 notifications(): MorphMany
+collaborations(): MorphMany
+messages(): MorphMany
 
 // Morph To Many
 tags(): MorphToMany
+collaborators(): MorphToMany
 ```
 
 #### Fillable Attributes
@@ -564,6 +627,14 @@ tags(): MorphToMany
 #### Traits
 
 - `SoftDeletes` - Enables soft deletion
+
+#### Collaboration Methods
+
+- `isCollaborator(User $user): bool` - Check if user is a collaborator
+- `getCollaboratorPermission(User $user): ?string` - Get user's permission level
+- `canUserEdit(User $user): bool` - Check if user can edit (owner or edit permission)
+- `canUserComment(User $user): bool` - Check if user can comment (owner or comment/edit permission)
+- `canUserView(User $user): bool` - Check if user can view (owner or any collaborator)
 
 ---
 
@@ -607,9 +678,12 @@ tasks(): HasMany
 // Morph Many
 reminders(): MorphMany
 notifications(): MorphMany
+collaborations(): MorphMany
+messages(): MorphMany
 
 // Morph To Many
 tags(): MorphToMany
+collaborators(): MorphToMany
 ```
 
 #### Fillable Attributes
@@ -628,6 +702,14 @@ tags(): MorphToMany
 #### Traits
 
 - `SoftDeletes` - Enables soft deletion
+
+#### Collaboration Methods
+
+- `isCollaborator(User $user): bool` - Check if user is a collaborator
+- `getCollaboratorPermission(User $user): ?string` - Get user's permission level
+- `canUserEdit(User $user): bool` - Check if user can edit (owner or edit permission)
+- `canUserComment(User $user): bool` - Check if user can comment (owner or comment/edit permission)
+- `canUserView(User $user): bool` - Check if user can view (owner or any collaborator)
 
 ---
 
@@ -1377,11 +1459,141 @@ task(): BelongsTo
 
 ---
 
+## Collaboration Models
+
+### Collaboration Model
+
+**Table:** `collaborations`
+**Model:** `App\Models\Collaboration`
+**Purpose:** Manages user collaborations on tasks, events, and projects with permission-based access control
+
+#### Schema
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | integer | Primary Key | Auto-incrementing ID |
+| `collaboratable_type` | varchar(255) | | Polymorphic type (Task, Event, Project) |
+| `collaboratable_id` | integer | | Polymorphic ID |
+| `user_id` | integer | Foreign Key → `users.id` (CASCADE) | User who is the collaborator |
+| `permission` | varchar(20) | | Permission level: 'view', 'comment', 'edit' |
+| `created_at` | datetime | | Creation timestamp |
+| `updated_at` | datetime | | Last update timestamp |
+
+#### Indexes
+
+- Primary Key: `id`
+- Unique: `collaboratable_type`, `collaboratable_id`, `user_id` (`collaborations_unique`)
+- Index: `user_id`
+- Composite Index: `collaboratable_type`, `collaboratable_id`
+
+#### Foreign Keys
+
+- `user_id` → `users.id` (ON DELETE: CASCADE)
+
+#### Model Relationships
+
+```php
+// Morph To
+collaboratable(): MorphTo
+
+// Belongs To
+user(): BelongsTo
+```
+
+#### Fillable Attributes
+
+- `collaboratable_type`
+- `collaboratable_id`
+- `user_id`
+- `permission`
+
+#### Permission Constants
+
+- `PERMISSION_VIEW = 'view'` - Can only view the item
+- `PERMISSION_COMMENT = 'comment'` - Can view and send messages
+- `PERMISSION_EDIT = 'edit'` - Can view, comment, and edit the item
+
+#### Methods
+
+- `canEdit(): bool` - Check if permission is edit
+- `canComment(): bool` - Check if permission is comment or edit
+- `canView(): bool` - Always true (all permissions can view)
+
+#### Scopes
+
+- `byPermission(string $permission)` - Filter by permission level
+- `editors()` - Get collaborators with edit permission
+- `commenters()` - Get collaborators with comment or edit permission
+- `viewers()` - Get all collaborators
+
+---
+
+### Message Model
+
+**Table:** `messages`
+**Model:** `App\Models\Message`
+**Purpose:** Chat messages for collaborated items (tasks, events, projects)
+
+#### Schema
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | integer | Primary Key | Auto-incrementing ID |
+| `messageable_type` | varchar(255) | | Polymorphic type (Task, Event, Project) |
+| `messageable_id` | integer | | Polymorphic ID |
+| `user_id` | integer | Foreign Key → `users.id` (CASCADE) | User who sent the message |
+| `content` | text | | Message content |
+| `created_at` | datetime | | Creation timestamp |
+| `updated_at` | datetime | | Last update timestamp |
+
+#### Indexes
+
+- Primary Key: `id`
+- Index: `user_id`
+- Composite Index: `messageable_type`, `messageable_id`, `created_at` (`messages_item_created_index`)
+
+#### Foreign Keys
+
+- `user_id` → `users.id` (ON DELETE: CASCADE)
+
+#### Model Relationships
+
+```php
+// Morph To
+messageable(): MorphTo
+
+// Belongs To
+user(): BelongsTo
+```
+
+#### Fillable Attributes
+
+- `messageable_type`
+- `messageable_id`
+- `user_id`
+- `content`
+
+#### Casts
+
+- `created_at` → `datetime`
+- `updated_at` → `datetime`
+
+#### Scopes
+
+- `latest()` - Order by created_at descending
+- `forItem(string $type, int $id)` - Filter by messageable item
+
+#### Accessors
+
+- `formatted_time` - Human-readable timestamp (diffForHumans)
+
+---
+
 ## Summary of Relationships
 
 ### One-to-Many Relationships
 
-- **User** → Tasks, Events, Projects, PomodoroSessions, Reminders, Notifications
+- **User** → Tasks, Events, Projects, PomodoroSessions, Reminders, Notifications, Collaborations, Messages
 - **Project** → Tasks
 - **Task** → PomodoroSessions
 - **RecurringTask** → TaskInstances, TaskExceptions
@@ -1401,6 +1613,8 @@ task(): BelongsTo
 - **PomodoroSession** → User, Task
 - **Reminder** → User
 - **Notification** → User
+- **Collaboration** → User
+- **Message** → User
 - **PomodoroSettings** → User
 - **NotificationPreference** → User
 - **RecurringTask** → Task
@@ -1415,6 +1629,8 @@ task(): BelongsTo
 - **Tag** → Tasks, Events, Projects (via `taggables` pivot table)
 - **Reminder** → Tasks, Events, Projects (via `remindable_type` and `remindable_id`)
 - **Notification** → Tasks, Events, Projects, Pomodoro, Reminder, etc. (via `notifiable_type` and `notifiable_id`)
+- **Collaboration** → Tasks, Events, Projects (via `collaboratable_type` and `collaboratable_id`)
+- **Message** → Tasks, Events, Projects (via `messageable_type` and `messageable_id`)
 
 ### Soft Deletes
 
@@ -1425,7 +1641,7 @@ The following models use soft deletes:
 
 ### Foreign Key Constraints
 
-- **CASCADE DELETE**: When a User is deleted, all related Tasks, Events, Projects, PomodoroSessions, Reminders, and Notifications are deleted
+- **CASCADE DELETE**: When a User is deleted, all related Tasks, Events, Projects, PomodoroSessions, Reminders, Notifications, Collaborations, and Messages are deleted
 - **SET NULL**: When a Project or Event is deleted, related Tasks retain the foreign key but set it to NULL
 - **CASCADE DELETE**: RecurringTasks and RecurringEvents cascade delete their Instances and Exceptions
 

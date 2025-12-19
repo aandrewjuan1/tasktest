@@ -6,6 +6,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
@@ -110,6 +111,52 @@ class User extends Authenticatable
     public function notificationPreferences(): HasOne
     {
         return $this->hasOne(NotificationPreference::class);
+    }
+
+    /**
+     * Collaborations where user is a collaborator.
+     */
+    public function collaborations(): HasMany
+    {
+        return $this->hasMany(Collaboration::class);
+    }
+
+    /**
+     * Messages sent by the user.
+     */
+    public function messages(): HasMany
+    {
+        return $this->hasMany(Message::class);
+    }
+
+    /**
+     * Tasks user collaborates on.
+     */
+    public function collaboratedTasks(): MorphToMany
+    {
+        return $this->morphedByMany(Task::class, 'collaboratable', 'collaborations')
+            ->withPivot('permission')
+            ->withTimestamps();
+    }
+
+    /**
+     * Events user collaborates on.
+     */
+    public function collaboratedEvents(): MorphToMany
+    {
+        return $this->morphedByMany(Event::class, 'collaboratable', 'collaborations')
+            ->withPivot('permission')
+            ->withTimestamps();
+    }
+
+    /**
+     * Projects user collaborates on.
+     */
+    public function collaboratedProjects(): MorphToMany
+    {
+        return $this->morphedByMany(Project::class, 'collaboratable', 'collaborations')
+            ->withPivot('permission')
+            ->withTimestamps();
     }
 
     /**

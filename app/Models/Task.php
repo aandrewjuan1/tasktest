@@ -79,4 +79,74 @@ class Task extends Model
     {
         return $this->morphMany(Notification::class, 'notifiable');
     }
+
+    public function collaborations(): MorphMany
+    {
+        return $this->morphMany(Collaboration::class, 'collaboratable');
+    }
+
+    public function messages(): MorphMany
+    {
+        return $this->morphMany(Message::class, 'messageable');
+    }
+
+    public function collaborators(): MorphToMany
+    {
+        return $this->morphToMany(User::class, 'collaboratable', 'collaborations')
+            ->withPivot('permission')
+            ->withTimestamps();
+    }
+
+    public function isCollaborator(User $user): bool
+    {
+        return $this->collaborations()
+            ->where('user_id', $user->id)
+            ->exists();
+    }
+
+    public function getCollaboratorPermission(User $user): ?string
+    {
+        $collaboration = $this->collaborations()
+            ->where('user_id', $user->id)
+            ->first();
+
+        return $collaboration?->permission;
+    }
+
+    public function canUserEdit(User $user): bool
+    {
+        // Owner can always edit
+        if ($this->user_id === $user->id) {
+            return true;
+        }
+
+        // Check if user has edit permission
+        $permission = $this->getCollaboratorPermission($user);
+
+        return $permission === Collaboration::PERMISSION_EDIT;
+    }
+
+    public function canUserComment(User $user): bool
+    {
+        // Owner can always comment
+        if ($this->user_id === $user->id) {
+            return true;
+        }
+
+        // Check if user has comment or edit permission
+        $permission = $this->getCollaboratorPermission($user);
+
+        return in_array($permission, [Collaboration::PERMISSION_COMMENT, Collaboration::PERMISSION_EDIT]);
+    }
+
+    public function canUserView(User $user): bool
+    {
+        // Owner can always view
+        if ($this->user_id === $user->id) {
+            return true;
+        }
+
+        // Any collaborator can view
+        return $this->isCollaborator($user);
+    }
 }

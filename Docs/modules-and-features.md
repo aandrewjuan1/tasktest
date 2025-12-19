@@ -6,7 +6,7 @@ This document provides a comprehensive listing of all modules and features to be
 
 ## Module Architecture
 
-TaskLyst is organized into 9 core modules that work together to provide a comprehensive task and time management solution:
+TaskLyst is organized into 10 core modules that work together to provide a comprehensive task and time management solution:
 
 1. **User, Profile, and Preferences Module** - User account management and personalization
 2. **Projects and Task Management Module** - Core task and project organization
@@ -17,6 +17,7 @@ TaskLyst is organized into 9 core modules that work together to provide a compre
 7. **Reminders and Notification Delivery Module** - Alert and notification system
 8. **LLM Assistant and Recommendation Module** - AI-powered intelligent assistance
 9. **Dashboard and Analytics Module** - Overview and insights
+10. **Collaboration and Messaging Module** - Multi-user collaboration with permission-based access and messaging
 
 ---
 
@@ -1623,6 +1624,102 @@ Offers a summary view of active tasks, upcoming deadlines, calendar events, remi
 - **Module 4**: Event analytics
 - **Module 6**: Pomodoro analytics
 - **Module 7**: Notification analytics
+- **Module 10**: Collaboration analytics
+
+---
+
+## Module 10: Collaboration and Messaging Module
+
+### Purpose
+Enables users to collaborate on tasks, events, and projects with permission-based access control and per-item messaging functionality.
+
+### Database Models
+- `Collaboration` - Collaboration records with permissions
+- `Message` - Chat messages for collaborated items
+- Updates to `Task`, `Event`, `Project`, `User` models
+
+### Core Features
+
+#### Collaboration Management
+
+- **Add Collaborators**
+  - Add collaborators to tasks, events, and projects
+  - Set permission levels: view, comment, edit
+  - Only owners and users with edit permission can invite
+  - Prevent duplicate collaborations (unique constraint)
+
+- **Permission Management**
+  - Three permission levels:
+    - `view`: Can only view the item
+    - `comment`: Can view and send messages
+    - `edit`: Can view, comment, and edit the item
+  - Only owners can change permissions
+  - Owners always have full access
+
+- **Remove Collaborators**
+  - Remove collaborators (owners only)
+  - Cascade delete collaboration records
+
+#### Messaging
+
+- **Per-Item Chat Threads**
+  - Separate chat thread per item (task/event/project)
+  - All collaborators can send messages (any permission level)
+  - Message history persistence
+  - Real-time message updates (via Livewire polling)
+
+- **Message Features**
+  - Message content (text, max 5000 characters)
+  - Timestamp tracking
+  - Sender identification
+  - Human-readable timestamps (diffForHumans)
+
+#### Notifications
+
+- **Collaboration Notifications**
+  - Notify when added as collaborator
+  - Include item type, title, permission level
+  - Link to collaborated item
+
+- **Message Notifications**
+  - Notify all collaborators when new message posted
+  - Include sender name, item type, message preview
+  - Link to item chat
+  - Exclude sender from notifications
+
+### Advanced Features
+
+- **Permission Checks**
+  - Check if user can edit (owner or edit permission)
+  - Check if user can comment (owner or comment/edit permission)
+  - Check if user can view (owner or any collaborator)
+  - Helper methods on Task, Event, Project models
+
+- **Collaboration Queries**
+  - Filter collaborators by permission level
+  - Get editors, commenters, viewers separately
+  - Efficient querying with indexes
+
+- **User Collaboration Access**
+  - View all tasks user collaborates on
+  - View all events user collaborates on
+  - View all projects user collaborates on
+  - Access via User model relationships
+
+### User Interface Requirements
+- Collaboration management UI (add/remove/update permissions)
+- Chat interface component per item
+- Message list display
+- Message input form
+- Collaborator list display
+- Permission badges/indicators
+
+### Integration Points
+- **Module 1**: Uses User model for collaborators
+- **Module 2**: Tasks support collaboration
+- **Module 4**: Events support collaboration
+- **Module 7**: Notifications for collaboration events and messages
+- **Module 9**: Dashboard can show collaborated items and recent messages
 
 ---
 
@@ -1646,7 +1743,8 @@ Module 2 (Tasks/Projects)
   ├─→ Module 6 (Pomodoro) - Task sessions
   ├─→ Module 7 (Notifications) - Task reminders
   ├─→ Module 8 (LLM) - Task analysis
-  └─→ Module 9 (Dashboard) - Task analytics
+  ├─→ Module 9 (Dashboard) - Task analytics
+  └─→ Module 10 (Collaboration) - Task collaboration
 
 Module 3 (Recurring)
   ↓
@@ -1661,7 +1759,8 @@ Module 4 (Events)
   ├─→ Module 5 (Tags) - Event tagging
   ├─→ Module 7 (Notifications) - Event reminders
   ├─→ Module 8 (LLM) - Event analysis
-  └─→ Module 9 (Dashboard) - Event analytics
+  ├─→ Module 9 (Dashboard) - Event analytics
+  └─→ Module 10 (Collaboration) - Event collaboration
 
 Module 5 (Tags)
   ↓
@@ -1683,7 +1782,8 @@ Module 7 (Notifications)
   ├─→ Module 2 (Tasks) - Task reminders
   ├─→ Module 4 (Events) - Event reminders
   ├─→ Module 6 (Pomodoro) - Pomodoro notifications
-  └─→ Module 9 (Dashboard) - Notification analytics
+  ├─→ Module 9 (Dashboard) - Notification analytics
+  └─→ Module 10 (Collaboration) - Collaboration notifications
 
 Module 8 (LLM)
   ↓
@@ -1693,17 +1793,26 @@ Module 8 (LLM)
 Module 9 (Dashboard)
   ↓
   └─→ All Modules - Aggregates all data
+
+Module 10 (Collaboration)
+  ↓
+  ├─→ Module 1 (User) - User collaborators
+  ├─→ Module 2 (Tasks) - Task collaboration
+  ├─→ Module 4 (Events) - Event collaboration
+  ├─→ Module 7 (Notifications) - Collaboration notifications
+  └─→ Module 9 (Dashboard) - Collaboration analytics
 ```
 
 ### Key Integration Patterns
 
 1. **User-Centric Design**: All modules respect user ownership and preferences
-2. **Polymorphic Relationships**: Tags and reminders work across multiple entity types
+2. **Polymorphic Relationships**: Tags, reminders, collaborations, and messages work across multiple entity types
 3. **Soft Deletes**: Tasks, events, and projects support soft deletion for data retention
 4. **Cascade Operations**: Related data is handled appropriately on deletion
 5. **Real-Time Updates**: Notifications and dashboard update in real-time
 6. **LLM Integration**: LLM reads from all modules but doesn't modify data directly
 7. **Analytics Aggregation**: Dashboard aggregates data from all modules
+8. **Collaboration Permissions**: Permission-based access control for collaborative items
 
 ### Data Flow Patterns
 
@@ -1713,6 +1822,8 @@ Module 9 (Dashboard)
 - **Notification Flow**: Trigger → Reminder → Notification → Channel Delivery → User
 - **LLM Flow**: User Query → Intent Classification → Context Retrieval → LLM → Structured Output → Recommendation → User Action
 - **Analytics Flow**: Data Aggregation → Calculation → Visualization → Dashboard Display
+- **Collaboration Flow**: Owner/Editor → Add Collaborator → Set Permission → Notification → Collaborator Access
+- **Messaging Flow**: Collaborator → Send Message → Store → Notify Other Collaborators → Real-time Update
 
 ---
 
@@ -1807,15 +1918,27 @@ Module 9 (Dashboard)
 - [ ] Notification analytics
 - [ ] Visualizations
 
+### Module 10: Collaboration and Messaging
+- [ ] Collaboration CRUD operations
+- [ ] Permission management
+- [ ] Add/remove collaborators
+- [ ] Messaging functionality
+- [ ] Per-item chat threads
+- [ ] Notifications for collaboration events
+- [ ] Notifications for new messages
+
 ---
 
 ## Notes
 
 - All modules should follow Laravel conventions and use Eloquent ORM
 - Soft deletes are used for Tasks, Events, and Projects
-- Polymorphic relationships enable flexible tagging and reminders
+- Polymorphic relationships enable flexible tagging, reminders, collaborations, and messages
 - LLM module is read-only and provides recommendations only
 - Dashboard aggregates data but doesn't store its own models
 - All user-facing features should respect notification preferences
 - Timezone support is critical for events and scheduling
 - Real-time updates should be implemented where appropriate
+- Collaboration permissions: view (read-only), comment (can chat), edit (full access)
+- Only owners and users with edit permission can invite collaborators
+- Only owners can change collaborator permissions
