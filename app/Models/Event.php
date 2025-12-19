@@ -26,7 +26,6 @@ class Event extends Model
         'location',
         'color',
         'status',
-        'recurring_event_id',
     ];
 
     protected function casts(): array
@@ -61,5 +60,10 @@ class Event extends Model
     public function reminders(): MorphMany
     {
         return $this->morphMany(Reminder::class, 'remindable');
+    }
+
+    public function notifications(): MorphMany
+    {
+        return $this->morphMany(Notification::class, 'notifiable');
     }
 }

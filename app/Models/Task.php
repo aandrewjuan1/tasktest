@@ -74,4 +74,9 @@ class Task extends Model
     {
         return $this->morphMany(Reminder::class, 'remindable');
     }
+
+    public function notifications(): MorphMany
+    {
+        return $this->morphMany(Notification::class, 'notifiable');
+    }
 }

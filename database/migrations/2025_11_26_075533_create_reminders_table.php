@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('reminders', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->morphs('remindable'); // remindable_id and remindable_type (Task or Event)
+            $table->morphs('remindable'); // remindable_id and remindable_type (Task, Event, or Project)
             $table->enum('reminder_type', ['task_due', 'event_start', 'custom']);
             $table->timestamp('trigger_time');
             $table->enum('time_before_unit', ['minutes', 'hours', 'days'])->nullable();
