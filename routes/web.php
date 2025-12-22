@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Laravel\WorkOS\Http\Middleware\ValidateSessionWithWorkOS;
+use Livewire\Volt\Volt;
 
 Route::get('/', function () {
     return view('welcome');
@@ -12,6 +13,7 @@ Route::middleware([
     ValidateSessionWithWorkOS::class,
 ])->group(function () {
     Route::view('dashboard', 'dashboard')->name('dashboard');
+    Volt::route('workspace', 'workspace.show')->name('workspace.show');
 });
 
 require __DIR__.'/settings.php';
