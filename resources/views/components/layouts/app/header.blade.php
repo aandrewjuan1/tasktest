@@ -18,7 +18,7 @@
             </flux:navbar>
 
             <flux:navbar class="-mb-px max-lg:hidden">
-                <flux:navbar.item icon="rectangle-stack" :href="route('workspace.show')" :current="request()->routeIs('workspace.show')" wire:navigate>
+                <flux:navbar.item icon="rectangle-stack" :href="route('workspace.index')" :current="request()->routeIs('workspace.index')" wire:navigate>
                     {{ __('Workspace') }}
                 </flux:navbar.item>
             </flux:navbar>

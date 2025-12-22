@@ -13,7 +13,7 @@ Route::middleware([
     ValidateSessionWithWorkOS::class,
 ])->group(function () {
     Route::view('dashboard', 'dashboard')->name('dashboard');
-    Volt::route('workspace', 'workspace.show')->name('workspace.show');
+    Volt::route('workspace', 'workspace.index')->name('workspace.index');
 });
 
 require __DIR__.'/settings.php';
