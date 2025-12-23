@@ -2,6 +2,10 @@
 
 namespace Database\Factories;
 
+use App\Enums\TaskComplexity;
+use App\Enums\TaskPriority;
+use App\Enums\TaskStatus;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -16,50 +20,23 @@ class TaskFactory extends Factory
      */
     public function definition(): array
     {
-        $startDate = fake()->dateTimeBetween('now', '+1 month');
+        $startDate = fake()->dateTimeBetween('-1 month', '+1 month');
         $endDate = fake()->dateTimeBetween($startDate, '+2 months');
+        $status = fake()->randomElement(TaskStatus::cases());
 
         return [
+            'user_id' => User::factory(),
             'title' => fake()->sentence(3),
-            'description' => fake()->paragraph(),
-            'status' => fake()->randomElement(['to_do', 'doing', 'done']),
-            'priority' => fake()->randomElement(['low', 'medium', 'high', 'urgent']),
-            'complexity' => fake()->randomElement(['simple', 'moderate', 'complex']),
-            'duration' => fake()->numberBetween(15, 240),
+            'description' => fake()->optional()->paragraph(),
+            'status' => $status,
+            'priority' => fake()->randomElement(TaskPriority::cases()),
+            'complexity' => fake()->randomElement(TaskComplexity::cases()),
+            'duration' => fake()->numberBetween(15, 480), // 15 minutes to 8 hours
             'start_date' => $startDate,
             'end_date' => $endDate,
-            'completed_at' => null,
+            'project_id' => null,
+            'event_id' => null,
+            'completed_at' => $status === TaskStatus::Done ? fake()->dateTimeBetween($startDate, 'now') : null,
         ];
-    }
-
-    /**
-     * Indicate that the task is completed.
-     */
-    public function completed(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'status' => 'done',
-            'completed_at' => now(),
-        ]);
-    }
-
-    /**
-     * Indicate that the task is in progress.
-     */
-    public function inProgress(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'status' => 'doing',
-        ]);
-    }
-
-    /**
-     * Indicate that the task is urgent priority.
-     */
-    public function urgent(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'priority' => 'urgent',
-        ]);
     }
 }

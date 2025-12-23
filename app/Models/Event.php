@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\CollaborationPermission;
+use App\Enums\EventStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -31,6 +33,7 @@ class Event extends Model
     protected function casts(): array
     {
         return [
+            'status' => EventStatus::class,
             'start_datetime' => 'datetime',
             'end_datetime' => 'datetime',
             'all_day' => 'boolean',
@@ -110,7 +113,7 @@ class Event extends Model
         // Check if user has edit permission
         $permission = $this->getCollaboratorPermission($user);
 
-        return $permission === Collaboration::PERMISSION_EDIT;
+        return $permission === CollaborationPermission::Edit;
     }
 
     public function canUserComment(User $user): bool
@@ -123,7 +126,7 @@ class Event extends Model
         // Check if user has comment or edit permission
         $permission = $this->getCollaboratorPermission($user);
 
-        return in_array($permission, [Collaboration::PERMISSION_COMMENT, Collaboration::PERMISSION_EDIT]);
+        return in_array($permission, [CollaborationPermission::Comment, CollaborationPermission::Edit]);
     }
 
     public function canUserView(User $user): bool

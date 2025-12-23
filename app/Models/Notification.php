@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\NotificationChannel;
+use App\Enums\NotificationType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -25,6 +27,8 @@ class Notification extends Model
     protected function casts(): array
     {
         return [
+            'notification_type' => NotificationType::class,
+            'channel' => NotificationChannel::class,
             'data' => 'array',
             'is_read' => 'boolean',
             'read_at' => 'datetime',

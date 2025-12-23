@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\NotificationFrequency;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -27,6 +28,7 @@ class NotificationPreference extends Model
     protected function casts(): array
     {
         return [
+            'notification_frequency' => NotificationFrequency::class,
             'reminder_notifications_enabled' => 'boolean',
             'task_due_notifications_enabled' => 'boolean',
             'event_start_notifications_enabled' => 'boolean',

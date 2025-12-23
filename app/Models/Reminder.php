@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\ReminderType;
+use App\Enums\TimeBeforeUnit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -24,6 +26,8 @@ class Reminder extends Model
     protected function casts(): array
     {
         return [
+            'reminder_type' => ReminderType::class,
+            'time_before_unit' => TimeBeforeUnit::class,
             'trigger_time' => 'datetime',
             'is_recurring' => 'boolean',
             'is_sent' => 'boolean',

@@ -2,6 +2,9 @@
 
 namespace Database\Factories;
 
+use App\Enums\EventStatus;
+use App\Models\Event;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -16,19 +19,24 @@ class EventFactory extends Factory
      */
     public function definition(): array
     {
-        $startDatetime = fake()->dateTimeBetween('now', '+1 month');
-        $endDatetime = fake()->dateTimeBetween($startDatetime, '+2 months');
+        $allDay = fake()->boolean(30); // 30% chance of all-day event
+        $startDateTime = fake()->dateTimeBetween('-1 month', '+2 months');
+        $endDateTime = $allDay
+            ? fake()->dateTimeBetween($startDateTime, $startDateTime->format('Y-m-d').' 23:59:59')
+            : fake()->dateTimeBetween($startDateTime, '+1 day');
+        $timezone = fake()->timezone();
 
         return [
+            'user_id' => User::factory(),
             'title' => fake()->sentence(3),
-            'description' => fake()->paragraph(),
-            'start_datetime' => $startDatetime,
-            'end_datetime' => $endDatetime,
-            'all_day' => fake()->boolean(20),
-            'timezone' => fake()->timezone(),
+            'description' => fake()->optional()->paragraph(),
+            'start_datetime' => $startDateTime,
+            'end_datetime' => $endDateTime,
+            'all_day' => $allDay,
+            'timezone' => $timezone,
             'location' => fake()->optional()->address(),
             'color' => fake()->optional()->hexColor(),
-            'status' => fake()->randomElement(['scheduled', 'cancelled', 'completed', 'tentative']),
+            'status' => fake()->randomElement(EventStatus::cases()),
         ];
     }
 }

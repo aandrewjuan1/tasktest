@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\CollaborationPermission;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,18 +12,19 @@ class Collaboration extends Model
 {
     use HasFactory;
 
-    public const PERMISSION_VIEW = 'view';
-
-    public const PERMISSION_COMMENT = 'comment';
-
-    public const PERMISSION_EDIT = 'edit';
-
     protected $fillable = [
         'collaboratable_type',
         'collaboratable_id',
         'user_id',
         'permission',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'permission' => CollaborationPermission::class,
+        ];
+    }
 
     public function collaboratable(): MorphTo
     {
@@ -36,12 +38,12 @@ class Collaboration extends Model
 
     public function canEdit(): bool
     {
-        return $this->permission === self::PERMISSION_EDIT;
+        return $this->permission === CollaborationPermission::Edit;
     }
 
     public function canComment(): bool
     {
-        return in_array($this->permission, [self::PERMISSION_COMMENT, self::PERMISSION_EDIT]);
+        return in_array($this->permission, [CollaborationPermission::Comment, CollaborationPermission::Edit]);
     }
 
     public function canView(): bool
@@ -49,19 +51,19 @@ class Collaboration extends Model
         return true; // All permissions can view
     }
 
-    public function scopeByPermission($query, string $permission)
+    public function scopeByPermission($query, CollaborationPermission $permission)
     {
         return $query->where('permission', $permission);
     }
 
     public function scopeEditors($query)
     {
-        return $query->where('permission', self::PERMISSION_EDIT);
+        return $query->where('permission', CollaborationPermission::Edit);
     }
 
     public function scopeCommenters($query)
     {
-        return $query->whereIn('permission', [self::PERMISSION_COMMENT, self::PERMISSION_EDIT]);
+        return $query->whereIn('permission', [CollaborationPermission::Comment, CollaborationPermission::Edit]);
     }
 
     public function scopeViewers($query)

@@ -2,6 +2,10 @@
 
 namespace App\Models;
 
+use App\Enums\CollaborationPermission;
+use App\Enums\TaskComplexity;
+use App\Enums\TaskPriority;
+use App\Enums\TaskStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -33,6 +37,9 @@ class Task extends Model
     protected function casts(): array
     {
         return [
+            'status' => TaskStatus::class,
+            'priority' => TaskPriority::class,
+            'complexity' => TaskComplexity::class,
             'start_date' => 'date',
             'end_date' => 'date',
             'completed_at' => 'datetime',
@@ -104,7 +111,7 @@ class Task extends Model
             ->exists();
     }
 
-    public function getCollaboratorPermission(User $user): ?string
+    public function getCollaboratorPermission(User $user): ?CollaborationPermission
     {
         $collaboration = $this->collaborations()
             ->where('user_id', $user->id)
@@ -123,7 +130,7 @@ class Task extends Model
         // Check if user has edit permission
         $permission = $this->getCollaboratorPermission($user);
 
-        return $permission === Collaboration::PERMISSION_EDIT;
+        return $permission === CollaborationPermission::Edit;
     }
 
     public function canUserComment(User $user): bool
@@ -136,7 +143,7 @@ class Task extends Model
         // Check if user has comment or edit permission
         $permission = $this->getCollaboratorPermission($user);
 
-        return in_array($permission, [Collaboration::PERMISSION_COMMENT, Collaboration::PERMISSION_EDIT]);
+        return in_array($permission, [CollaborationPermission::Comment, CollaborationPermission::Edit]);
     }
 
     public function canUserView(User $user): bool

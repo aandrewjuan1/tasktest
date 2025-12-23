@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\EventStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -25,6 +26,7 @@ class EventInstance extends Model
     protected function casts(): array
     {
         return [
+            'status' => EventStatus::class,
             'instance_start' => 'datetime',
             'instance_end' => 'datetime',
             'all_day' => 'boolean',

@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -16,12 +17,31 @@ class ProjectFactory extends Factory
      */
     public function definition(): array
     {
-        $startDate = fake()->dateTimeBetween('now', '+1 month');
+        $startDate = fake()->dateTimeBetween('-6 months', '+1 month');
         $endDate = fake()->dateTimeBetween($startDate, '+6 months');
 
+        $projectNames = [
+            'Website Redesign',
+            'Mobile App Development',
+            'Database Migration',
+            'API Integration',
+            'E-commerce Platform',
+            'Content Management System',
+            'Customer Portal',
+            'Analytics Dashboard',
+            'Marketing Campaign',
+            'Product Launch',
+            'System Upgrade',
+            'Security Audit',
+            'Performance Optimization',
+            'User Experience Enhancement',
+            'Documentation Project',
+        ];
+
         return [
-            'name' => fake()->words(3, true),
-            'description' => fake()->paragraph(),
+            'user_id' => User::factory(),
+            'name' => fake()->randomElement($projectNames),
+            'description' => fake()->optional()->paragraph(),
             'start_date' => $startDate,
             'end_date' => $endDate,
         ];
