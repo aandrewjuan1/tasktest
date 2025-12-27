@@ -114,6 +114,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Timegrid settings for the user.
+     */
+    public function timegridSetting(): HasOne
+    {
+        return $this->hasOne(TimegridSetting::class);
+    }
+
+    /**
      * Collaborations where user is a collaborator.
      */
     public function collaborations(): HasMany

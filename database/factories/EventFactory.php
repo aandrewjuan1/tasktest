@@ -20,11 +20,8 @@ class EventFactory extends Factory
     public function definition(): array
     {
         $allDay = fake()->boolean(30); // 30% chance of all-day event
-        $startDateTime = fake()->dateTimeBetween('-1 month', '+2 months');
-        $endDateTime = $allDay
-            ? fake()->dateTimeBetween($startDateTime, $startDateTime->format('Y-m-d').' 23:59:59')
-            : fake()->dateTimeBetween($startDateTime, '+1 day');
-        $timezone = fake()->timezone();
+        $startDateTime = fake()->dateTimeBetween('now', '+2 months');
+        $endDateTime = fake()->dateTimeBetween($startDateTime, $startDateTime->format('Y-m-d H:i:s').' +4 hours');
 
         return [
             'user_id' => User::factory(),
@@ -33,7 +30,7 @@ class EventFactory extends Factory
             'start_datetime' => $startDateTime,
             'end_datetime' => $endDateTime,
             'all_day' => $allDay,
-            'timezone' => $timezone,
+            'timezone' => config('app.timezone'),
             'location' => fake()->optional()->address(),
             'color' => fake()->optional()->hexColor(),
             'status' => fake()->randomElement(EventStatus::cases()),

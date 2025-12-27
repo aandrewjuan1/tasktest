@@ -20,7 +20,7 @@ class TaskFactory extends Factory
      */
     public function definition(): array
     {
-        $startDate = fake()->dateTimeBetween('-1 month', '+1 month');
+        $startDate = fake()->dateTimeBetween('now', '+1 month');
         $endDate = fake()->dateTimeBetween($startDate, '+2 months');
         $status = fake()->randomElement(TaskStatus::cases());
 
@@ -31,12 +31,13 @@ class TaskFactory extends Factory
             'status' => $status,
             'priority' => fake()->randomElement(TaskPriority::cases()),
             'complexity' => fake()->randomElement(TaskComplexity::cases()),
-            'duration' => fake()->numberBetween(15, 480), // 15 minutes to 8 hours
+            'duration' => fake()->optional()->numberBetween(15, 480), // 15 minutes to 8 hours
             'start_date' => $startDate,
+            'start_time' => fake()->optional()->time(),
             'end_date' => $endDate,
             'project_id' => null,
             'event_id' => null,
-            'completed_at' => $status === TaskStatus::Done ? fake()->dateTimeBetween($startDate, 'now') : null,
+            'completed_at' => $status === TaskStatus::Done ? now() : null,
         ];
     }
 }

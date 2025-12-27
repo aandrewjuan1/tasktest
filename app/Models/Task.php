@@ -28,6 +28,7 @@ class Task extends Model
         'complexity',
         'duration',
         'start_date',
+        'start_time',
         'end_date',
         'project_id',
         'event_id',
