@@ -17,6 +17,7 @@ new class extends Component
     use WithPagination;
 
     // View and display options
+    #[Url(except: 'list')]
     public string $viewMode = 'list'; // list, kanban, weekly_calendar
 
     #[Url(except: 'all')]
@@ -47,6 +48,7 @@ new class extends Component
         $this->weekStartDate = now()->startOfWeek();
         $this->currentDate = now();
         $this->loadTimegridSettings();
+        $this->dispatch('date-focused', date: $this->currentDate->format('Y-m-d'));
     }
 
     public function loadTimegridSettings(): void
@@ -91,19 +93,40 @@ new class extends Component
         $this->weekStartDate = now()->startOfWeek();
     }
 
+
+    public function goToTodayDate(): void
+    {
+        $this->currentDate = now();
+        $this->dispatch('date-focused', date: $this->currentDate->format('Y-m-d'));
+    }
+
     public function previousDay(): void
     {
         $this->currentDate = $this->currentDate->copy()->subDay();
+        $this->dispatch('date-focused', date: $this->currentDate->format('Y-m-d'));
     }
 
     public function nextDay(): void
     {
         $this->currentDate = $this->currentDate->copy()->addDay();
+        $this->dispatch('date-focused', date: $this->currentDate->format('Y-m-d'));
     }
 
-    public function goToTodayDate(): void
+    #[On('switch-to-day-view')]
+    public function switchToDayView(string $date): void
     {
-        $this->currentDate = now();
+        $this->viewMode = 'list';
+        $this->currentDate = Carbon::parse($date);
+        $this->dispatch('date-focused', date: $date);
+    }
+
+    #[On('date-focused')]
+    public function updateCurrentDate(string $date): void
+    {
+        // Only update currentDate if we're in list or kanban view
+        if (in_array($this->viewMode, ['list', 'kanban'])) {
+            $this->currentDate = Carbon::parse($date);
+        }
     }
 
     #[On('switch-to-week-view')]
@@ -361,7 +384,39 @@ new class extends Component
                 $dateKey = Carbon::parse($task->start_date)->format('Y-m-d');
 
                 if (isset($itemsByDay[$dateKey])) {
-                    $itemsByDay[$dateKey]['all_day']->push($task);
+                    // Check if task has a start_time
+                    if ($task->start_time) {
+                        // Combine start_date and start_time to create datetime
+                        $startDateString = Carbon::parse($task->start_date)->format('Y-m-d');
+                        $startDateTime = Carbon::parse($startDateString . ' ' . $task->start_time);
+
+                        // Calculate end datetime using duration (default to 60 minutes if null)
+                        $durationMinutes = $task->duration ?? 60;
+                        $endDateTime = $startDateTime->copy()->addMinutes($durationMinutes);
+
+                        // Calculate position and height (same logic as events)
+                        $startMinutes = ($startDateTime->hour * 60) + $startDateTime->minute;
+                        $endMinutes = ($endDateTime->hour * 60) + $endDateTime->minute;
+
+                        $gridStartMinutes = $this->startHour * 60;
+                        $gridEndMinutes = $this->endHour * 60;
+
+                        if ($startMinutes < $gridEndMinutes && $endMinutes > $gridStartMinutes) {
+                            $topMinutes = max($startMinutes - $gridStartMinutes, 0);
+                            $durationMinutes = min($endMinutes, $gridEndMinutes) - max($startMinutes, $gridStartMinutes);
+
+                            $task->grid_top = ($topMinutes / 60) * $this->hourHeight;
+                            $task->grid_height = ($durationMinutes / 60) * $this->hourHeight;
+
+                            // Store computed datetime for display purposes
+                            $task->computed_start_datetime = $startDateTime;
+
+                            $itemsByDay[$dateKey]['timed']->push($task);
+                        }
+                    } else {
+                        // No start_time, add to all-day section
+                        $itemsByDay[$dateKey]['all_day']->push($task);
+                    }
                 }
             }
         }
@@ -709,17 +764,6 @@ new class extends Component
                                     <div class="absolute w-full border-t border-zinc-200 dark:border-zinc-700" style="top: {{ ($hour - $startHour) * $hourHeight }}px;"></div>
                                 @endfor
 
-                                <!-- Current Time Indicator -->
-                                @if($isToday && now()->hour >= $startHour && now()->hour <= $endHour)
-                                    @php
-                                        $currentMinutes = (now()->hour - $startHour) * 60 + now()->minute;
-                                        $currentTop = ($currentMinutes / 60) * $hourHeight;
-                                    @endphp
-                                    <div class="absolute w-full border-t-2 border-red-500 z-10" style="top: {{ $currentTop }}px;">
-                                        <div class="absolute -left-1 -top-1 w-2 h-2 bg-red-500 rounded-full"></div>
-                                    </div>
-                                @endif
-
                                 <!-- Timed Items -->
                                 @foreach($timedItems as $item)
                                     <div
@@ -728,7 +772,7 @@ new class extends Component
                                             $event.dataTransfer.effectAllowed = 'move';
                                             $event.dataTransfer.setData('itemId', {{ $item->id }});
                                             $event.dataTransfer.setData('itemType', '{{ $item->item_type }}');
-                                            $event.dataTransfer.setData('duration', {{ $item->item_type === 'event' ? (Carbon::parse($item->end_datetime)->diffInMinutes(Carbon::parse($item->start_datetime))) : 60 }});
+                                            $event.dataTransfer.setData('duration', {{ $item->item_type === 'event' ? (Carbon::parse($item->end_datetime)->diffInMinutes(Carbon::parse($item->start_datetime))) : ($item->item_type === 'task' ? ($item->duration ?? 60) : 60) }});
                                         "
                                         class="absolute w-full px-1 py-1 text-xs rounded cursor-move overflow-hidden hover:z-20 hover:shadow-lg transition-shadow"
                                         style="top: {{ $item->grid_top }}px; height: {{ $item->grid_height }}px; background-color: {{ $item->color ?? ($item->item_type === 'event' ? '#8b5cf6' : '#3b82f6') }}; color: white;"
@@ -738,6 +782,10 @@ new class extends Component
                                         @if($item->item_type === 'event')
                                             <div class="text-xs opacity-90">
                                                 {{ Carbon::parse($item->start_datetime)->format('g:i A') }}
+                                            </div>
+                                        @elseif($item->item_type === 'task' && isset($item->computed_start_datetime))
+                                            <div class="text-xs opacity-90">
+                                                {{ $item->computed_start_datetime->format('g:i A') }}
                                             </div>
                                         @endif
                                     </div>

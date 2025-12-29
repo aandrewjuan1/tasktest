@@ -2,6 +2,7 @@
 
 use Livewire\Volt\Component;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use App\Models\Event;
 use App\Models\Task;
 use Carbon\Carbon;
@@ -9,11 +10,13 @@ use Carbon\Carbon;
 new class extends Component {
     public int $year;
     public int $month;
+    public ?Carbon $focusedDate = null;
 
     public function mount(): void
     {
         $this->year = now()->year;
         $this->month = now()->month;
+        $this->focusedDate = now();
     }
 
     public function previousMonth(): void
@@ -34,6 +37,14 @@ new class extends Component {
     {
         $this->year = now()->year;
         $this->month = now()->month;
+        $this->focusedDate = now();
+        $this->dispatch('date-focused', date: now()->format('Y-m-d'));
+    }
+
+    #[On('date-focused')]
+    public function updateFocusedDate(string $date): void
+    {
+        $this->focusedDate = Carbon::parse($date);
     }
 
     #[Computed]
@@ -190,19 +201,27 @@ new class extends Component {
                 @php
                     $itemCount = $this->getItemCountForDate($day['date']);
                     $urgencyLevel = $this->getUrgencyLevelForDate($day['date']);
-                    $weekStart = $day['date']->copy()->startOfWeek();
+                    $dayDateString = $day['date']->format('Y-m-d');
+                    $isFocused = $this->focusedDate && $this->focusedDate->format('Y-m-d') === $dayDateString;
 
                     $badgeClasses = match($urgencyLevel) {
                         'urgent' => 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
                         'high' => 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300',
                         default => 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
                     };
+
+                    $ringClasses = '';
+                    if ($isFocused) {
+                        $ringClasses = 'ring-2 ring-green-500';
+                    } elseif ($day['isToday']) {
+                        $ringClasses = 'ring-2 ring-blue-500';
+                    }
                 @endphp
                 <div
-                    class="min-h-[80px] border rounded-lg p-1 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors {{ $day['isCurrentMonth'] ? 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700' : 'bg-zinc-50 dark:bg-zinc-800/50 border-zinc-100 dark:border-zinc-800' }} {{ $day['isToday'] ? 'ring-2 ring-blue-500' : '' }}"
-                    @click="$dispatch('switch-to-week-view', { weekStart: '{{ $weekStart->format('Y-m-d') }}' })"
+                    class="min-h-[80px] border rounded-lg p-1 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors {{ $day['isCurrentMonth'] ? 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700' : 'bg-zinc-50 dark:bg-zinc-800/50 border-zinc-100 dark:border-zinc-800' }} {{ $ringClasses }}"
+                    @click="$dispatch('switch-to-day-view', { date: '{{ $dayDateString }}' })"
                 >
-                    <div class="text-xs {{ $day['isCurrentMonth'] ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 dark:text-zinc-600' }} {{ $day['isToday'] ? 'font-bold text-blue-600 dark:text-blue-400' : '' }} mb-1">
+                    <div class="text-xs {{ $day['isCurrentMonth'] ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 dark:text-zinc-600' }} {{ ($day['isToday'] || $isFocused) ? 'font-bold ' : '' }}{{ $day['isToday'] ? 'text-blue-600 dark:text-blue-400' : ($isFocused ? 'text-green-600 dark:text-green-400' : '') }} mb-1">
                         {{ $day['date']->day }}
                     </div>
 
