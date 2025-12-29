@@ -622,7 +622,19 @@ new class extends Component
     #[Computed]
     public function availableTags(): Collection
     {
-        return Tag::orderBy('name')->get();
+        $userId = auth()->id();
+
+        return Tag::whereHas('tasks', function ($query) use ($userId) {
+                $query->where('user_id', $userId);
+            })
+            ->orWhereHas('events', function ($query) use ($userId) {
+                $query->where('user_id', $userId);
+            })
+            ->orWhereHas('projects', function ($query) use ($userId) {
+                $query->where('user_id', $userId);
+            })
+            ->orderBy('name')
+            ->get();
     }
 
     #[Computed]
