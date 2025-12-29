@@ -139,4 +139,5 @@ class Event extends Model
         // Any collaborator can view
         return $this->isCollaborator($user);
     }
+
 }

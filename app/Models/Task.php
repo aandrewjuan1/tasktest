@@ -157,4 +157,5 @@ class Task extends Model
         // Any collaborator can view
         return $this->isCollaborator($user);
     }
+
 }

@@ -16,16 +16,13 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Find or create the specified user
-        $user = User::firstOrCreate(
-            ['email' => 'andrew.juan.cvt@eac.edu.ph'],
-            [
-                'name' => 'Andrew Juan',
-                'email_verified_at' => now(),
-                'workos_id' => 'fake-'.str()->random(10),
-                'avatar' => '',
-            ]
-        );
+        // Find the specified user (must be registered before running seeder)
+        $user = User::where('email', 'andrew.juan.cvt@eac.edu.ph')->first();
+
+        if (! $user) {
+            $this->command->warn('User andrew.juan.cvt@eac.edu.ph not found. Please register this user before running the seeder.');
+            return;
+        }
 
         // Create tags (10-15 tags)
         $tags = Tag::factory(12)->create();
