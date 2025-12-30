@@ -1,15 +1,18 @@
 <?php
 
-use Livewire\Volt\Component;
-use Livewire\Attributes\Computed;
-use Livewire\Attributes\On;
 use App\Models\Event;
 use App\Models\Task;
 use Carbon\Carbon;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
+use Livewire\Volt\Component;
 
-new class extends Component {
+new class extends Component
+{
     public int $year;
+
     public int $month;
+
     public ?Carbon $focusedDate = null;
 
     public function mount(): void
@@ -106,7 +109,7 @@ new class extends Component {
         $eventsByDate = [];
         foreach ($events as $event) {
             $dateKey = $event->start_datetime->format('Y-m-d');
-            if (!isset($eventsByDate[$dateKey])) {
+            if (! isset($eventsByDate[$dateKey])) {
                 $eventsByDate[$dateKey] = [];
             }
             $eventsByDate[$dateKey][] = $event;
@@ -133,7 +136,7 @@ new class extends Component {
         $tasksByDate = [];
         foreach ($tasks as $task) {
             $dateKey = $task->start_date->format('Y-m-d');
-            if (!isset($tasksByDate[$dateKey])) {
+            if (! isset($tasksByDate[$dateKey])) {
                 $tasksByDate[$dateKey] = [];
             }
             $tasksByDate[$dateKey][] = $task;
@@ -147,6 +150,7 @@ new class extends Component {
         $dateKey = $date->format('Y-m-d');
         $eventCount = count($this->events[$dateKey] ?? []);
         $taskCount = count($this->tasks[$dateKey] ?? []);
+
         return $eventCount + $taskCount;
     }
 
@@ -167,7 +171,13 @@ new class extends Component {
             }
         }
 
-        return 'normal';
+        foreach ($dayTasks as $task) {
+            if ($task->priority?->value === 'medium') {
+                return 'medium';
+            }
+        }
+
+        return 'low';
     }
 }; ?>
 
@@ -211,6 +221,7 @@ new class extends Component {
                     $badgeClasses = match($urgencyLevel) {
                         'urgent' => 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
                         'high' => 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300',
+                        'medium' => 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300',
                         default => 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
                     };
 
