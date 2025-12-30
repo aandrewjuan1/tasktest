@@ -29,13 +29,31 @@ new class extends Component
                     {{ $currentDate->format('M d, Y') }}
                 </h3>
             </div>
-            <div class="flex items-center gap-2">
-                <flux:button variant="ghost" size="sm" wire:click="$parent.goToTodayDate">
+            <div class="flex items-center gap-2"
+                 x-data="{
+                     navigateDate(action) {
+                         if (action === 'today') {
+                             $wire.$parent.goToTodayDate();
+                             $dispatch('date-focused', { date: new Date().toISOString().split('T')[0] });
+                         } else if (action === 'previous') {
+                             const currentDate = new Date('{{ $currentDate->format('Y-m-d') }}');
+                             currentDate.setDate(currentDate.getDate() - 1);
+                             $wire.$parent.previousDay();
+                             $dispatch('date-focused', { date: currentDate.toISOString().split('T')[0] });
+                         } else if (action === 'next') {
+                             const currentDate = new Date('{{ $currentDate->format('Y-m-d') }}');
+                             currentDate.setDate(currentDate.getDate() + 1);
+                             $wire.$parent.nextDay();
+                             $dispatch('date-focused', { date: currentDate.toISOString().split('T')[0] });
+                         }
+                     }
+                 }">
+                <flux:button variant="ghost" size="sm" @click="navigateDate('today')">
                     Today
                 </flux:button>
-                <flux:button variant="ghost" size="sm" icon="chevron-left" wire:click="$parent.previousDay">
+                <flux:button variant="ghost" size="sm" icon="chevron-left" @click="navigateDate('previous')">
                 </flux:button>
-                <flux:button variant="ghost" size="sm" icon="chevron-right" wire:click="$parent.nextDay">
+                <flux:button variant="ghost" size="sm" icon="chevron-right" @click="navigateDate('next')">
                 </flux:button>
             </div>
         </div>

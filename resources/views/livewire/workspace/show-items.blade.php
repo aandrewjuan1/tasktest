@@ -83,18 +83,20 @@ new class extends Component
     #[On('switch-to-day-view')]
     public function switchToDayView(string $date): void
     {
+        // This method is kept for backward compatibility
+        // Calendar now dispatches date-focused directly, but other components might still use this
         $this->viewMode = 'list';
         $this->currentDate = Carbon::parse($date);
-        $this->dispatch('date-focused', date: $date);
     }
 
     #[On('date-focused')]
     public function updateCurrentDate(string $date): void
     {
-        // Only update currentDate if we're in list or kanban view
-        if (in_array($this->viewMode, ['list', 'kanban'])) {
-            $this->currentDate = Carbon::parse($date);
+        // If not in list or kanban view, switch to list view (e.g., when clicking calendar day)
+        if (! in_array($this->viewMode, ['list', 'kanban'])) {
+            $this->viewMode = 'list';
         }
+        $this->currentDate = Carbon::parse($date);
     }
 
     #[On('switch-to-week-view')]

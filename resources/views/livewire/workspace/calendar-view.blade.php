@@ -44,7 +44,11 @@ new class extends Component {
     #[On('date-focused')]
     public function updateFocusedDate(string $date): void
     {
-        $this->focusedDate = Carbon::parse($date);
+        // Only update if the date is different (prevents unnecessary updates from calendar clicks)
+        $parsedDate = Carbon::parse($date);
+        if (! $this->focusedDate || $this->focusedDate->format('Y-m-d') !== $parsedDate->format('Y-m-d')) {
+            $this->focusedDate = $parsedDate;
+        }
     }
 
     #[Computed]
@@ -210,18 +214,21 @@ new class extends Component {
                         default => 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
                     };
 
-                    $ringClasses = '';
-                    if ($isFocused) {
-                        $ringClasses = 'ring-2 ring-green-500';
-                    } elseif ($day['isToday']) {
-                        $ringClasses = 'ring-2 ring-blue-500';
+                    $borderClasses = '';
+                    if ($day['isToday']) {
+                        $borderClasses = 'border-2 border-green-500';
+                    } elseif ($isFocused) {
+                        $borderClasses = 'border-2 border-blue-500';
                     }
                 @endphp
                 <div
-                    class="min-h-[80px] border rounded-lg p-1 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors {{ $day['isCurrentMonth'] ? 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700' : 'bg-zinc-50 dark:bg-zinc-800/50 border-zinc-100 dark:border-zinc-800' }} {{ $ringClasses }}"
-                    @click="$dispatch('switch-to-day-view', { date: '{{ $dayDateString }}' })"
+                    class="min-h-[80px] rounded-lg p-1 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors {{ $day['isCurrentMonth'] ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50' }} {{ $borderClasses ?: 'border border-zinc-200 dark:border-zinc-700' }}"
+                    @click="
+                        $wire.$set('focusedDate', '{{ $dayDateString }}');
+                        $dispatch('date-focused', { date: '{{ $dayDateString }}' });
+                    "
                 >
-                    <div class="text-xs {{ $day['isCurrentMonth'] ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 dark:text-zinc-600' }} {{ ($day['isToday'] || $isFocused) ? 'font-bold ' : '' }}{{ $day['isToday'] ? 'text-blue-600 dark:text-blue-400' : ($isFocused ? 'text-green-600 dark:text-green-400' : '') }} mb-1">
+                    <div class="text-xs {{ $day['isCurrentMonth'] ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 dark:text-zinc-600' }} {{ ($day['isToday'] || $isFocused) ? 'font-bold ' : '' }}{{ $day['isToday'] ? 'text-green-600 dark:text-green-400' : ($isFocused ? 'text-blue-600 dark:text-blue-400' : '') }} mb-1">
                         {{ $day['date']->day }}
                     </div>
 

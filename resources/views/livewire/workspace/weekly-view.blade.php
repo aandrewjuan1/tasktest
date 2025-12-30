@@ -251,6 +251,16 @@ new class extends Component
                              const itemType = $event.dataTransfer.getData('itemType');
                              const duration = parseInt($event.dataTransfer.getData('duration') || '60');
 
+                             // Validate itemId exists and is valid
+                             if (!itemId || itemId === '' || isNaN(parseInt(itemId))) {
+                                 return;
+                             }
+
+                             const parsedItemId = parseInt(itemId);
+                             if (parsedItemId <= 0) {
+                                 return;
+                             }
+
                              const rect = $event.currentTarget.getBoundingClientRect();
                              const y = $event.clientY - rect.top;
                              const minutesFromStart = (y / {{ $hourHeight }}) * 60;
@@ -264,7 +274,7 @@ new class extends Component
                              const newEnd = endDate.toISOString().slice(0, 19).replace('T', ' ');
 
                              $dispatch('update-item-datetime', {
-                                 itemId: parseInt(itemId),
+                                 itemId: parsedItemId,
                                  itemType: itemType,
                                  newStart: newStart,
                                  newEnd: newEnd

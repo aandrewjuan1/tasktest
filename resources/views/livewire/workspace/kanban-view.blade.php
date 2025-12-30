@@ -33,13 +33,31 @@ new class extends Component
                     {{ $currentDate->format('M d, Y') }}
                 </h3>
             </div>
-            <div class="flex items-center gap-2">
-                <flux:button variant="ghost" size="sm" wire:click="$parent.goToTodayDate">
+            <div class="flex items-center gap-2"
+                 x-data="{
+                     navigateDate(action) {
+                         if (action === 'today') {
+                             $wire.$parent.goToTodayDate();
+                             $dispatch('date-focused', { date: new Date().toISOString().split('T')[0] });
+                         } else if (action === 'previous') {
+                             const currentDate = new Date('{{ $currentDate->format('Y-m-d') }}');
+                             currentDate.setDate(currentDate.getDate() - 1);
+                             $wire.$parent.previousDay();
+                             $dispatch('date-focused', { date: currentDate.toISOString().split('T')[0] });
+                         } else if (action === 'next') {
+                             const currentDate = new Date('{{ $currentDate->format('Y-m-d') }}');
+                             currentDate.setDate(currentDate.getDate() + 1);
+                             $wire.$parent.nextDay();
+                             $dispatch('date-focused', { date: currentDate.toISOString().split('T')[0] });
+                         }
+                     }
+                 }">
+                <flux:button variant="ghost" size="sm" @click="navigateDate('today')">
                     Today
                 </flux:button>
-                <flux:button variant="ghost" size="sm" icon="chevron-left" wire:click="$parent.previousDay">
+                <flux:button variant="ghost" size="sm" icon="chevron-left" @click="navigateDate('previous')">
                 </flux:button>
-                <flux:button variant="ghost" size="sm" icon="chevron-right" wire:click="$parent.nextDay">
+                <flux:button variant="ghost" size="sm" icon="chevron-right" @click="navigateDate('next')">
                 </flux:button>
             </div>
         </div>
@@ -48,6 +66,7 @@ new class extends Component
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
     @foreach(['to_do', 'doing', 'done'] as $status)
         <div class="bg-zinc-100 dark:bg-zinc-900 rounded-lg p-4"
+             draggable="false"
              x-data="{ draggingOver: false }"
              @dragover.prevent="draggingOver = true"
              @dragleave="draggingOver = false"
@@ -56,20 +75,30 @@ new class extends Component
                  const itemId = $event.dataTransfer.getData('itemId');
                  const itemType = $event.dataTransfer.getData('itemType');
 
+                 // Validate itemId exists and is valid
+                 if (!itemId || itemId === '' || isNaN(parseInt(itemId))) {
+                     return;
+                 }
+
+                 const parsedItemId = parseInt(itemId);
+                 if (parsedItemId <= 0) {
+                     return;
+                 }
+
                  // Prevent events from being dropped in 'doing' column
                  if (itemType === 'event' && '{{ $status }}' === 'doing') {
                      return;
                  }
 
                  $dispatch('update-item-status', {
-                     itemId: parseInt(itemId),
+                     itemId: parsedItemId,
                      itemType: itemType,
                      newStatus: '{{ $status }}'
                  });
              "
              :class="{ 'ring-2 ring-blue-500': draggingOver }"
         >
-            <h3 class="font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+            <h3 class="font-semibold text-zinc-900 dark:text-zinc-100 mb-4 select-none" draggable="false">
                 {{ match($status) {
                     'to_do' => 'To Do',
                     'doing' => 'In Progress',
@@ -103,7 +132,7 @@ new class extends Component
                 @endforeach
 
                 @if(collect($itemsByStatus[$status])->isEmpty())
-                    <div class="text-center py-8 text-zinc-500 dark:text-zinc-400 text-sm">
+                    <div class="text-center py-8 text-zinc-500 dark:text-zinc-400 text-sm select-none" draggable="false">
                         No items
                     </div>
                 @endif
