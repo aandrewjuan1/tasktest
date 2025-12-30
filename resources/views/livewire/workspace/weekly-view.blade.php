@@ -29,15 +29,6 @@ new class extends Component
         $this->weekStartDate = $weekStartDate ?? now()->startOfWeek();
     }
 
-    #[On('item-updated')]
-    #[On('task-updated')]
-    #[On('event-updated')]
-    public function refreshItems(): void
-    {
-        // Items are reactive, so they will automatically update from parent
-        // This listener ensures weeklyItems computed property recalculates when items change
-    }
-
     public function previousWeek(): void
     {
         $newWeekStart = $this->weekStartDate->copy()->subWeek();

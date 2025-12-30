@@ -2,7 +2,6 @@
 
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
-use Livewire\Attributes\On;
 use Livewire\Attributes\Reactive;
 use Livewire\Volt\Component;
 
@@ -22,36 +21,6 @@ new class extends Component
         $this->items = $items;
         $this->itemsByStatus = $itemsByStatus;
         $this->currentDate = $currentDate ?? now();
-        $this->dispatch('date-focused', date: $this->currentDate->format('Y-m-d'));
-    }
-
-    #[On('item-updated')]
-    #[On('task-updated')]
-    #[On('event-updated')]
-    public function refreshItems(): void
-    {
-        // Force component to re-render and re-read reactive properties from parent
-        // Accessing the reactive properties ensures they are updated from the parent
-        $this->items;
-        $this->itemsByStatus;
-    }
-
-    public function goToTodayDate(): void
-    {
-        $newDate = now();
-        $this->dispatch('date-focused', date: $newDate->format('Y-m-d'));
-    }
-
-    public function previousDay(): void
-    {
-        $newDate = $this->currentDate->copy()->subDay();
-        $this->dispatch('date-focused', date: $newDate->format('Y-m-d'));
-    }
-
-    public function nextDay(): void
-    {
-        $newDate = $this->currentDate->copy()->addDay();
-        $this->dispatch('date-focused', date: $newDate->format('Y-m-d'));
     }
 }; ?>
 
@@ -65,12 +34,12 @@ new class extends Component
                 </h3>
             </div>
             <div class="flex items-center gap-2">
-                <flux:button variant="ghost" size="sm" wire:click="goToTodayDate">
+                <flux:button variant="ghost" size="sm" wire:click="$parent.goToTodayDate">
                     Today
                 </flux:button>
-                <flux:button variant="ghost" size="sm" icon="chevron-left" wire:click="previousDay">
+                <flux:button variant="ghost" size="sm" icon="chevron-left" wire:click="$parent.previousDay">
                 </flux:button>
-                <flux:button variant="ghost" size="sm" icon="chevron-right" wire:click="nextDay">
+                <flux:button variant="ghost" size="sm" icon="chevron-right" wire:click="$parent.nextDay">
                 </flux:button>
             </div>
         </div>

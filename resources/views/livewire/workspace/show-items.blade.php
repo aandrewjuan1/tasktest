@@ -37,9 +37,6 @@ new class extends Component
     // Date navigation for list and kanban views
     public ?Carbon $currentDate = null;
 
-    // Refresh counter to force child component re-renders
-    public int $refreshCounter = 0;
-
     public function mount(): void
     {
         $this->weekStartDate = now()->startOfWeek();
@@ -60,6 +57,27 @@ new class extends Component
     public function switchView(string $mode): void
     {
         $this->viewMode = $mode;
+    }
+
+    public function goToTodayDate(): void
+    {
+        if (in_array($this->viewMode, ['list', 'kanban'])) {
+            $this->currentDate = now();
+        }
+    }
+
+    public function previousDay(): void
+    {
+        if (in_array($this->viewMode, ['list', 'kanban']) && $this->currentDate) {
+            $this->currentDate = $this->currentDate->copy()->subDay();
+        }
+    }
+
+    public function nextDay(): void
+    {
+        if (in_array($this->viewMode, ['list', 'kanban']) && $this->currentDate) {
+            $this->currentDate = $this->currentDate->copy()->addDay();
+        }
     }
 
     #[On('switch-to-day-view')]
@@ -142,11 +160,6 @@ new class extends Component
         }
 
         $model->save();
-        // Invalidate computed property cache to force recalculation
-        unset($this->items);
-        if (isset($this->itemsByStatus)) {
-            unset($this->itemsByStatus);
-        }
         $this->dispatch('item-updated');
     }
 
@@ -186,11 +199,6 @@ new class extends Component
         }
 
         $model->save();
-        // Invalidate computed property cache to force recalculation
-        unset($this->items);
-        if (isset($this->itemsByStatus)) {
-            unset($this->itemsByStatus);
-        }
         $this->dispatch('item-updated');
     }
 
@@ -223,15 +231,7 @@ new class extends Component
 
             if ($statusEnum) {
                 $model->update(['status' => $statusEnum]);
-                // Invalidate computed property cache to force recalculation
-                unset($this->items);
-                unset($this->itemsByStatus);
-                // Force recalculation by accessing the computed properties
-                $this->items;
-                $this->itemsByStatus;
-                // Increment refresh counter to force child component re-render
-                $this->refreshCounter++;
-                $this->dispatch('task-updated');
+                $this->dispatch('item-updated');
             }
         } elseif ($itemType === 'event') {
             $statusEnum = match ($newStatus) {
@@ -242,15 +242,7 @@ new class extends Component
 
             if ($statusEnum) {
                 $model->update(['status' => $statusEnum]);
-                // Invalidate computed property cache to force recalculation
-                unset($this->items);
-                unset($this->itemsByStatus);
-                // Force recalculation by accessing the computed properties
-                $this->items;
-                $this->itemsByStatus;
-                // Increment refresh counter to force child component re-render
-                $this->refreshCounter++;
-                $this->dispatch('event-updated');
+                $this->dispatch('item-updated');
             }
         }
         // Projects don't have status, so no update needed
@@ -482,7 +474,7 @@ new class extends Component
             :items="$this->items"
             :items-by-status="$this->itemsByStatus"
             :current-date="$currentDate"
-            wire:key="kanban-view-{{ $currentDate->format('Y-m-d') }}-{{ $itemType }}-{{ $refreshCounter }}"
+            wire:key="kanban-view-{{ $currentDate->format('Y-m-d') }}-{{ $itemType }}"
         />
     @endif
 
