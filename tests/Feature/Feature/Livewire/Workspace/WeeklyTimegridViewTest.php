@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Models\Event;
 use App\Models\Project;
 use App\Models\Task;
-use App\Models\TimegridSetting;
 use App\Models\User;
 use Livewire\Volt\Volt;
 
@@ -141,25 +140,6 @@ test('weekly view displays projects in all-day section', function () {
     expect($weeklyItems[$dateKey]['all_day'])->toHaveCount(1);
 });
 
-test('timegrid settings are loaded from database', function () {
-    TimegridSetting::create([
-        'user_id' => $this->user->id,
-        'start_hour' => 8,
-        'end_hour' => 18,
-        'hour_height' => 80,
-        'show_weekends' => false,
-        'default_event_duration' => 60,
-        'slot_increment' => 30,
-    ]);
-
-    $component = Volt::test('workspace.show-items');
-
-    expect($component->get('startHour'))->toBe(8);
-    expect($component->get('endHour'))->toBe(18);
-    expect($component->get('hourHeight'))->toBe(80);
-    expect($component->get('slotIncrement'))->toBe(30);
-});
-
 test('can update item datetime via drag and drop', function () {
     $event = Event::factory()->create([
         'user_id' => $this->user->id,
@@ -224,39 +204,4 @@ test('search applies to weekly view', function () {
         ->set('search', 'Team')
         ->assertSee('Team Meeting')
         ->assertDontSee('Client Call');
-});
-
-test('timegrid settings modal can be opened', function () {
-    Volt::test('workspace.timegrid-settings-modal')
-        ->call('openModal')
-        ->assertSet('showModal', true);
-});
-
-test('timegrid settings can be saved', function () {
-    Volt::test('workspace.timegrid-settings-modal')
-        ->set('startHour', 9)
-        ->set('endHour', 17)
-        ->set('hourHeight', 100)
-        ->set('showWeekends', false)
-        ->set('defaultEventDuration', 45)
-        ->set('slotIncrement', 15)
-        ->call('save');
-
-    $settings = $this->user->fresh()->timegridSetting;
-
-    expect($settings)->not->toBeNull();
-    expect($settings->start_hour)->toBe(9);
-    expect($settings->end_hour)->toBe(17);
-    expect($settings->hour_height)->toBe(100);
-    expect($settings->show_weekends)->toBe(false);
-    expect($settings->default_event_duration)->toBe(45);
-    expect($settings->slot_increment)->toBe(15);
-});
-
-test('timegrid settings validation works', function () {
-    Volt::test('workspace.timegrid-settings-modal')
-        ->set('startHour', 20)
-        ->set('endHour', 10)
-        ->call('save')
-        ->assertHasErrors(['endHour']);
 });

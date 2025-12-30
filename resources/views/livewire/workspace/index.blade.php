@@ -10,7 +10,6 @@ class extends Component {
     #[On('task-created')]
     #[On('event-created')]
     #[On('project-created')]
-    #[On('timegrid-settings-updated')]
     public function refreshItems(): void
     {
         // This will trigger a re-render of child components
@@ -45,9 +44,6 @@ class extends Component {
     <livewire:workspace.show-task-detail />
     <livewire:workspace.show-event-detail />
     <livewire:workspace.show-project-detail />
-
-    <!-- Timegrid Settings Modal -->
-    <livewire:workspace.timegrid-settings-modal />
 
     <!-- Calendar Event Popover -->
     <livewire:workspace.calendar-event-popover />

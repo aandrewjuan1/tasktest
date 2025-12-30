@@ -1,5 +1,7 @@
 <?php
 
+use App\Enums\EventStatus;
+use App\Enums\TaskStatus;
 use App\Models\Event;
 use App\Models\Project;
 use App\Models\Tag;
@@ -37,7 +39,7 @@ new class extends Component
 
     public int $startHour = 6;
 
-    public int $endHour = 22;
+    public int $endHour = 23;
 
     public int $hourHeight = 60;
 
@@ -47,20 +49,7 @@ new class extends Component
     {
         $this->weekStartDate = now()->startOfWeek();
         $this->currentDate = now();
-        $this->loadTimegridSettings();
         $this->dispatch('date-focused', date: $this->currentDate->format('Y-m-d'));
-    }
-
-    public function loadTimegridSettings(): void
-    {
-        $settings = auth()->user()->timegridSetting;
-
-        if ($settings) {
-            $this->startHour = $settings->start_hour;
-            $this->endHour = $settings->end_hour;
-            $this->hourHeight = $settings->hour_height;
-            $this->slotIncrement = $settings->slot_increment;
-        }
     }
 
     public function updatingItemType(): void
@@ -136,10 +125,6 @@ new class extends Component
         $this->weekStartDate = Carbon::parse($weekStart);
     }
 
-    public function openTimegridSettings(): void
-    {
-        $this->dispatch('open-timegrid-settings');
-    }
 
     public function updateItemDateTime(int $itemId, string $itemType, string $newStart, ?string $newEnd = null): void
     {
@@ -155,9 +140,15 @@ new class extends Component
         }
 
         if ($itemType === 'task') {
-            $model->start_date = Carbon::parse($newStart)->toDateString();
+            $startDateTime = Carbon::parse($newStart);
+            $model->start_date = $startDateTime->toDateString();
+            $model->start_time = $startDateTime->format('H:i:s');
+
             if ($newEnd) {
                 $model->end_date = Carbon::parse($newEnd)->toDateString();
+                // Calculate duration from start and end times
+                $endDateTime = Carbon::parse($newEnd);
+                $model->duration = $startDateTime->diffInMinutes($endDateTime);
             }
         } elseif ($itemType === 'event') {
             $model->start_datetime = Carbon::parse($newStart);
@@ -175,16 +166,89 @@ new class extends Component
         $this->dispatch('item-updated');
     }
 
-    public function updateTaskStatus(int $taskId, string $newStatus): void
+    public function updateItemDuration(int $itemId, string $itemType, int $newDurationMinutes): void
     {
-        $task = Task::where('id', $taskId)
-            ->where('user_id', auth()->id())
-            ->first();
+        // Enforce minimum duration of 30 minutes
+        $newDurationMinutes = max(30, $newDurationMinutes);
 
-        if ($task) {
-            $task->update(['status' => $newStatus]);
-            $this->dispatch('task-updated');
+        // Snap to 30-minute grid intervals
+        $newDurationMinutes = round($newDurationMinutes / 30) * 30;
+        $newDurationMinutes = max(30, $newDurationMinutes); // Ensure still at least 30 after snapping
+
+        $model = match ($itemType) {
+            'task' => Task::where('id', $itemId)->where('user_id', auth()->id())->first(),
+            'event' => Event::where('id', $itemId)->where('user_id', auth()->id())->first(),
+            default => null,
+        };
+
+        if (! $model) {
+            return;
         }
+
+        if ($itemType === 'task') {
+            // For tasks, update duration and recalculate end_date if needed
+            $model->duration = $newDurationMinutes;
+
+            if ($model->start_date && $model->start_time) {
+                $startDateString = Carbon::parse($model->start_date)->format('Y-m-d');
+                $startDateTime = Carbon::parse($startDateString . ' ' . $model->start_time);
+                $endDateTime = $startDateTime->copy()->addMinutes($newDurationMinutes);
+                $model->end_date = $endDateTime->toDateString();
+            }
+        } elseif ($itemType === 'event') {
+            // For events, update end_datetime while keeping start_datetime
+            $startDateTime = Carbon::parse($model->start_datetime);
+            $model->end_datetime = $startDateTime->copy()->addMinutes($newDurationMinutes);
+        }
+
+        $model->save();
+        $this->dispatch('item-updated');
+    }
+
+    public function updateItemStatus(int $itemId, string $itemType, string $newStatus): void
+    {
+        // Prevent events from being dropped in 'doing' column
+        if ($itemType === 'event' && $newStatus === 'doing') {
+            return;
+        }
+
+        $model = match ($itemType) {
+            'task' => Task::where('id', $itemId)->where('user_id', auth()->id())->first(),
+            'event' => Event::where('id', $itemId)->where('user_id', auth()->id())->first(),
+            'project' => Project::where('id', $itemId)->where('user_id', auth()->id())->first(),
+            default => null,
+        };
+
+        if (! $model) {
+            return;
+        }
+
+        // Map kanban column status to appropriate enum value for each item type
+        if ($itemType === 'task') {
+            $statusEnum = match ($newStatus) {
+                'to_do' => TaskStatus::ToDo,
+                'doing' => TaskStatus::Doing,
+                'done' => TaskStatus::Done,
+                default => null,
+            };
+
+            if ($statusEnum) {
+                $model->update(['status' => $statusEnum]);
+                $this->dispatch('task-updated');
+            }
+        } elseif ($itemType === 'event') {
+            $statusEnum = match ($newStatus) {
+                'to_do' => EventStatus::Scheduled,
+                'done' => EventStatus::Completed,
+                default => null,
+            };
+
+            if ($statusEnum) {
+                $model->update(['status' => $statusEnum]);
+                $this->dispatch('event-updated');
+            }
+        }
+        // Projects don't have status, so no update needed
     }
 
     #[Computed]
@@ -596,11 +660,15 @@ new class extends Component
                      @dragleave="draggingOver = false"
                      @drop.prevent="
                          draggingOver = false;
-                         const taskId = $event.dataTransfer.getData('taskId');
+                         const itemId = $event.dataTransfer.getData('itemId');
                          const itemType = $event.dataTransfer.getData('itemType');
-                         if (itemType === 'task') {
-                             $wire.updateTaskStatus(parseInt(taskId), '{{ $status }}');
+
+                         // Prevent events from being dropped in 'doing' column
+                         if (itemType === 'event' && '{{ $status }}' === 'doing') {
+                             return;
                          }
+
+                         $wire.updateItemStatus(parseInt(itemId), itemType, '{{ $status }}');
                      "
                      :class="{ 'ring-2 ring-blue-500': draggingOver }"
                 >
@@ -618,10 +686,11 @@ new class extends Component
                     <div class="space-y-3">
                         @foreach($this->itemsByStatus[$status] as $item)
                             <div
+                                wire:key="item-{{ $item->item_type }}-{{ $item->id }}"
                                 draggable="true"
                                 @dragstart="
                                     $event.dataTransfer.effectAllowed = 'move';
-                                    $event.dataTransfer.setData('taskId', {{ $item->id }});
+                                    $event.dataTransfer.setData('itemId', {{ $item->id }});
                                     $event.dataTransfer.setData('itemType', '{{ $item->item_type }}');
                                 "
                                 class="cursor-move"
@@ -664,12 +733,6 @@ new class extends Component
                     <flux:button variant="ghost" size="sm" icon="chevron-left" wire:click="previousWeek">
                     </flux:button>
                     <flux:button variant="ghost" size="sm" icon="chevron-right" wire:click="nextWeek">
-                    </flux:button>
-                    <flux:button variant="ghost" size="sm" wire:click="openTimegridSettings" title="Timegrid Settings">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
                     </flux:button>
                 </div>
             </div>
@@ -748,7 +811,7 @@ new class extends Component
                                      const minutesFromStart = (y / {{ $hourHeight }}) * 60;
                                      const totalMinutes = ({{ $startHour }} * 60) + minutesFromStart;
                                      const hours = Math.floor(totalMinutes / 60);
-                                     const minutes = Math.floor((totalMinutes % 60) / {{ $slotIncrement }}) * {{ $slotIncrement }};
+                                     const minutes = Math.floor((totalMinutes % 60) / 30) * 30;
 
                                      const newStart = '{{ $dateKey }} ' + String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0') + ':00';
                                      const endDate = new Date('{{ $dateKey }} ' + String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0'));
@@ -764,19 +827,89 @@ new class extends Component
                                     <div class="absolute w-full border-t border-zinc-200 dark:border-zinc-700" style="top: {{ ($hour - $startHour) * $hourHeight }}px;"></div>
                                 @endfor
 
+                                <!-- 30-Minute Grid Lines -->
+                                @for($hour = $startHour; $hour < $endHour; $hour++)
+                                    <div class="absolute w-full border-t border-dotted border-zinc-100 dark:border-zinc-800" style="top: {{ (($hour - $startHour) * $hourHeight) + ($hourHeight / 2) }}px;"></div>
+                                @endfor
+
                                 <!-- Timed Items -->
                                 @foreach($timedItems as $item)
+                                    @php
+                                        $currentDuration = $item->item_type === 'event'
+                                            ? Carbon::parse($item->end_datetime)->diffInMinutes(Carbon::parse($item->start_datetime))
+                                            : ($item->duration ?? 60);
+                                    @endphp
                                     <div
+                                        wire:key="timed-item-{{ $item->item_type }}-{{ $item->id }}"
+                                        x-data="{
+                                            isResizing: false,
+                                            initialY: 0,
+                                            initialHeight: {{ $item->grid_height }},
+                                            initialDuration: {{ $currentDuration }},
+                                            currentHeight: {{ $item->grid_height }},
+                                            itemTop: {{ $item->grid_top }},
+                                            hourHeight: {{ $hourHeight }},
+                                            gridInterval: 30,
+                                            minHeight: {{ ($hourHeight / 60) * 30 }},
+                                            startResize(e) {
+                                                if (e.target.classList.contains('resize-handle')) {
+                                                    this.isResizing = true;
+                                                    this.initialY = e.clientY;
+                                                    this.initialHeight = this.currentHeight;
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+
+                                                    const handleMove = (moveEvent) => {
+                                                        if (!this.isResizing) return;
+                                                        const deltaY = moveEvent.clientY - this.initialY;
+                                                        const newHeight = Math.max(this.minHeight, this.initialHeight + deltaY);
+                                                        const newDuration = (newHeight / this.hourHeight) * 60;
+                                                        const snappedDuration = Math.max(30, Math.round(newDuration / this.gridInterval) * this.gridInterval);
+                                                        const snappedHeight = (snappedDuration / 60) * this.hourHeight;
+                                                        this.currentHeight = snappedHeight;
+                                                    };
+
+                                                    const handleUp = (upEvent) => {
+                                                        if (!this.isResizing) return;
+                                                        const deltaY = upEvent.clientY - this.initialY;
+                                                        const newHeight = Math.max(this.minHeight, this.initialHeight + deltaY);
+                                                        const newDuration = (newHeight / this.hourHeight) * 60;
+                                                        const snappedDuration = Math.max(30, Math.round(newDuration / this.gridInterval) * this.gridInterval);
+
+                                                        $wire.updateItemDuration({{ $item->id }}, '{{ $item->item_type }}', snappedDuration);
+
+                                                        this.isResizing = false;
+                                                        this.initialHeight = this.currentHeight;
+                                                        this.initialDuration = snappedDuration;
+
+                                                        document.removeEventListener('mousemove', handleMove);
+                                                        document.removeEventListener('mouseup', handleUp);
+                                                    };
+
+                                                    document.addEventListener('mousemove', handleMove);
+                                                    document.addEventListener('mouseup', handleUp);
+                                                }
+                                            }
+                                        }"
+                                        @mousedown="startResize($event)"
                                         draggable="true"
                                         @dragstart="
-                                            $event.dataTransfer.effectAllowed = 'move';
-                                            $event.dataTransfer.setData('itemId', {{ $item->id }});
-                                            $event.dataTransfer.setData('itemType', '{{ $item->item_type }}');
-                                            $event.dataTransfer.setData('duration', {{ $item->item_type === 'event' ? (Carbon::parse($item->end_datetime)->diffInMinutes(Carbon::parse($item->start_datetime))) : ($item->item_type === 'task' ? ($item->duration ?? 60) : 60) }});
+                                            if (!isResizing && !$event.target.classList.contains('resize-handle')) {
+                                                $event.dataTransfer.effectAllowed = 'move';
+                                                $event.dataTransfer.setData('itemId', {{ $item->id }});
+                                                $event.dataTransfer.setData('itemType', '{{ $item->item_type }}');
+                                                $event.dataTransfer.setData('duration', {{ $currentDuration }});
+                                            } else {
+                                                $event.preventDefault();
+                                            }
                                         "
                                         class="absolute w-full px-1 py-1 text-xs rounded cursor-move overflow-hidden hover:z-20 hover:shadow-lg transition-shadow"
-                                        style="top: {{ $item->grid_top }}px; height: {{ $item->grid_height }}px; background-color: {{ $item->color ?? ($item->item_type === 'event' ? '#8b5cf6' : '#3b82f6') }}; color: white;"
-                                        wire:click="$dispatch('view-{{ $item->item_type }}-detail', { id: {{ $item->id }} })"
+                                        :style="`top: ${itemTop}px; height: ${isResizing ? currentHeight : {{ $item->grid_height }}}px; background-color: {{ $item->color ?? ($item->item_type === 'event' ? '#8b5cf6' : '#3b82f6') }}; color: white;`"
+                                        @click="
+                                            if (!isResizing && !$event.target.classList.contains('resize-handle')) {
+                                                $dispatch('view-{{ $item->item_type }}-detail', { id: {{ $item->id }} });
+                                            }
+                                        "
                                     >
                                         <div class="font-semibold truncate">{{ $item->title }}</div>
                                         @if($item->item_type === 'event')
@@ -788,6 +921,10 @@ new class extends Component
                                                 {{ $item->computed_start_datetime->format('g:i A') }}
                                             </div>
                                         @endif
+                                        <div
+                                            class="resize-handle absolute bottom-0 left-0 right-0 bg-white/30 hover:bg-white/50 cursor-ns-resize transition-colors z-10"
+                                            style="height: 3px;"
+                                        ></div>
                                     </div>
                                 @endforeach
                             </div>

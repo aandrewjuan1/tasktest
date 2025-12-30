@@ -113,13 +113,6 @@ class User extends Authenticatable
         return $this->hasOne(NotificationPreference::class);
     }
 
-    /**
-     * Timegrid settings for the user.
-     */
-    public function timegridSetting(): HasOne
-    {
-        return $this->hasOne(TimegridSetting::class);
-    }
 
     /**
      * Collaborations where user is a collaborator.
