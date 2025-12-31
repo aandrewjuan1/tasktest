@@ -109,13 +109,13 @@ new class extends Component
                             $topMinutes = max($startMinutes - $gridStartMinutes, 0);
                             $durationMinutes = min($endMinutes, $gridEndMinutes) - max($startMinutes, $gridStartMinutes);
 
-                            $item->grid_top = ($topMinutes / 60) * $this->hourHeight;
-                            $item->grid_height = ($durationMinutes / 60) * $this->hourHeight;
+                            // Clone the item to avoid mutating the reactive prop
+                            $itemCopy = clone $item;
+                            $itemCopy->grid_top = ($topMinutes / 60) * $this->hourHeight;
+                            $itemCopy->grid_height = ($durationMinutes / 60) * $this->hourHeight;
+                            $itemCopy->computed_start_datetime = $startDateTime;
 
-                            // Store computed datetime for display purposes
-                            $item->computed_start_datetime = $startDateTime;
-
-                            $itemsByDay[$dateKey]['timed']->push($item);
+                            $itemsByDay[$dateKey]['timed']->push($itemCopy);
                         }
                     } else {
                         // No start_time, add to all-day section
@@ -143,10 +143,12 @@ new class extends Component
                             $topMinutes = max($startMinutes - $gridStartMinutes, 0);
                             $durationMinutes = min($endMinutes, $gridEndMinutes) - max($startMinutes, $gridStartMinutes);
 
-                            $item->grid_top = ($topMinutes / 60) * $this->hourHeight;
-                            $item->grid_height = ($durationMinutes / 60) * $this->hourHeight;
+                            // Clone the item to avoid mutating the reactive prop
+                            $itemCopy = clone $item;
+                            $itemCopy->grid_top = ($topMinutes / 60) * $this->hourHeight;
+                            $itemCopy->grid_height = ($durationMinutes / 60) * $this->hourHeight;
 
-                            $itemsByDay[$dateKey]['timed']->push($item);
+                            $itemsByDay[$dateKey]['timed']->push($itemCopy);
                         }
                     }
                 }

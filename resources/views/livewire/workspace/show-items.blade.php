@@ -22,15 +22,6 @@ new class extends Component
     #[Url(except: 'list')]
     public string $viewMode = 'list'; // list, kanban, weekly_calendar
 
-    #[Url(except: 'all')]
-    public string $itemType = 'all';
-
-    #[Url(except: 'created_at')]
-    public string $sortBy = 'created_at';
-
-    #[Url(except: 'desc')]
-    public string $sortDirection = 'desc';
-
     // Weekly calendar view properties
     public ?Carbon $weekStartDate = null;
 
@@ -42,11 +33,6 @@ new class extends Component
         $this->weekStartDate = now()->startOfWeek();
         $this->currentDate = now();
         $this->dispatch('date-focused', date: $this->currentDate->format('Y-m-d'));
-    }
-
-    public function updatingItemType(): void
-    {
-        $this->resetPage();
     }
 
     public function openCreateModal(): void
@@ -256,135 +242,43 @@ new class extends Component
         $user = auth()->user();
         $items = collect();
 
-        // Determine filtering mode based on view
-        $filterByDate = in_array($this->viewMode, ['list', 'kanban']) && $this->currentDate;
-        $filterByWeek = $this->viewMode === 'weekly' && $this->weekStartDate;
-
-        $selectedDate = $filterByDate ? $this->currentDate->copy()->startOfDay() : null;
-        $selectedDateEnd = $filterByDate ? $this->currentDate->copy()->endOfDay() : null;
-
-        $weekStart = $filterByWeek ? $this->weekStartDate->copy()->startOfDay() : null;
-        $weekEnd = $filterByWeek ? $this->weekStartDate->copy()->addDays(6)->endOfDay() : null;
-
-        // Build queries based on item type filter
-        if (in_array($this->itemType, ['all', 'tasks'])) {
-            $taskQuery = Task::query()
-                ->where('user_id', $user->id)
-                ->with(['project', 'tags', 'event']);
-
-            // Filter by date for list/kanban views
-            if ($filterByDate) {
-                $taskQuery->where(function ($query) use ($selectedDate, $selectedDateEnd) {
-                    $query->whereDate('start_date', $selectedDate->toDateString())
-                        ->orWhereDate('end_date', $selectedDate->toDateString())
-                        ->orWhere(function ($q) use ($selectedDate, $selectedDateEnd) {
-                            $q->where('start_date', '<=', $selectedDateEnd)
-                                ->where('end_date', '>=', $selectedDate);
-                        });
-                });
-            } elseif ($filterByWeek) {
-                // Filter by week range for weekly view
-                $taskQuery->where(function ($query) use ($weekStart, $weekEnd) {
-                    $query->whereBetween('start_date', [$weekStart, $weekEnd])
-                        ->orWhereBetween('end_date', [$weekStart, $weekEnd]);
-                });
-            }
-
-            $tasks = $taskQuery->get();
-
-            $tasks = $tasks->map(function ($task) {
+        // Always fetch all tasks
+        $tasks = Task::query()
+            ->where('user_id', $user->id)
+            ->with(['project', 'tags', 'event'])
+            ->get()
+            ->map(function ($task) {
                 $task->item_type = 'task';
                 $task->sort_date = $task->end_date ?? $task->created_at;
 
                 return $task;
             });
 
-            $items = $items->merge($tasks);
-        }
-
-        if (in_array($this->itemType, ['all', 'events'])) {
-            $eventQuery = Event::query()
-                ->where('user_id', $user->id)
-                ->with(['tags']);
-
-            // Filter by date for list/kanban views
-            if ($filterByDate) {
-                $eventQuery->where(function ($query) use ($selectedDate, $selectedDateEnd) {
-                    $query->whereDate('start_datetime', $selectedDate->toDateString())
-                        ->orWhereDate('end_datetime', $selectedDate->toDateString())
-                        ->orWhere(function ($q) use ($selectedDate, $selectedDateEnd) {
-                            $q->where('start_datetime', '<=', $selectedDateEnd)
-                                ->where('end_datetime', '>=', $selectedDate);
-                        });
-                });
-            } elseif ($filterByWeek) {
-                // Filter by week range for weekly view
-                $eventQuery->where(function ($query) use ($weekStart, $weekEnd) {
-                    $query->whereBetween('start_datetime', [$weekStart, $weekEnd])
-                        ->orWhereBetween('end_datetime', [$weekStart, $weekEnd]);
-                });
-            }
-
-            $events = $eventQuery->get();
-
-            $events = $events->map(function ($event) {
+        // Always fetch all events
+        $events = Event::query()
+            ->where('user_id', $user->id)
+            ->with(['tags'])
+            ->get()
+            ->map(function ($event) {
                 $event->item_type = 'event';
                 $event->sort_date = $event->start_datetime;
 
                 return $event;
             });
 
-            $items = $items->merge($events);
-        }
-
-        if (in_array($this->itemType, ['all', 'projects'])) {
-            $projectQuery = Project::query()
-                ->where('user_id', $user->id)
-                ->with(['tags', 'tasks']);
-
-            // Filter by date for list/kanban views
-            if ($filterByDate) {
-                $projectQuery->where(function ($query) use ($selectedDate, $selectedDateEnd) {
-                    $query->whereDate('start_date', $selectedDate->toDateString())
-                        ->orWhereDate('end_date', $selectedDate->toDateString())
-                        ->orWhere(function ($q) use ($selectedDate, $selectedDateEnd) {
-                            $q->where('start_date', '<=', $selectedDateEnd)
-                                ->where('end_date', '>=', $selectedDate);
-                        });
-                });
-            } elseif ($filterByWeek) {
-                // Filter by week range for weekly view
-                $projectQuery->where(function ($query) use ($weekStart, $weekEnd) {
-                    $query->whereBetween('start_date', [$weekStart, $weekEnd])
-                        ->orWhereBetween('end_date', [$weekStart, $weekEnd]);
-                });
-            }
-
-            $projects = $projectQuery->get();
-
-            $projects = $projects->map(function ($project) {
+        // Always fetch all projects
+        $projects = Project::query()
+            ->where('user_id', $user->id)
+            ->with(['tags', 'tasks'])
+            ->get()
+            ->map(function ($project) {
                 $project->item_type = 'project';
                 $project->sort_date = $project->created_at;
 
                 return $project;
             });
 
-            $items = $items->merge($projects);
-        }
-
-        // Sort items (only for list view, kanban and weekly have their own sorting)
-        if ($this->viewMode === 'list') {
-            $items = $items->sortBy(function ($item) {
-                return match ($this->sortBy) {
-                    'due_date' => $item->sort_date,
-                    'title' => $item->title ?? $item->name ?? '',
-                    'priority' => $item->priority?->value ?? 'zzz',
-                    default => $item->created_at,
-                };
-            }, SORT_REGULAR, $this->sortDirection === 'desc');
-        }
-
-        return $items;
+        return $items->merge($tasks)->merge($events)->merge($projects);
     }
 
     #[Computed]
@@ -466,7 +360,7 @@ new class extends Component
         <livewire:workspace.list-view
             :items="$this->items"
             :current-date="$currentDate"
-            wire:key="list-view-{{ $currentDate->format('Y-m-d') }}-{{ $itemType }}"
+            wire:key="list-view-{{ $currentDate->format('Y-m-d') }}"
         />
     @endif
 
@@ -476,7 +370,7 @@ new class extends Component
             :items="$this->items"
             :items-by-status="$this->itemsByStatus"
             :current-date="$currentDate"
-            wire:key="kanban-view-{{ $currentDate->format('Y-m-d') }}-{{ $itemType }}"
+            wire:key="kanban-view-{{ $currentDate->format('Y-m-d') }}"
         />
     @endif
 
