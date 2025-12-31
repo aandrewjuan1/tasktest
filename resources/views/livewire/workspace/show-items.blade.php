@@ -78,11 +78,15 @@ new class extends Component
     #[On('date-focused')]
     public function updateCurrentDate(string $date): void
     {
-        // If not in list or kanban view, switch to list view (e.g., when clicking calendar day)
-        if (! in_array($this->viewMode, ['list', 'kanban'])) {
-            $this->viewMode = 'list';
+        $parsedDate = Carbon::parse($date);
+
+        // Update the appropriate date property based on current view mode
+        if (in_array($this->viewMode, ['list', 'kanban'])) {
+            $this->currentDate = $parsedDate;
+        } elseif ($this->viewMode === 'weekly') {
+            // For weekly view, update to the start of the week containing the clicked date
+            $this->weekStartDate = $parsedDate->copy()->startOfWeek();
         }
-        $this->currentDate = Carbon::parse($date);
     }
 
     #[On('switch-to-week-view')]
@@ -331,9 +335,91 @@ new class extends Component
     }
 
     #[Computed]
+    public function filteredItems(): Collection
+    {
+        // For weekly view, return all items (weekly view handles its own filtering)
+        if ($this->viewMode === 'weekly') {
+            return $this->items;
+        }
+
+        // For list/kanban views, filter items by currentDate
+        if (! in_array($this->viewMode, ['list', 'kanban']) || ! $this->currentDate) {
+            return $this->items;
+        }
+
+        $targetDate = $this->currentDate->format('Y-m-d');
+
+        return $this->items->filter(function ($item) use ($targetDate) {
+            if ($item->item_type === 'task') {
+                if (! $item->start_date) {
+                    return false;
+                }
+
+                $startDate = $item->start_date instanceof Carbon
+                    ? $item->start_date->format('Y-m-d')
+                    : Carbon::parse($item->start_date)->format('Y-m-d');
+
+                $endDate = null;
+                if ($item->end_date) {
+                    $endDate = $item->end_date instanceof Carbon
+                        ? $item->end_date->format('Y-m-d')
+                        : Carbon::parse($item->end_date)->format('Y-m-d');
+                }
+
+                // Include task if it starts, ends, or spans the target date
+                return ($startDate === $targetDate) ||
+                       ($endDate === $targetDate) ||
+                       ($endDate && $startDate <= $targetDate && $endDate >= $targetDate);
+            } elseif ($item->item_type === 'event') {
+                if (! $item->start_datetime) {
+                    return false;
+                }
+
+                $startDate = $item->start_datetime instanceof Carbon
+                    ? $item->start_datetime->format('Y-m-d')
+                    : Carbon::parse($item->start_datetime)->format('Y-m-d');
+
+                $endDate = null;
+                if ($item->end_datetime) {
+                    $endDate = $item->end_datetime instanceof Carbon
+                        ? $item->end_datetime->format('Y-m-d')
+                        : Carbon::parse($item->end_datetime)->format('Y-m-d');
+                }
+
+                // Include event if it starts, ends, or spans the target date
+                return ($startDate === $targetDate) ||
+                       ($endDate === $targetDate) ||
+                       ($endDate && $startDate <= $targetDate && $endDate >= $targetDate);
+            } elseif ($item->item_type === 'project') {
+                if (! $item->start_date) {
+                    return false;
+                }
+
+                $startDate = $item->start_date instanceof Carbon
+                    ? $item->start_date->format('Y-m-d')
+                    : Carbon::parse($item->start_date)->format('Y-m-d');
+
+                $endDate = null;
+                if ($item->end_date) {
+                    $endDate = $item->end_date instanceof Carbon
+                        ? $item->end_date->format('Y-m-d')
+                        : Carbon::parse($item->end_date)->format('Y-m-d');
+                }
+
+                // Include project if it starts, ends, or spans the target date
+                return ($startDate === $targetDate) ||
+                       ($endDate === $targetDate) ||
+                       ($endDate && $startDate <= $targetDate && $endDate >= $targetDate);
+            }
+
+            return false;
+        });
+    }
+
+    #[Computed]
     public function itemsByStatus(): array
     {
-        $items = $this->items;
+        $items = $this->filteredItems;
 
         return [
             'to_do' => $items->filter(fn ($item) => in_array($item->status?->value ?? '', ['to_do', 'scheduled', 'tentative'])),
@@ -429,7 +515,7 @@ new class extends Component
     <div wire:transition="fade">
         @if($viewMode === 'list')
             <livewire:workspace.list-view
-                :items="$this->items"
+                :items="$this->filteredItems"
                 :current-date="$currentDate"
                 wire:key="list-view-{{ $currentDate->format('Y-m-d') }}"
             />
@@ -440,7 +526,7 @@ new class extends Component
     <div wire:transition="fade">
         @if($viewMode === 'kanban')
             <livewire:workspace.kanban-view
-                :items="$this->items"
+                :items="$this->filteredItems"
                 :items-by-status="$this->itemsByStatus"
                 :current-date="$currentDate"
                 wire:key="kanban-view-{{ $currentDate->format('Y-m-d') }}"
