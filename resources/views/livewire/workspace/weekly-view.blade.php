@@ -3,7 +3,6 @@
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
-use Livewire\Attributes\On;
 use Livewire\Attributes\Reactive;
 use Livewire\Volt\Component;
 
@@ -45,12 +44,6 @@ new class extends Component
     {
         $newWeekStart = now()->startOfWeek();
         $this->dispatch('switch-to-week-view', weekStart: $newWeekStart->format('Y-m-d'));
-    }
-
-    #[On('switch-to-week-view')]
-    public function switchToWeekView(string $weekStart): void
-    {
-        $this->weekStartDate = Carbon::parse($weekStart);
     }
 
     #[Computed]
@@ -173,13 +166,42 @@ new class extends Component
                 {{ $weekStartDate->format('M d') }} - {{ $weekStartDate->copy()->addDays(6)->format('M d, Y') }}
             </h3>
         </div>
-        <div class="flex items-center gap-2">
-            <flux:button variant="ghost" size="sm" wire:click="goToToday">
-                Today
+        <div class="flex items-center gap-2" role="group" aria-label="Week navigation">
+            <flux:button
+                variant="ghost"
+                size="sm"
+                wire:click="goToToday"
+                wire:loading.attr="disabled"
+                wire:target="goToToday,previousWeek,nextWeek"
+                aria-label="Go to current week"
+            >
+                <span wire:loading.remove wire:target="goToToday,previousWeek,nextWeek">Today</span>
+                <span wire:loading wire:target="goToToday,previousWeek,nextWeek">
+                    <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </span>
             </flux:button>
-            <flux:button variant="ghost" size="sm" icon="chevron-left" wire:click="previousWeek">
+            <flux:button
+                variant="ghost"
+                size="sm"
+                icon="chevron-left"
+                wire:click="previousWeek"
+                wire:loading.attr="disabled"
+                wire:target="goToToday,previousWeek,nextWeek"
+                aria-label="Previous week"
+            >
             </flux:button>
-            <flux:button variant="ghost" size="sm" icon="chevron-right" wire:click="nextWeek">
+            <flux:button
+                variant="ghost"
+                size="sm"
+                icon="chevron-right"
+                wire:click="nextWeek"
+                wire:loading.attr="disabled"
+                wire:target="goToToday,previousWeek,nextWeek"
+                aria-label="Next week"
+            >
             </flux:button>
         </div>
     </div>
@@ -244,7 +266,9 @@ new class extends Component
                         $isToday = $day->isToday();
                     @endphp
                     <div class="relative border-r border-zinc-200 dark:border-zinc-700 {{ $isToday ? 'bg-blue-50 dark:bg-blue-950/20' : '' }}"
-                         x-data="{ draggingOver: false }"
+                         role="gridcell"
+                         aria-label="{{ $day->format('l, F j') }}"
+                         x-data="{ draggingOver: false, isUpdating: false }"
                          @dragover.prevent="draggingOver = true"
                          @dragleave="draggingOver = false"
                          @drop.prevent="
@@ -263,26 +287,34 @@ new class extends Component
                                  return;
                              }
 
-                             const rect = $event.currentTarget.getBoundingClientRect();
-                             const y = $event.clientY - rect.top;
-                             const minutesFromStart = (y / {{ $hourHeight }}) * 60;
-                             const totalMinutes = ({{ $startHour }} * 60) + minutesFromStart;
-                             const hours = Math.floor(totalMinutes / 60);
-                             const minutes = Math.floor((totalMinutes % 60) / 30) * 30;
+                             try {
+                                 const rect = $event.currentTarget.getBoundingClientRect();
+                                 const y = $event.clientY - rect.top;
+                                 const minutesFromStart = (y / {{ $hourHeight }}) * 60;
+                                 const totalMinutes = ({{ $startHour }} * 60) + minutesFromStart;
+                                 const hours = Math.floor(totalMinutes / 60);
+                                 const minutes = Math.floor((totalMinutes % 60) / 30) * 30;
 
-                             const newStart = '{{ $dateKey }} ' + String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0') + ':00';
-                             const endDate = new Date('{{ $dateKey }} ' + String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0'));
-                             endDate.setMinutes(endDate.getMinutes() + duration);
-                             const newEnd = endDate.toISOString().slice(0, 19).replace('T', ' ');
+                                 const newStart = '{{ $dateKey }} ' + String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0') + ':00';
+                                 const endDate = new Date('{{ $dateKey }} ' + String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0'));
+                                 endDate.setMinutes(endDate.getMinutes() + duration);
+                                 const newEnd = endDate.toISOString().slice(0, 19).replace('T', ' ');
 
-                             $dispatch('update-item-datetime', {
-                                 itemId: parsedItemId,
-                                 itemType: itemType,
-                                 newStart: newStart,
-                                 newEnd: newEnd
-                             });
+                                 isUpdating = true;
+                                 $dispatch('update-item-datetime', {
+                                     itemId: parsedItemId,
+                                     itemType: itemType,
+                                     newStart: newStart,
+                                     newEnd: newEnd
+                                 });
+
+                                 setTimeout(() => { isUpdating = false; }, 1000);
+                             } catch (error) {
+                                 console.error('Error updating item datetime:', error);
+                                 isUpdating = false;
+                             }
                          "
-                         :class="{ 'ring-2 ring-blue-500': draggingOver }"
+                         :class="{ 'ring-2 ring-blue-500': draggingOver || isUpdating }"
                     >
                         <!-- Hour Lines -->
                         @for($hour = $startHour; $hour <= $endHour; $hour++)
@@ -303,8 +335,12 @@ new class extends Component
                             @endphp
                             <div
                                 wire:key="timed-item-{{ $item->item_type }}-{{ $item->id }}"
+                                role="button"
+                                tabindex="0"
+                                aria-label="{{ $item->title }} from {{ Carbon::parse($item->item_type === 'event' ? $item->start_datetime : ($item->computed_start_datetime ?? $item->start_date))->format('g:i A') }}"
                                 x-data="{
                                     isResizing: false,
+                                    isDragging: false,
                                     initialY: 0,
                                     initialHeight: {{ $item->grid_height }},
                                     initialDuration: {{ $currentDuration }},
@@ -338,11 +374,15 @@ new class extends Component
                                                 const newDuration = (newHeight / this.hourHeight) * 60;
                                                 const snappedDuration = Math.max(30, Math.round(newDuration / this.gridInterval) * this.gridInterval);
 
-                                                $dispatch('update-item-duration', {
-                                                    itemId: {{ $item->id }},
-                                                    itemType: '{{ $item->item_type }}',
-                                                    newDurationMinutes: snappedDuration
-                                                });
+                                                try {
+                                                    $dispatch('update-item-duration', {
+                                                        itemId: {{ $item->id }},
+                                                        itemType: '{{ $item->item_type }}',
+                                                        newDurationMinutes: snappedDuration
+                                                    });
+                                                } catch (error) {
+                                                    console.error('Error updating duration:', error);
+                                                }
 
                                                 this.isResizing = false;
                                                 this.initialHeight = this.currentHeight;
@@ -361,6 +401,7 @@ new class extends Component
                                 draggable="true"
                                 @dragstart="
                                     if (!isResizing && !$event.target.classList.contains('resize-handle')) {
+                                        isDragging = true;
                                         $event.dataTransfer.effectAllowed = 'move';
                                         $event.dataTransfer.setData('itemId', {{ $item->id }});
                                         $event.dataTransfer.setData('itemType', '{{ $item->item_type }}');
@@ -369,13 +410,18 @@ new class extends Component
                                         $event.preventDefault();
                                     }
                                 "
+                                @dragend="isDragging = false"
+                                wire:loading.class="opacity-50"
+                                wire:target="handleUpdateItemDateTime,handleUpdateItemDuration"
                                 class="absolute w-full px-1 py-1 text-xs rounded cursor-move overflow-hidden hover:z-20 hover:shadow-lg transition-shadow"
+                                :class="{ 'opacity-50 ring-2 ring-blue-500': isDragging }"
                                 :style="`top: ${itemTop}px; height: ${isResizing ? currentHeight : {{ $item->grid_height }}}px; background-color: {{ $item->color ?? ($item->item_type === 'event' ? '#8b5cf6' : '#3b82f6') }}; color: white;`"
                                 @click="
                                     if (!isResizing && !$event.target.classList.contains('resize-handle')) {
                                         $dispatch('view-{{ $item->item_type }}-detail', { id: {{ $item->id }} });
                                     }
                                 "
+                                @keydown.enter.prevent="$dispatch('view-{{ $item->item_type }}-detail', { id: {{ $item->id }} })"
                             >
                                 <div class="font-semibold truncate">{{ $item->title }}</div>
                                 @if($item->item_type === 'event')
@@ -390,7 +436,17 @@ new class extends Component
                                 <div
                                     class="resize-handle absolute bottom-0 left-0 right-0 bg-white/30 hover:bg-white/50 cursor-ns-resize transition-colors z-10"
                                     style="height: 3px;"
+                                    aria-label="Resize handle"
+                                    role="slider"
+                                    tabindex="0"
                                 ></div>
+                                <!-- Loading indicator -->
+                                <div wire:loading wire:target="handleUpdateItemDateTime,handleUpdateItemDuration" class="absolute inset-0 flex items-center justify-center bg-white/30 dark:bg-black/30 rounded">
+                                    <svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                </div>
                             </div>
                         @endforeach
                     </div>

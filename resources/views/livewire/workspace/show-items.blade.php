@@ -113,127 +113,150 @@ new class extends Component
 
     public function updateItemDateTime(int $itemId, string $itemType, string $newStart, ?string $newEnd = null): void
     {
-        $model = match ($itemType) {
-            'task' => Task::where('id', $itemId)->where('user_id', auth()->id())->first(),
-            'event' => Event::where('id', $itemId)->where('user_id', auth()->id())->first(),
-            'project' => Project::where('id', $itemId)->where('user_id', auth()->id())->first(),
-            default => null,
-        };
+        try {
+            $model = match ($itemType) {
+                'task' => Task::where('id', $itemId)->where('user_id', auth()->id())->first(),
+                'event' => Event::where('id', $itemId)->where('user_id', auth()->id())->first(),
+                'project' => Project::where('id', $itemId)->where('user_id', auth()->id())->first(),
+                default => null,
+            };
 
-        if (! $model) {
-            return;
+            if (! $model) {
+                $this->dispatch('notify', message: 'Item not found', type: 'error');
+                return;
+            }
+
+            if ($itemType === 'task') {
+                $startDateTime = Carbon::parse($newStart);
+                $model->start_date = $startDateTime->toDateString();
+                $model->start_time = $startDateTime->format('H:i:s');
+
+                if ($newEnd) {
+                    $model->end_date = Carbon::parse($newEnd)->toDateString();
+                    // Calculate duration from start and end times
+                    $endDateTime = Carbon::parse($newEnd);
+                    $model->duration = $startDateTime->diffInMinutes($endDateTime);
+                }
+            } elseif ($itemType === 'event') {
+                $model->start_datetime = Carbon::parse($newStart);
+                if ($newEnd) {
+                    $model->end_datetime = Carbon::parse($newEnd);
+                }
+            } elseif ($itemType === 'project') {
+                $model->start_date = Carbon::parse($newStart)->toDateString();
+                if ($newEnd) {
+                    $model->end_date = Carbon::parse($newEnd)->toDateString();
+                }
+            }
+
+            $model->save();
+            $this->dispatch('item-updated');
+            $this->dispatch('notify', message: 'Item updated successfully', type: 'success');
+        } catch (\Exception $e) {
+            \Log::error('Failed to update item datetime', ['error' => $e->getMessage(), 'itemId' => $itemId, 'itemType' => $itemType]);
+            $this->dispatch('notify', message: 'Failed to update item', type: 'error');
         }
-
-        if ($itemType === 'task') {
-            $startDateTime = Carbon::parse($newStart);
-            $model->start_date = $startDateTime->toDateString();
-            $model->start_time = $startDateTime->format('H:i:s');
-
-            if ($newEnd) {
-                $model->end_date = Carbon::parse($newEnd)->toDateString();
-                // Calculate duration from start and end times
-                $endDateTime = Carbon::parse($newEnd);
-                $model->duration = $startDateTime->diffInMinutes($endDateTime);
-            }
-        } elseif ($itemType === 'event') {
-            $model->start_datetime = Carbon::parse($newStart);
-            if ($newEnd) {
-                $model->end_datetime = Carbon::parse($newEnd);
-            }
-        } elseif ($itemType === 'project') {
-            $model->start_date = Carbon::parse($newStart)->toDateString();
-            if ($newEnd) {
-                $model->end_date = Carbon::parse($newEnd)->toDateString();
-            }
-        }
-
-        $model->save();
-        $this->dispatch('item-updated');
     }
 
     public function updateItemDuration(int $itemId, string $itemType, int $newDurationMinutes): void
     {
-        // Enforce minimum duration of 30 minutes
-        $newDurationMinutes = max(30, $newDurationMinutes);
+        try {
+            // Enforce minimum duration of 30 minutes
+            $newDurationMinutes = max(30, $newDurationMinutes);
 
-        // Snap to 30-minute grid intervals
-        $newDurationMinutes = round($newDurationMinutes / 30) * 30;
-        $newDurationMinutes = max(30, $newDurationMinutes); // Ensure still at least 30 after snapping
+            // Snap to 30-minute grid intervals
+            $newDurationMinutes = round($newDurationMinutes / 30) * 30;
+            $newDurationMinutes = max(30, $newDurationMinutes); // Ensure still at least 30 after snapping
 
-        $model = match ($itemType) {
-            'task' => Task::where('id', $itemId)->where('user_id', auth()->id())->first(),
-            'event' => Event::where('id', $itemId)->where('user_id', auth()->id())->first(),
-            default => null,
-        };
+            $model = match ($itemType) {
+                'task' => Task::where('id', $itemId)->where('user_id', auth()->id())->first(),
+                'event' => Event::where('id', $itemId)->where('user_id', auth()->id())->first(),
+                default => null,
+            };
 
-        if (! $model) {
-            return;
-        }
-
-        if ($itemType === 'task') {
-            // For tasks, update duration and recalculate end_date if needed
-            $model->duration = $newDurationMinutes;
-
-            if ($model->start_date && $model->start_time) {
-                $startDateString = Carbon::parse($model->start_date)->format('Y-m-d');
-                $startDateTime = Carbon::parse($startDateString . ' ' . $model->start_time);
-                $endDateTime = $startDateTime->copy()->addMinutes($newDurationMinutes);
-                $model->end_date = $endDateTime->toDateString();
+            if (! $model) {
+                $this->dispatch('notify', message: 'Item not found', type: 'error');
+                return;
             }
-        } elseif ($itemType === 'event') {
-            // For events, update end_datetime while keeping start_datetime
-            $startDateTime = Carbon::parse($model->start_datetime);
-            $model->end_datetime = $startDateTime->copy()->addMinutes($newDurationMinutes);
-        }
 
-        $model->save();
-        $this->dispatch('item-updated');
+            if ($itemType === 'task') {
+                // For tasks, update duration and recalculate end_date if needed
+                $model->duration = $newDurationMinutes;
+
+                if ($model->start_date && $model->start_time) {
+                    $startDateString = Carbon::parse($model->start_date)->format('Y-m-d');
+                    $startDateTime = Carbon::parse($startDateString . ' ' . $model->start_time);
+                    $endDateTime = $startDateTime->copy()->addMinutes($newDurationMinutes);
+                    $model->end_date = $endDateTime->toDateString();
+                }
+            } elseif ($itemType === 'event') {
+                // For events, update end_datetime while keeping start_datetime
+                $startDateTime = Carbon::parse($model->start_datetime);
+                $model->end_datetime = $startDateTime->copy()->addMinutes($newDurationMinutes);
+            }
+
+            $model->save();
+            $this->dispatch('item-updated');
+            $this->dispatch('notify', message: 'Duration updated successfully', type: 'success');
+        } catch (\Exception $e) {
+            \Log::error('Failed to update item duration', ['error' => $e->getMessage(), 'itemId' => $itemId, 'itemType' => $itemType]);
+            $this->dispatch('notify', message: 'Failed to update duration', type: 'error');
+        }
     }
 
     public function updateItemStatus(int $itemId, string $itemType, string $newStatus): void
     {
-        // Prevent events from being dropped in 'doing' column
-        if ($itemType === 'event' && $newStatus === 'doing') {
-            return;
-        }
+        try {
+            // Prevent events from being dropped in 'doing' column
+            if ($itemType === 'event' && $newStatus === 'doing') {
+                $this->dispatch('notify', message: 'Events cannot be moved to In Progress', type: 'warning');
+                return;
+            }
 
-        $model = match ($itemType) {
-            'task' => Task::where('id', $itemId)->where('user_id', auth()->id())->first(),
-            'event' => Event::where('id', $itemId)->where('user_id', auth()->id())->first(),
-            'project' => Project::where('id', $itemId)->where('user_id', auth()->id())->first(),
-            default => null,
-        };
-
-        if (! $model) {
-            return;
-        }
-
-        // Map kanban column status to appropriate enum value for each item type
-        if ($itemType === 'task') {
-            $statusEnum = match ($newStatus) {
-                'to_do' => TaskStatus::ToDo,
-                'doing' => TaskStatus::Doing,
-                'done' => TaskStatus::Done,
+            $model = match ($itemType) {
+                'task' => Task::where('id', $itemId)->where('user_id', auth()->id())->first(),
+                'event' => Event::where('id', $itemId)->where('user_id', auth()->id())->first(),
+                'project' => Project::where('id', $itemId)->where('user_id', auth()->id())->first(),
                 default => null,
             };
 
-            if ($statusEnum) {
-                $model->update(['status' => $statusEnum]);
-                $this->dispatch('item-updated');
+            if (! $model) {
+                $this->dispatch('notify', message: 'Item not found', type: 'error');
+                return;
             }
-        } elseif ($itemType === 'event') {
-            $statusEnum = match ($newStatus) {
-                'to_do' => EventStatus::Scheduled,
-                'done' => EventStatus::Completed,
-                default => null,
-            };
 
-            if ($statusEnum) {
-                $model->update(['status' => $statusEnum]);
-                $this->dispatch('item-updated');
+            // Map kanban column status to appropriate enum value for each item type
+            if ($itemType === 'task') {
+                $statusEnum = match ($newStatus) {
+                    'to_do' => TaskStatus::ToDo,
+                    'doing' => TaskStatus::Doing,
+                    'done' => TaskStatus::Done,
+                    default => null,
+                };
+
+                if ($statusEnum) {
+                    $model->update(['status' => $statusEnum]);
+                    $this->dispatch('item-updated');
+                    $this->dispatch('notify', message: 'Status updated successfully', type: 'success');
+                }
+            } elseif ($itemType === 'event') {
+                $statusEnum = match ($newStatus) {
+                    'to_do' => EventStatus::Scheduled,
+                    'done' => EventStatus::Completed,
+                    default => null,
+                };
+
+                if ($statusEnum) {
+                    $model->update(['status' => $statusEnum]);
+                    $this->dispatch('item-updated');
+                    $this->dispatch('notify', message: 'Status updated successfully', type: 'success');
+                }
             }
+            // Projects don't have status, so no update needed
+        } catch (\Exception $e) {
+            \Log::error('Failed to update item status', ['error' => $e->getMessage(), 'itemId' => $itemId, 'itemType' => $itemType]);
+            $this->dispatch('notify', message: 'Failed to update status', type: 'error');
         }
-        // Projects don't have status, so no update needed
     }
 
     #[Computed]
@@ -321,67 +344,120 @@ new class extends Component
 
 }; ?>
 
-<div class="space-y-4">
+<div class="space-y-4" wire:loading.class="opacity-50" wire:target="switchView">
     <!-- View Switcher -->
     <div class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
-        <div class="flex gap-2">
+        <div class="flex gap-2" role="group" aria-label="View mode selection">
             <button
                 wire:click="switchView('list')"
-                class="px-3 py-2 rounded {{ $viewMode === 'list' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600' }}"
+                wire:loading.attr="disabled"
+                wire:target="switchView"
+                aria-label="Switch to list view"
+                aria-pressed="{{ $viewMode === 'list' ? 'true' : 'false' }}"
+                class="px-3 py-2 rounded transition-colors {{ $viewMode === 'list' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600' }} disabled:opacity-50 disabled:cursor-not-allowed"
                 title="List View"
             >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
+                <span wire:loading.remove wire:target="switchView">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </span>
+                <span wire:loading wire:target="switchView">
+                    <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </span>
             </button>
             <button
                 wire:click="switchView('kanban')"
-                class="px-3 py-2 rounded {{ $viewMode === 'kanban' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600' }}"
+                wire:loading.attr="disabled"
+                wire:target="switchView"
+                aria-label="Switch to kanban view"
+                aria-pressed="{{ $viewMode === 'kanban' ? 'true' : 'false' }}"
+                class="px-3 py-2 rounded transition-colors {{ $viewMode === 'kanban' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600' }} disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Kanban View"
             >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-                </svg>
+                <span wire:loading.remove wire:target="switchView">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                    </svg>
+                </span>
+                <span wire:loading wire:target="switchView">
+                    <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </span>
             </button>
             <button
                 wire:click="switchView('weekly')"
-                class="px-3 py-2 rounded {{ $viewMode === 'weekly' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600' }}"
+                wire:loading.attr="disabled"
+                wire:target="switchView"
+                aria-label="Switch to weekly timegrid view"
+                aria-pressed="{{ $viewMode === 'weekly' ? 'true' : 'false' }}"
+                class="px-3 py-2 rounded transition-colors {{ $viewMode === 'weekly' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600' }} disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Weekly Timegrid View"
             >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
+                <span wire:loading.remove wire:target="switchView">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                </span>
+                <span wire:loading wire:target="switchView">
+                    <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </span>
             </button>
         </div>
     </div>
 
+    <!-- Loading Overlay -->
+    <div wire:loading wire:target="switchView" class="fixed inset-0 bg-black/10 dark:bg-black/20 z-40 flex items-center justify-center pointer-events-none">
+        <div class="bg-white dark:bg-zinc-800 rounded-lg p-4 shadow-lg flex items-center gap-2">
+            <svg class="animate-spin h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">Switching view...</span>
+        </div>
+    </div>
+
     <!-- List View -->
-    @if($viewMode === 'list')
-        <livewire:workspace.list-view
-            :items="$this->items"
-            :current-date="$currentDate"
-            wire:key="list-view-{{ $currentDate->format('Y-m-d') }}"
-        />
-    @endif
+    <div wire:transition="fade">
+        @if($viewMode === 'list')
+            <livewire:workspace.list-view
+                :items="$this->items"
+                :current-date="$currentDate"
+                wire:key="list-view-{{ $currentDate->format('Y-m-d') }}"
+            />
+        @endif
+    </div>
 
     <!-- Kanban View -->
-    @if($viewMode === 'kanban')
-        <livewire:workspace.kanban-view
-            :items="$this->items"
-            :items-by-status="$this->itemsByStatus"
-            :current-date="$currentDate"
-            wire:key="kanban-view-{{ $currentDate->format('Y-m-d') }}"
-        />
-    @endif
+    <div wire:transition="fade">
+        @if($viewMode === 'kanban')
+            <livewire:workspace.kanban-view
+                :items="$this->items"
+                :items-by-status="$this->itemsByStatus"
+                :current-date="$currentDate"
+                wire:key="kanban-view-{{ $currentDate->format('Y-m-d') }}"
+            />
+        @endif
+    </div>
 
     <!-- Weekly Timegrid View -->
-    @if($viewMode === 'weekly')
-        <livewire:workspace.weekly-view
-            :items="$this->items"
-            :week-start-date="$weekStartDate"
-            wire:key="weekly-view-{{ $weekStartDate->format('Y-m-d') }}"
-        />
-    @endif
+    <div wire:transition="fade">
+        @if($viewMode === 'weekly')
+            <livewire:workspace.weekly-view
+                :items="$this->items"
+                :week-start-date="$weekStartDate"
+                wire:key="weekly-view-{{ $weekStartDate->format('Y-m-d') }}"
+            />
+        @endif
+    </div>
 
     <!-- Floating Action Button -->
     <div class="fixed bottom-8 right-8">

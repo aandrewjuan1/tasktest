@@ -64,3 +64,45 @@ select:focus[data-flux-control] {
 /* \[:where(&)\]:size-4 {
     @apply size-4;
 } */
+
+/* Fade transition for wire:transition="fade" */
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity 0.2s ease-in-out;
+}
+
+.fade-enter,
+.fade-leave-to {
+    opacity: 0;
+}
+
+/* Skeleton loading animation */
+@keyframes skeleton-loading {
+    0% {
+        background-position: -200px 0;
+    }
+    100% {
+        background-position: calc(200px + 100%) 0;
+    }
+}
+
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        var(--color-zinc-200, #e5e5e5) 0px,
+        var(--color-zinc-100, #f5f5f5) 40px,
+        var(--color-zinc-200, #e5e5e5) 80px
+    );
+    background-size: 200px 100%;
+    animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+.dark .skeleton {
+    background: linear-gradient(
+        90deg,
+        var(--color-zinc-800, #262626) 0px,
+        var(--color-zinc-700, #404040) 40px,
+        var(--color-zinc-800, #262626) 80px
+    );
+    background-size: 200px 100%;
+}
