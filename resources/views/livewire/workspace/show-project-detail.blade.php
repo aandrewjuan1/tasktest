@@ -22,15 +22,13 @@ new class extends Component {
     public function openModal(int $id): void
     {
         $this->project = Project::with(['tags', 'tasks', 'reminders'])
-            ->where('id', $id)
-            ->where('user_id', auth()->id())
-            ->first();
+            ->findOrFail($id);
 
-        if ($this->project) {
-            $this->isOpen = true;
-            $this->editMode = false;
-            $this->loadProjectData();
-        }
+        $this->authorize('view', $this->project);
+
+        $this->isOpen = true;
+        $this->editMode = false;
+        $this->loadProjectData();
     }
 
     public function closeModal(): void
@@ -64,6 +62,8 @@ new class extends Component {
 
     public function save(): void
     {
+        $this->authorize('update', $this->project);
+
         $validated = $this->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -86,6 +86,8 @@ new class extends Component {
 
     public function deleteProject(): void
     {
+        $this->authorize('delete', $this->project);
+
         $this->project->delete();
         $this->closeModal();
         $this->dispatch('project-deleted');

@@ -99,6 +99,8 @@ new class extends Component {
 
     public function createTask(): void
     {
+        $this->authorize('create', Task::class);
+
         $validated = $this->validate([
             'taskTitle' => 'required|string|max:255',
             'taskDescription' => 'nullable|string',
@@ -148,6 +150,8 @@ new class extends Component {
 
     public function createEvent(): void
     {
+        $this->authorize('create', Event::class);
+
         $validated = $this->validate([
             'eventTitle' => 'required|string|max:255',
             'eventDescription' => 'nullable|string',
@@ -189,6 +193,8 @@ new class extends Component {
 
     public function createProject(): void
     {
+        $this->authorize('create', Project::class);
+
         $validated = $this->validate([
             'projectName' => 'required|string|max:255',
             'projectDescription' => 'nullable|string',
@@ -224,7 +230,7 @@ new class extends Component {
     #[Computed]
     public function projects(): Collection
     {
-        return Project::where('user_id', auth()->id())
+        return Project::accessibleBy(auth()->user())
             ->orderBy('name')
             ->get();
     }

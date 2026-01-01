@@ -15,15 +15,13 @@ new class extends Component {
     public function showPopover(int $id, int $x = 0, int $y = 0): void
     {
         $this->event = Event::with(['tags'])
-            ->where('id', $id)
-            ->where('user_id', auth()->id())
-            ->first();
+            ->findOrFail($id);
 
-        if ($this->event) {
-            $this->x = $x;
-            $this->y = $y;
-            $this->isOpen = true;
-        }
+        $this->authorize('view', $this->event);
+
+        $this->x = $x;
+        $this->y = $y;
+        $this->isOpen = true;
     }
 
     public function closePopover(): void

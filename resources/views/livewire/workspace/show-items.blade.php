@@ -119,16 +119,13 @@ new class extends Component
     {
         try {
             $model = match ($itemType) {
-                'task' => Task::where('id', $itemId)->where('user_id', auth()->id())->first(),
-                'event' => Event::where('id', $itemId)->where('user_id', auth()->id())->first(),
-                'project' => Project::where('id', $itemId)->where('user_id', auth()->id())->first(),
-                default => null,
+                'task' => Task::findOrFail($itemId),
+                'event' => Event::findOrFail($itemId),
+                'project' => Project::findOrFail($itemId),
+                default => throw new \InvalidArgumentException('Invalid item type'),
             };
 
-            if (! $model) {
-                $this->dispatch('notify', message: 'Item not found', type: 'error');
-                return;
-            }
+            $this->authorize('update', $model);
 
             if ($itemType === 'task') {
                 $startDateTime = Carbon::parse($newStart);
@@ -173,15 +170,12 @@ new class extends Component
             $newDurationMinutes = max(30, $newDurationMinutes); // Ensure still at least 30 after snapping
 
             $model = match ($itemType) {
-                'task' => Task::where('id', $itemId)->where('user_id', auth()->id())->first(),
-                'event' => Event::where('id', $itemId)->where('user_id', auth()->id())->first(),
-                default => null,
+                'task' => Task::findOrFail($itemId),
+                'event' => Event::findOrFail($itemId),
+                default => throw new \InvalidArgumentException('Invalid item type'),
             };
 
-            if (! $model) {
-                $this->dispatch('notify', message: 'Item not found', type: 'error');
-                return;
-            }
+            $this->authorize('update', $model);
 
             if ($itemType === 'task') {
                 // For tasks, update duration and recalculate end_date if needed
@@ -218,16 +212,13 @@ new class extends Component
             }
 
             $model = match ($itemType) {
-                'task' => Task::where('id', $itemId)->where('user_id', auth()->id())->first(),
-                'event' => Event::where('id', $itemId)->where('user_id', auth()->id())->first(),
-                'project' => Project::where('id', $itemId)->where('user_id', auth()->id())->first(),
-                default => null,
+                'task' => Task::findOrFail($itemId),
+                'event' => Event::findOrFail($itemId),
+                'project' => Project::findOrFail($itemId),
+                default => throw new \InvalidArgumentException('Invalid item type'),
             };
 
-            if (! $model) {
-                $this->dispatch('notify', message: 'Item not found', type: 'error');
-                return;
-            }
+            $this->authorize('update', $model);
 
             // Map kanban column status to appropriate enum value for each item type
             if ($itemType === 'task') {
@@ -271,7 +262,7 @@ new class extends Component
 
         // Always fetch all tasks
         $tasks = Task::query()
-            ->where('user_id', $user->id)
+            ->accessibleBy($user)
             ->with(['project', 'tags', 'event'])
             ->get()
             ->map(function ($task) {
@@ -283,7 +274,7 @@ new class extends Component
 
         // Always fetch all events
         $events = Event::query()
-            ->where('user_id', $user->id)
+            ->accessibleBy($user)
             ->with(['tags'])
             ->get()
             ->map(function ($event) {
@@ -295,7 +286,7 @@ new class extends Component
 
         // Always fetch all projects
         $projects = Project::query()
-            ->where('user_id', $user->id)
+            ->accessibleBy($user)
             ->with(['tags', 'tasks'])
             ->get()
             ->map(function ($project) {
@@ -311,16 +302,16 @@ new class extends Component
     #[Computed]
     public function availableTags(): Collection
     {
-        $userId = auth()->id();
+        $user = auth()->user();
 
-        return Tag::whereHas('tasks', function ($query) use ($userId) {
-            $query->where('user_id', $userId);
+        return Tag::whereHas('tasks', function ($query) use ($user) {
+            $query->accessibleBy($user);
         })
-            ->orWhereHas('events', function ($query) use ($userId) {
-                $query->where('user_id', $userId);
+            ->orWhereHas('events', function ($query) use ($user) {
+                $query->accessibleBy($user);
             })
-            ->orWhereHas('projects', function ($query) use ($userId) {
-                $query->where('user_id', $userId);
+            ->orWhereHas('projects', function ($query) use ($user) {
+                $query->accessibleBy($user);
             })
             ->orderBy('name')
             ->get();
@@ -329,7 +320,7 @@ new class extends Component
     #[Computed]
     public function availableProjects(): Collection
     {
-        return Project::where('user_id', auth()->id())
+        return Project::accessibleBy(auth()->user())
             ->orderBy('name')
             ->get();
     }
@@ -430,7 +421,7 @@ new class extends Component
 
 }; ?>
 
-<div class="space-y-4" wire:loading.class="opacity-50" wire:target="switchView">
+<div class="space-y-4" wire:loading.class="opacity-50" wire:target="switchView,goToTodayDate,previousDay,nextDay,updateCurrentDate">
     <!-- View Switcher -->
     <div class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
         <div class="flex gap-2" role="group" aria-label="View mode selection">
@@ -500,7 +491,7 @@ new class extends Component
         </div>
     </div>
 
-    <!-- Loading Overlay -->
+    <!-- Loading Overlay for View Switching -->
     <div wire:loading wire:target="switchView" class="fixed inset-0 bg-black/10 dark:bg-black/20 z-40 flex items-center justify-center pointer-events-none">
         <div class="bg-white dark:bg-zinc-800 rounded-lg p-4 shadow-lg flex items-center gap-2">
             <svg class="animate-spin h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
@@ -508,6 +499,17 @@ new class extends Component
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
             <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">Switching view...</span>
+        </div>
+    </div>
+
+    <!-- Loading Overlay for Date Navigation -->
+    <div wire:loading wire:target="goToTodayDate,previousDay,nextDay,updateCurrentDate" class="fixed inset-0 bg-black/10 dark:bg-black/20 z-40 flex items-center justify-center pointer-events-none">
+        <div class="bg-white dark:bg-zinc-800 rounded-lg p-4 shadow-lg flex items-center gap-2">
+            <svg class="animate-spin h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">Loading date...</span>
         </div>
     </div>
 
@@ -523,16 +525,14 @@ new class extends Component
     </div>
 
     <!-- Kanban View -->
-    <div wire:transition="fade">
-        @if($viewMode === 'kanban')
-            <livewire:workspace.kanban-view
-                :items="$this->filteredItems"
-                :items-by-status="$this->itemsByStatus"
-                :current-date="$currentDate"
-                wire:key="kanban-view-{{ $currentDate->format('Y-m-d') }}"
-            />
-        @endif
-    </div>
+    @if($viewMode === 'kanban')
+        <livewire:workspace.kanban-view
+            :items="$this->filteredItems"
+            :items-by-status="$this->itemsByStatus"
+            :current-date="$currentDate"
+            wire:key="kanban-view-{{ $currentDate->format('Y-m-d') }}"
+        />
+    @endif
 
     <!-- Weekly Timegrid View -->
     <div wire:transition="fade">

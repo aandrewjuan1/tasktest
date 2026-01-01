@@ -94,7 +94,7 @@ new class extends Component
         $end = $this->currentDate->copy()->endOfMonth()->endOfWeek();
 
         $events = Event::query()
-            ->where('user_id', auth()->id())
+            ->accessibleBy(auth()->user())
             ->with(['tags'])
             ->where(function ($query) use ($start, $end) {
                 $query->whereBetween('start_datetime', [$start, $end])
@@ -125,7 +125,7 @@ new class extends Component
         $end = $this->currentDate->copy()->endOfMonth()->endOfWeek();
 
         $tasks = Task::query()
-            ->where('user_id', auth()->id())
+            ->accessibleBy(auth()->user())
             ->with(['project', 'tags', 'event'])
             ->where(function ($query) use ($start, $end) {
                 $query->whereBetween('start_date', [$start->toDateString(), $end->toDateString()])
@@ -135,6 +135,10 @@ new class extends Component
 
         $tasksByDate = [];
         foreach ($tasks as $task) {
+            if (! $task->start_date) {
+                continue;
+            }
+
             $dateKey = $task->start_date->format('Y-m-d');
             if (! isset($tasksByDate[$dateKey])) {
                 $tasksByDate[$dateKey] = [];

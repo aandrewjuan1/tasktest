@@ -94,7 +94,8 @@ new class extends Component
         </div>
     </div>
 
-    @forelse($this->items as $item)
+    <div wire:transition="fade" wire:loading.class="opacity-50" wire:target="goToTodayDate,previousDay,nextDay,updateCurrentDate">
+        @forelse($this->items as $item)
         @if($item->item_type === 'task')
             <x-workspace.task-card :task="$item" />
         @elseif($item->item_type === 'event')
@@ -122,4 +123,5 @@ new class extends Component
             </div>
         </div>
     @endforelse
+    </div>
 </div>

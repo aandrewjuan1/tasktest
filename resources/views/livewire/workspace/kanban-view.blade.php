@@ -98,7 +98,8 @@ new class extends Component
         </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4" aria-label="Kanban board">
+    <div wire:transition="fade" wire:loading.class="opacity-50" wire:target="goToTodayDate,previousDay,nextDay,updateCurrentDate" wire:key="kanban-content-{{ $currentDate->format('Y-m-d') }}">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4" aria-label="Kanban board">
     @foreach(['to_do', 'doing', 'done'] as $status)
         <div class="bg-zinc-100 dark:bg-zinc-900 rounded-lg p-4"
              draggable="false"
@@ -203,5 +204,6 @@ new class extends Component
             </div>
         </div>
     @endforeach
+        </div>
     </div>
 </div>

@@ -30,15 +30,13 @@ new class extends Component {
     public function openModal(int $id): void
     {
         $this->task = Task::with(['project', 'event', 'tags', 'reminders', 'pomodoroSessions'])
-            ->where('id', $id)
-            ->where('user_id', auth()->id())
-            ->first();
+            ->findOrFail($id);
 
-        if ($this->task) {
-            $this->isOpen = true;
-            $this->editMode = false;
-            $this->loadTaskData();
-        }
+        $this->authorize('view', $this->task);
+
+        $this->isOpen = true;
+        $this->editMode = false;
+        $this->loadTaskData();
     }
 
     public function closeModal(): void
@@ -79,6 +77,8 @@ new class extends Component {
 
     public function save(): void
     {
+        $this->authorize('update', $this->task);
+
         $validated = $this->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -116,6 +116,8 @@ new class extends Component {
 
     public function deleteTask(): void
     {
+        $this->authorize('delete', $this->task);
+
         $this->task->delete();
         $this->closeModal();
         $this->dispatch('task-deleted');
@@ -125,7 +127,7 @@ new class extends Component {
     #[Computed]
     public function projects(): Collection
     {
-        return Project::where('user_id', auth()->id())
+        return Project::accessibleBy(auth()->user())
             ->orderBy('name')
             ->get();
     }

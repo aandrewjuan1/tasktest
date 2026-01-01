@@ -140,4 +140,11 @@ class Event extends Model
         return $this->isCollaborator($user);
     }
 
+    public function scopeAccessibleBy($query, User $user)
+    {
+        return $query->where(function ($q) use ($user) {
+            $q->where('user_id', $user->id)
+                ->orWhereHas('collaborations', fn ($q) => $q->where('user_id', $user->id));
+        });
+    }
 }

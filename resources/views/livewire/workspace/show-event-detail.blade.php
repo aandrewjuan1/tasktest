@@ -24,15 +24,13 @@ new class extends Component {
     public function openModal(int $id): void
     {
         $this->event = Event::with(['tags', 'reminders'])
-            ->where('id', $id)
-            ->where('user_id', auth()->id())
-            ->first();
+            ->findOrFail($id);
 
-        if ($this->event) {
-            $this->isOpen = true;
-            $this->editMode = false;
-            $this->loadEventData();
-        }
+        $this->authorize('view', $this->event);
+
+        $this->isOpen = true;
+        $this->editMode = false;
+        $this->loadEventData();
     }
 
     public function closeModal(): void
@@ -70,6 +68,8 @@ new class extends Component {
 
     public function save(): void
     {
+        $this->authorize('update', $this->event);
+
         $validated = $this->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -100,6 +100,8 @@ new class extends Component {
 
     public function deleteEvent(): void
     {
+        $this->authorize('delete', $this->event);
+
         $this->event->delete();
         $this->closeModal();
         $this->dispatch('event-deleted');
