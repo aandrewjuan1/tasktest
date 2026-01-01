@@ -1,54 +1,70 @@
 <?php
 
-use Livewire\Volt\Component;
-use Livewire\Attributes\On;
-use Livewire\Attributes\Computed;
-use App\Http\Requests\TaskStoreRequest;
-use App\Http\Requests\EventStoreRequest;
-use App\Http\Requests\ProjectStoreRequest;
-use App\Models\Task;
 use App\Models\Event;
 use App\Models\Project;
-use App\Enums\TaskStatus;
-use App\Enums\EventStatus;
+use App\Models\Task;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
+use Livewire\Volt\Component;
 
-new class extends Component {
+new class extends Component
+{
     public bool $isOpen = false;
+
     public string $activeTab = 'task';
 
     // Task form fields
     public string $taskTitle = '';
+
     public string $taskDescription = '';
+
     public string $taskStatus = 'to_do';
+
     public string $taskPriority = 'medium';
+
     public string $taskComplexity = 'moderate';
+
     public string $taskDuration = '60';
+
     public string $taskStartDate;
+
     public string $taskStartTime = '';
+
     public string $taskEndDate;
+
     public string $taskProjectId = '';
 
     public function mount(): void
     {
-        $this->taskStartDate = now()->format('Y-m-d');
-        $this->taskEndDate = now()->addWeek()->format('Y-m-d');
+        // Don't set dates by default - let them be optional
     }
 
     // Event form fields
     public string $eventTitle = '';
+
     public string $eventDescription = '';
+
     public string $eventStartDatetime = '';
+
     public string $eventEndDatetime = '';
+
     public bool $eventAllDay = false;
+
     public string $eventLocation = '';
+
     public string $eventColor = '#3b82f6';
+
     public string $eventStatus = 'scheduled';
 
     // Project form fields
     public string $projectName = '';
+
     public string $projectDescription = '';
+
     public string $projectStartDate = '';
+
     public string $projectEndDate = '';
 
     #[On('open-create-modal')]
@@ -75,9 +91,9 @@ new class extends Component {
         $this->taskPriority = 'medium';
         $this->taskComplexity = 'moderate';
         $this->taskDuration = '60';
-        $this->taskStartDate = now()->format('Y-m-d');
+        $this->taskStartDate = '';
         $this->taskStartTime = '';
-        $this->taskEndDate = now()->addWeek()->format('Y-m-d');
+        $this->taskEndDate = '';
         $this->taskProjectId = '';
 
         // Reset event fields
@@ -104,13 +120,13 @@ new class extends Component {
         $validated = $this->validate([
             'taskTitle' => 'required|string|max:255',
             'taskDescription' => 'nullable|string',
-            'taskStatus' => 'required|string|in:to_do,doing,done',
-            'taskPriority' => 'required|string|in:low,medium,high,urgent',
-            'taskComplexity' => 'required|string|in:simple,moderate,complex',
+            'taskStatus' => 'nullable|string|in:to_do,doing,done',
+            'taskPriority' => 'nullable|string|in:low,medium,high,urgent',
+            'taskComplexity' => 'nullable|string|in:simple,moderate,complex',
             'taskDuration' => 'nullable|integer|min:1',
-            'taskStartDate' => 'required|date',
+            'taskStartDate' => 'nullable|date',
             'taskStartTime' => 'nullable|date_format:H:i',
-            'taskEndDate' => 'required|date|after_or_equal:taskStartDate',
+            'taskEndDate' => 'nullable|date|after_or_equal:taskStartDate',
             'taskProjectId' => 'nullable|exists:projects,id',
         ], [], [
             'taskTitle' => 'title',
@@ -126,19 +142,19 @@ new class extends Component {
         ]);
 
         // Convert H:i format to H:i:s for database storage
-        $startTime = $this->taskStartTime ? $this->taskStartTime . ':00' : null;
+        $startTime = $this->taskStartTime ? $this->taskStartTime.':00' : null;
 
         Task::create([
             'user_id' => auth()->id(),
             'title' => $this->taskTitle,
             'description' => $this->taskDescription ?: null,
-            'status' => $this->taskStatus,
-            'priority' => $this->taskPriority,
-            'complexity' => $this->taskComplexity,
+            'status' => $this->taskStatus ?: null,
+            'priority' => $this->taskPriority ?: null,
+            'complexity' => $this->taskComplexity ?: null,
             'duration' => $this->taskDuration ?: null,
-            'start_date' => $this->taskStartDate,
+            'start_date' => $this->taskStartDate ?: null,
             'start_time' => $startTime,
-            'end_date' => $this->taskEndDate,
+            'end_date' => $this->taskEndDate ?: null,
             'project_id' => $this->taskProjectId ?: null,
         ]);
 
@@ -156,7 +172,7 @@ new class extends Component {
             'eventTitle' => 'required|string|max:255',
             'eventDescription' => 'nullable|string',
             'eventStartDatetime' => 'required|date',
-            'eventEndDatetime' => 'required|date|after:eventStartDatetime',
+            'eventEndDatetime' => 'nullable|date|after:eventStartDatetime',
             'eventAllDay' => 'boolean',
             'eventLocation' => 'nullable|string|max:255',
             'eventColor' => 'nullable|string|max:7',
@@ -172,12 +188,18 @@ new class extends Component {
             'eventStatus' => 'status',
         ]);
 
+        // Auto-calculate end_datetime if not provided
+        $startDatetime = Carbon::parse($this->eventStartDatetime);
+        $endDatetime = $this->eventEndDatetime
+            ? Carbon::parse($this->eventEndDatetime)
+            : $startDatetime->copy()->addHour();
+
         Event::create([
             'user_id' => auth()->id(),
             'title' => $this->eventTitle,
             'description' => $this->eventDescription ?: null,
-            'start_datetime' => $this->eventStartDatetime,
-            'end_datetime' => $this->eventEndDatetime,
+            'start_datetime' => $startDatetime,
+            'end_datetime' => $endDatetime,
             'all_day' => $this->eventAllDay,
             'timezone' => config('app.timezone'),
             'location' => $this->eventLocation ?: null,
@@ -271,7 +293,8 @@ new class extends Component {
                     <flux:textarea wire:model="taskDescription" label="Description" rows="3" />
 
                     <div class="grid grid-cols-2 gap-4">
-                        <flux:select wire:model="taskStatus" label="Status" required>
+                        <flux:select wire:model="taskStatus" label="Status">
+                            <option value="">Select Status</option>
                             <option value="to_do">To Do</option>
                             <option value="doing">In Progress</option>
                             <option value="done">Done</option>
@@ -298,8 +321,8 @@ new class extends Component {
                     </div>
 
                     <div class="grid grid-cols-2 gap-4">
-                        <flux:input wire:model="taskStartDate" label="Start Date" type="date" required />
-                        <flux:input wire:model="taskEndDate" label="Due Date" type="date" required />
+                        <flux:input wire:model="taskStartDate" label="Start Date (optional)" type="date" />
+                        <flux:input wire:model="taskEndDate" label="Due Date (optional)" type="date" />
                     </div>
 
                     <flux:input wire:model="taskStartTime" label="Start Time (optional)" type="time" />
@@ -327,7 +350,7 @@ new class extends Component {
 
                     <div class="grid grid-cols-2 gap-4">
                         <flux:input wire:model="eventStartDatetime" label="Start Date & Time" type="datetime-local" required />
-                        <flux:input wire:model="eventEndDatetime" label="End Date & Time" type="datetime-local" required />
+                        <flux:input wire:model="eventEndDatetime" label="End Date & Time (optional)" type="datetime-local" />
                     </div>
 
                     <flux:checkbox wire:model="eventAllDay" label="All Day Event" />

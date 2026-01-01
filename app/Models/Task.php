@@ -48,6 +48,22 @@ class Task extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::creating(function (Task $task) {
+            // Set defaults if null
+            if (is_null($task->status)) {
+                $task->status = TaskStatus::ToDo;
+            }
+            if (is_null($task->priority)) {
+                $task->priority = TaskPriority::Medium;
+            }
+            if (is_null($task->complexity)) {
+                $task->complexity = TaskComplexity::Moderate;
+            }
+        });
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

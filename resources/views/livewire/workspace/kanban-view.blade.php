@@ -19,8 +19,13 @@ new class extends Component
     public function mount(Collection $items, array $itemsByStatus, ?Carbon $currentDate = null): void
     {
         $this->items = $items;
-        $this->itemsByStatus = $itemsByStatus;
+        $this->itemsByStatus = $itemsByStatus ?? ['to_do' => [], 'doing' => [], 'done' => []];
         $this->currentDate = $currentDate ?? now();
+    }
+
+    public function getItemsByStatusProperty(): array
+    {
+        return $this->itemsByStatus ?? ['to_do' => [], 'doing' => [], 'done' => []];
     }
 }; ?>
 
@@ -30,7 +35,7 @@ new class extends Component
         <div class="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-700">
             <div class="flex items-center gap-2">
                 <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-                    {{ $currentDate->format('M d, Y') }}
+                    {{ $currentDate?->format('M d, Y') ?? now()->format('M d, Y') }}
                 </h3>
             </div>
             <div class="flex items-center gap-2"
@@ -98,7 +103,29 @@ new class extends Component
         </div>
     </div>
 
-    <div wire:transition="fade" wire:loading.class="opacity-50" wire:target="goToTodayDate,previousDay,nextDay,updateCurrentDate" wire:key="kanban-content-{{ $currentDate->format('Y-m-d') }}">
+    <!-- Loading overlay for status updates -->
+    <div
+        x-data="{ isUpdating: false }"
+        x-on:update-item-status.window="isUpdating = true"
+        x-on:item-updated.window="setTimeout(() => { isUpdating = false; }, 300)"
+        x-show="isUpdating"
+        x-transition
+        class="fixed inset-0 bg-black/10 dark:bg-black/20 z-40 flex items-center justify-center pointer-events-none"
+        style="display: none;"
+    >
+        <div class="bg-white dark:bg-zinc-800 rounded-lg p-4 shadow-lg flex items-center gap-2">
+            <svg class="animate-spin h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">Updating status...</span>
+        </div>
+    </div>
+
+    <div wire:transition="fade"
+         wire:loading.class="opacity-50"
+         wire:target="goToTodayDate,previousDay,nextDay,updateCurrentDate"
+         wire:key="kanban-{{ $currentDate?->format('Y-m-d') ?? 'default' }}">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4" aria-label="Kanban board">
     @foreach(['to_do', 'doing', 'done'] as $status)
         <div class="bg-zinc-100 dark:bg-zinc-900 rounded-lg p-4"
@@ -150,13 +177,13 @@ new class extends Component
                     'doing' => 'In Progress',
                     'done' => 'Done',
                 } }}
-                <span class="text-sm text-zinc-500 dark:text-zinc-400 ml-2" aria-label="{{ collect($itemsByStatus[$status])->count() }} items">
-                    ({{ collect($itemsByStatus[$status])->count() }})
+                <span class="text-sm text-zinc-500 dark:text-zinc-400 ml-2" aria-label="{{ collect($this->itemsByStatus[$status] ?? [])->count() }} items">
+                    ({{ collect($this->itemsByStatus[$status] ?? [])->count() }})
                 </span>
             </h3>
 
             <div class="space-y-3" aria-live="polite">
-                @foreach(collect($itemsByStatus[$status]) as $item)
+                @foreach(collect($this->itemsByStatus[$status] ?? []) as $item)
                     <div
                         wire:key="item-{{ $item->item_type }}-{{ $item->id }}"
                         draggable="true"
@@ -176,8 +203,6 @@ new class extends Component
                             // Allow keyboard activation for drag (would need additional implementation)
                         "
                         class="cursor-move relative transition-all"
-                        wire:loading.class="opacity-50 pointer-events-none"
-                        wire:target="handleUpdateItemStatus"
                     >
                         @if($item->item_type === 'task')
                             <x-workspace.task-card :task="$item" />
@@ -187,7 +212,15 @@ new class extends Component
                             <x-workspace.project-card :project="$item" />
                         @endif
                         <!-- Loading indicator -->
-                        <div wire:loading wire:target="handleUpdateItemStatus" class="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-zinc-900/50 rounded">
+                        <div
+                            x-data="{ isUpdating: false }"
+                            x-on:update-item-status.window="if ($event.detail.itemId === {{ $item->id }}) { isUpdating = true; }"
+                            x-on:item-updated.window="setTimeout(() => { isUpdating = false; }, 300)"
+                            x-show="isUpdating"
+                            x-transition
+                            class="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-zinc-900/50 rounded"
+                            style="display: none;"
+                        >
                             <svg class="animate-spin h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -196,7 +229,7 @@ new class extends Component
                     </div>
                 @endforeach
 
-                @if(collect($itemsByStatus[$status])->isEmpty())
+                @if(collect($this->itemsByStatus[$status] ?? [])->isEmpty())
                     <div class="text-center py-8 text-zinc-500 dark:text-zinc-400 text-sm select-none" draggable="false" aria-label="Empty column">
                         No items
                     </div>

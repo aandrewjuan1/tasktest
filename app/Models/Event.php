@@ -40,6 +40,26 @@ class Event extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::creating(function (Event $event) {
+            // Set default status
+            if (is_null($event->status)) {
+                $event->status = EventStatus::Scheduled;
+            }
+
+            // Auto-calculate end_datetime if not provided
+            if (is_null($event->end_datetime) && $event->start_datetime) {
+                $event->end_datetime = $event->start_datetime->copy()->addHour();
+            }
+
+            // Set timezone from config if not provided
+            if (is_null($event->timezone)) {
+                $event->timezone = config('app.timezone');
+            }
+        });
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

@@ -14,17 +14,14 @@ it('allows tags to attach to tasks, events, and projects', function () {
 
     $task = Task::factory()->for($user)->create();
     $project = Project::factory()->for($user)->create();
+    $start = now();
     $event = Event::create([
         'user_id' => $user->id,
         'title' => 'Planning Session',
-        'description' => 'Quarterly planning',
-        'start_datetime' => now(),
-        'end_datetime' => now()->addHour(),
-        'all_day' => false,
-        'timezone' => 'UTC',
-        'location' => 'Conference Room',
-        'color' => '#FF0000',
-        'status' => 'scheduled',
+        'start_datetime' => $start,
+        // end_datetime will be auto-calculated (start + 1 hour)
+        // timezone will be set from config
+        // status will default to 'scheduled'
     ]);
 
     $task->tags()->attach($tag);

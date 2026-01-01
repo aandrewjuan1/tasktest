@@ -30,18 +30,31 @@
     </div>
 
     <div class="space-y-2 text-xs text-zinc-600 dark:text-zinc-400 mb-3">
-        <div class="flex items-center gap-2">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>
-                @if($event->all_day)
-                    {{ $event->start_datetime->format('M j, Y') }} (All day)
-                @else
-                    {{ $event->start_datetime->format('M j, Y g:i A') }}
-                @endif
-            </span>
-        </div>
+        @if($event->start_datetime)
+            <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>
+                    @if($event->all_day)
+                        {{ $event->start_datetime->format('M j, Y') }} (All day)
+                    @else
+                        {{ $event->start_datetime->format('M j, Y g:i A') }}
+                    @endif
+                </span>
+            </div>
+        @endif
+
+        @if($event->end_datetime && !$event->all_day)
+            <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>{{ $event->end_datetime->format('M j, Y g:i A') }}</span>
+            </div>
+        @elseif(!$event->end_datetime && $event->start_datetime)
+            <span class="text-zinc-400 dark:text-zinc-500 text-xs">No end time</span>
+        @endif
 
         @if($event->location)
             <button

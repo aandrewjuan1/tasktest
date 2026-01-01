@@ -1,23 +1,33 @@
 <?php
 
-use Livewire\Volt\Component;
-use Livewire\Attributes\On;
 use App\Models\Event;
-use App\Models\Tag;
+use Carbon\Carbon;
+use Livewire\Attributes\On;
+use Livewire\Volt\Component;
 
-new class extends Component {
+new class extends Component
+{
     public bool $isOpen = false;
+
     public ?Event $event = null;
+
     public bool $editMode = false;
 
     // Edit fields
     public string $title = '';
+
     public string $description = '';
+
     public string $startDatetime = '';
+
     public string $endDatetime = '';
+
     public bool $allDay = false;
+
     public string $location = '';
+
     public string $color = '#3b82f6';
+
     public string $status = 'scheduled';
 
     #[On('view-event-detail')]
@@ -43,7 +53,7 @@ new class extends Component {
 
     public function toggleEditMode(): void
     {
-        $this->editMode = !$this->editMode;
+        $this->editMode = ! $this->editMode;
         if ($this->editMode) {
             $this->loadEventData();
         }
@@ -52,18 +62,18 @@ new class extends Component {
 
     protected function loadEventData(): void
     {
-        if (!$this->event) {
+        if (! $this->event) {
             return;
         }
 
         $this->title = $this->event->title;
         $this->description = $this->event->description ?? '';
         $this->startDatetime = $this->event->start_datetime->format('Y-m-d\TH:i');
-        $this->endDatetime = $this->event->end_datetime->format('Y-m-d\TH:i');
+        $this->endDatetime = $this->event->end_datetime?->format('Y-m-d\TH:i') ?? '';
         $this->allDay = $this->event->all_day;
         $this->location = $this->event->location ?? '';
         $this->color = $this->event->color ?? '#3b82f6';
-        $this->status = $this->event->status->value;
+        $this->status = $this->event->status?->value ?? 'scheduled';
     }
 
     public function save(): void
@@ -74,22 +84,28 @@ new class extends Component {
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'startDatetime' => 'required|date',
-            'endDatetime' => 'required|date|after:startDatetime',
+            'endDatetime' => 'nullable|date|after:startDatetime',
             'allDay' => 'boolean',
             'location' => 'nullable|string|max:255',
             'color' => 'nullable|string|max:7',
-            'status' => 'required|string|in:scheduled,cancelled,completed,tentative',
+            'status' => 'nullable|string|in:scheduled,cancelled,completed,tentative',
         ]);
+
+        // Auto-calculate end_datetime if not provided
+        $startDatetime = Carbon::parse($this->startDatetime);
+        $endDatetime = $this->endDatetime
+            ? Carbon::parse($this->endDatetime)
+            : $startDatetime->copy()->addHour();
 
         $this->event->update([
             'title' => $this->title,
             'description' => $this->description ?: null,
-            'start_datetime' => $this->startDatetime,
-            'end_datetime' => $this->endDatetime,
+            'start_datetime' => $startDatetime,
+            'end_datetime' => $endDatetime,
             'all_day' => $this->allDay,
             'location' => $this->location ?: null,
             'color' => $this->color,
-            'status' => $this->status,
+            'status' => $this->status ?: 'scheduled',
         ]);
 
         $this->event->refresh();
@@ -178,7 +194,7 @@ new class extends Component {
                     <!-- End DateTime -->
                     <div>
                         @if($editMode)
-                            <flux:input wire:model="endDatetime" label="End Date & Time" type="datetime-local" required />
+                            <flux:input wire:model="endDatetime" label="End Date & Time (optional)" type="datetime-local" />
                         @else
                             <flux:heading size="sm">End</flux:heading>
                             <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">

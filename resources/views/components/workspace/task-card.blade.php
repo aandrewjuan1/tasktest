@@ -27,20 +27,22 @@
     @endif
 
     <div class="flex flex-wrap gap-2 mb-3">
-        <button
-            wire:click="filterByStatus('{{ $task->status->value }}')"
-            class="inline-flex items-center px-2 py-1 text-xs font-medium rounded hover:opacity-80 cursor-pointer transition-opacity {{ match($task->status->value) {
-                'to_do' => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300',
-                'doing' => 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
-                'done' => 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
-            } }}"
-        >
-            {{ match($task->status->value) {
-                'to_do' => 'To Do',
-                'doing' => 'In Progress',
-                'done' => 'Done',
-            } }}
-        </button>
+        @if($task->status)
+            <button
+                wire:click="filterByStatus('{{ $task->status->value }}')"
+                class="inline-flex items-center px-2 py-1 text-xs font-medium rounded hover:opacity-80 cursor-pointer transition-opacity {{ match($task->status->value) {
+                    'to_do' => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300',
+                    'doing' => 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
+                    'done' => 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
+                } }}"
+            >
+                {{ match($task->status->value) {
+                    'to_do' => 'To Do',
+                    'doing' => 'In Progress',
+                    'done' => 'Done',
+                } }}
+            </button>
+        @endif
 
         @if($task->complexity)
             <button
@@ -58,12 +60,14 @@
 
     <div class="flex items-center gap-4 text-xs text-zinc-600 dark:text-zinc-400 mb-3">
         @if($task->end_date)
-            <div class="flex items-center gap-1 {{ $task->end_date->isPast() && $task->status->value !== 'done' ? 'text-red-600 dark:text-red-400 font-semibold' : '' }}">
+            <div class="flex items-center gap-1 {{ $task->end_date->isPast() && $task->status?->value !== 'done' ? 'text-red-600 dark:text-red-400 font-semibold' : '' }}">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
                 <span>{{ $task->end_date->format('M j, Y') }}</span>
             </div>
+        @else
+            <span class="text-zinc-400 dark:text-zinc-500 text-xs">No due date</span>
         @endif
 
         @if($task->project)

@@ -71,3 +71,19 @@ test('events page displays only non-deleted events', function () {
     expect($events)->toHaveCount(1);
     expect($events->first()->title)->toBe('Active Event');
 });
+
+test('event end_datetime is auto-calculated if not provided', function () {
+    $user = User::factory()->create();
+    $start = now();
+
+    $event = Event::create([
+        'user_id' => $user->id,
+        'title' => 'Quick Event',
+        'start_datetime' => $start,
+    ]);
+
+    expect($event->end_datetime->format('Y-m-d H:i'))
+        ->toBe($start->copy()->addHour()->format('Y-m-d H:i'));
+    expect($event->timezone)->toBe(config('app.timezone'));
+    expect($event->status->value)->toBe('scheduled');
+});

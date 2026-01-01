@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Enums\TaskComplexity;
+use App\Enums\TaskPriority;
+use App\Enums\TaskStatus;
 use App\Models\Project;
 use App\Models\Tag;
 use App\Models\Task;
@@ -374,4 +377,19 @@ test('soft deleted tasks can be queried with withTrashed', function () {
     expect($allTasks)->toHaveCount(2);
     expect($onlyDeleted)->toHaveCount(1);
     expect($onlyDeleted->first()->title)->toBe('Deleted');
+});
+
+test('user can create task with only title', function () {
+    $user = User::factory()->create();
+
+    $task = Task::create([
+        'user_id' => $user->id,
+        'title' => 'Quick Task',
+    ]);
+
+    expect($task->status)->toBe(TaskStatus::ToDo);
+    expect($task->priority)->toBe(TaskPriority::Medium);
+    expect($task->complexity)->toBe(TaskComplexity::Moderate);
+    expect($task->start_date)->toBeNull();
+    expect($task->end_date)->toBeNull();
 });

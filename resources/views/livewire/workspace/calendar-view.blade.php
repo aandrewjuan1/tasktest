@@ -96,6 +96,7 @@ new class extends Component
         $events = Event::query()
             ->accessibleBy(auth()->user())
             ->with(['tags'])
+            ->whereNotNull('start_datetime')
             ->where(function ($query) use ($start, $end) {
                 $query->whereBetween('start_datetime', [$start, $end])
                     ->orWhereBetween('end_datetime', [$start, $end])
@@ -108,6 +109,10 @@ new class extends Component
 
         $eventsByDate = [];
         foreach ($events as $event) {
+            if (! $event->start_datetime) {
+                continue;
+            }
+
             $dateKey = $event->start_datetime->format('Y-m-d');
             if (! isset($eventsByDate[$dateKey])) {
                 $eventsByDate[$dateKey] = [];

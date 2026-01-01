@@ -114,6 +114,16 @@ new class extends Component
         $this->updateItemDuration($itemId, $itemType, $newDurationMinutes);
     }
 
+    #[On('item-updated')]
+    public function refreshItems(): void
+    {
+        // Clear computed property cache to force refresh
+        unset($this->items);
+        unset($this->filteredItems);
+        unset($this->itemsByStatus);
+        unset($this->availableTags);
+        unset($this->availableProjects);
+    }
 
     public function updateItemDateTime(int $itemId, string $itemType, string $newStart, ?string $newEnd = null): void
     {
@@ -128,25 +138,46 @@ new class extends Component
             $this->authorize('update', $model);
 
             if ($itemType === 'task') {
-                $startDateTime = Carbon::parse($newStart);
-                $model->start_date = $startDateTime->toDateString();
-                $model->start_time = $startDateTime->format('H:i:s');
+                if ($newStart) {
+                    $startDateTime = Carbon::parse($newStart);
+                    $model->start_date = $startDateTime->toDateString();
+                    $model->start_time = $startDateTime->format('H:i:s');
+                } else {
+                    $model->start_date = null;
+                    $model->start_time = null;
+                }
 
                 if ($newEnd) {
                     $model->end_date = Carbon::parse($newEnd)->toDateString();
                     // Calculate duration from start and end times
-                    $endDateTime = Carbon::parse($newEnd);
-                    $model->duration = $startDateTime->diffInMinutes($endDateTime);
+                    if ($model->start_date && $model->start_time) {
+                        $startDateTime = Carbon::parse($model->start_date.' '.$model->start_time);
+                        $endDateTime = Carbon::parse($newEnd);
+                        $model->duration = $startDateTime->diffInMinutes($endDateTime);
+                    }
+                } else {
+                    $model->end_date = null;
                 }
             } elseif ($itemType === 'event') {
-                $model->start_datetime = Carbon::parse($newStart);
+                if ($newStart) {
+                    $model->start_datetime = Carbon::parse($newStart);
+                }
                 if ($newEnd) {
                     $model->end_datetime = Carbon::parse($newEnd);
+                } elseif ($newStart) {
+                    // Auto-calculate if start provided but no end
+                    $model->end_datetime = Carbon::parse($newStart)->addHour();
                 }
             } elseif ($itemType === 'project') {
-                $model->start_date = Carbon::parse($newStart)->toDateString();
+                if ($newStart) {
+                    $model->start_date = Carbon::parse($newStart)->toDateString();
+                } else {
+                    $model->start_date = null;
+                }
                 if ($newEnd) {
                     $model->end_date = Carbon::parse($newEnd)->toDateString();
+                } else {
+                    $model->end_date = null;
                 }
             }
 
@@ -183,7 +214,7 @@ new class extends Component
 
                 if ($model->start_date && $model->start_time) {
                     $startDateString = Carbon::parse($model->start_date)->format('Y-m-d');
-                    $startDateTime = Carbon::parse($startDateString . ' ' . $model->start_time);
+                    $startDateTime = Carbon::parse($startDateString.' '.$model->start_time);
                     $endDateTime = $startDateTime->copy()->addMinutes($newDurationMinutes);
                     $model->end_date = $endDateTime->toDateString();
                 }
@@ -208,6 +239,7 @@ new class extends Component
             // Prevent events from being dropped in 'doing' column
             if ($itemType === 'event' && $newStatus === 'doing') {
                 $this->dispatch('notify', message: 'Events cannot be moved to In Progress', type: 'warning');
+
                 return;
             }
 
@@ -342,7 +374,8 @@ new class extends Component
 
         return $this->items->filter(function ($item) use ($targetDate) {
             if ($item->item_type === 'task') {
-                if (! $item->start_date) {
+                // If task has no dates, don't show in date-filtered view
+                if (! $item->start_date && ! $item->end_date) {
                     return false;
                 }
 
@@ -382,7 +415,8 @@ new class extends Component
                        ($endDate === $targetDate) ||
                        ($endDate && $startDate <= $targetDate && $endDate >= $targetDate);
             } elseif ($item->item_type === 'project') {
-                if (! $item->start_date) {
+                // If project has no dates, don't show in date-filtered view
+                if (! $item->start_date && ! $item->end_date) {
                     return false;
                 }
 
@@ -418,7 +452,6 @@ new class extends Component
             'done' => $items->filter(fn ($item) => in_array($item->status?->value ?? '', ['done', 'completed'])),
         ];
     }
-
 }; ?>
 
 <div class="space-y-4" wire:loading.class="opacity-50" wire:target="switchView,goToTodayDate,previousDay,nextDay,updateCurrentDate">

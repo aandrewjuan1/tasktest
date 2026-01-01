@@ -1,29 +1,41 @@
 <?php
 
-use Livewire\Volt\Component;
-use Livewire\Attributes\On;
-use Livewire\Attributes\Computed;
-use App\Models\Task;
 use App\Models\Project;
-use App\Models\Tag;
+use App\Models\Task;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
+use Livewire\Volt\Component;
 
-new class extends Component {
+new class extends Component
+{
     public bool $isOpen = false;
+
     public ?Task $task = null;
+
     public bool $editMode = false;
 
     // Edit fields
     public string $title = '';
+
     public string $description = '';
+
     public string $status = '';
+
     public string $priority = '';
+
     public string $complexity = '';
+
     public string $duration = '';
+
     public string $startDate = '';
+
     public string $startTime = '';
+
     public string $endDate = '';
+
     public string $projectId = '';
+
     public string $eventId = '';
 
     #[On('view-task-detail')]
@@ -49,7 +61,7 @@ new class extends Component {
 
     public function toggleEditMode(): void
     {
-        $this->editMode = !$this->editMode;
+        $this->editMode = ! $this->editMode;
         if ($this->editMode) {
             $this->loadTaskData();
         }
@@ -58,13 +70,13 @@ new class extends Component {
 
     protected function loadTaskData(): void
     {
-        if (!$this->task) {
+        if (! $this->task) {
             return;
         }
 
         $this->title = $this->task->title;
         $this->description = $this->task->description ?? '';
-        $this->status = $this->task->status->value;
+        $this->status = $this->task->status?->value ?? 'to_do';
         $this->priority = $this->task->priority?->value ?? '';
         $this->complexity = $this->task->complexity?->value ?? '';
         $this->duration = $this->task->duration ? (string) $this->task->duration : '';
@@ -82,29 +94,29 @@ new class extends Component {
         $validated = $this->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'status' => 'required|string|in:to_do,doing,done',
+            'status' => 'nullable|string|in:to_do,doing,done',
             'priority' => 'nullable|string|in:low,medium,high,urgent',
             'complexity' => 'nullable|string|in:simple,moderate,complex',
             'duration' => 'nullable|integer|min:1',
-            'startDate' => 'required|date',
+            'startDate' => 'nullable|date',
             'startTime' => 'nullable|date_format:H:i',
-            'endDate' => 'required|date|after_or_equal:startDate',
+            'endDate' => 'nullable|date|after_or_equal:startDate',
             'projectId' => 'nullable|exists:projects,id',
         ]);
 
         // Convert H:i format to H:i:s for database storage
-        $startTime = $this->startTime ? $this->startTime . ':00' : null;
+        $startTime = $this->startTime ? $this->startTime.':00' : null;
 
         $this->task->update([
             'title' => $this->title,
             'description' => $this->description ?: null,
-            'status' => $this->status,
+            'status' => $this->status ?: null,
             'priority' => $this->priority ?: null,
             'complexity' => $this->complexity ?: null,
             'duration' => $this->duration ?: null,
-            'start_date' => $this->startDate,
+            'start_date' => $this->startDate ?: null,
             'start_time' => $startTime,
-            'end_date' => $this->endDate,
+            'end_date' => $this->endDate ?: null,
             'project_id' => $this->projectId ?: null,
         ]);
 
@@ -186,7 +198,8 @@ new class extends Component {
                     <!-- Status -->
                     <div>
                         @if($editMode)
-                            <flux:select wire:model="status" label="Status" required>
+                            <flux:select wire:model="status" label="Status">
+                                <option value="">Select Status</option>
                                 <option value="to_do">To Do</option>
                                 <option value="doing">In Progress</option>
                                 <option value="done">Done</option>
@@ -273,7 +286,7 @@ new class extends Component {
                     <!-- Start Date -->
                     <div>
                         @if($editMode)
-                            <flux:input wire:model="startDate" label="Start Date" type="date" required />
+                            <flux:input wire:model="startDate" label="Start Date (optional)" type="date" />
                         @else
                             <flux:heading size="sm">Start Date</flux:heading>
                             <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
@@ -288,7 +301,7 @@ new class extends Component {
                     <!-- End Date -->
                     <div>
                         @if($editMode)
-                            <flux:input wire:model="endDate" label="Due Date" type="date" required />
+                            <flux:input wire:model="endDate" label="Due Date (optional)" type="date" />
                         @else
                             <flux:heading size="sm">Due Date</flux:heading>
                             <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2 {{ $task->end_date?->isPast() && $task->status->value !== 'done' ? 'text-red-600 dark:text-red-400 font-semibold' : '' }}">
