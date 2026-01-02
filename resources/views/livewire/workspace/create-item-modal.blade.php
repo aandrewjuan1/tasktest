@@ -279,7 +279,6 @@ new class extends Component
     closeModal() {
         $flux.modal('create-item').close();
         this.openDropdown = null;
-        $wire.call('resetForm');
     },
     switchTab(tab) {
         this.activeTab = tab;
