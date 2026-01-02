@@ -15,9 +15,8 @@
 
     <div class="flex flex-wrap gap-2 mb-3">
         @if($event->status)
-            <button
-                wire:click="filterByStatus('{{ $event->status->value }}')"
-                class="inline-flex items-center px-2 py-1 text-xs font-medium rounded hover:opacity-80 cursor-pointer transition-opacity {{ match($event->status->value) {
+            <span
+                class="inline-flex items-center px-2 py-1 text-xs font-medium rounded {{ match($event->status->value) {
                     'scheduled' => 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
                     'cancelled' => 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
                     'completed' => 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
@@ -25,7 +24,7 @@
                 } }}"
             >
                 {{ ucfirst($event->status->value) }}
-            </button>
+            </span>
         @endif
     </div>
 
@@ -57,28 +56,24 @@
         @endif
 
         @if($event->location)
-            <button
-                wire:click="filterByLocation('{{ addslashes($event->location) }}')"
-                class="flex items-center gap-2 hover:opacity-80 cursor-pointer transition-opacity"
-            >
+            <div class="flex items-center gap-2">
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
                 <span class="truncate">{{ $event->location }}</span>
-            </button>
+            </div>
         @endif
     </div>
 
     @if($event->tags->isNotEmpty())
         <div class="flex flex-wrap gap-1 mb-3">
             @foreach($event->tags->take(3) as $tag)
-                <button
-                    wire:click="toggleTagFilter('{{ $tag->name }}')"
-                    class="inline-flex items-center px-2 py-0.5 text-xs rounded bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 hover:opacity-80 cursor-pointer transition-opacity"
+                <span
+                    class="inline-flex items-center px-2 py-0.5 text-xs rounded bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300"
                 >
                     {{ $tag->name }}
-                </button>
+                </span>
             @endforeach
             @if($event->tags->count() > 3)
                 <span class="inline-flex items-center px-2 py-0.5 text-xs rounded bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400">

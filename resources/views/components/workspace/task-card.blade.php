@@ -7,16 +7,15 @@
         </h3>
 
         @if($task->priority)
-            <button
-                wire:click="filterByPriority('{{ $task->priority->value }}')"
+            <span
                 class="flex-shrink-0 w-3 h-3 rounded-full {{ match($task->priority->value) {
                     'low' => 'bg-zinc-400',
                     'medium' => 'bg-yellow-400',
                     'high' => 'bg-orange-500',
                     'urgent' => 'bg-red-500',
-                } }} hover:opacity-80 cursor-pointer transition-opacity"
-                title="Filter by {{ ucfirst($task->priority->value) }} priority"
-            ></button>
+                } }}"
+                title="{{ ucfirst($task->priority->value) }} priority"
+            ></span>
         @endif
     </div>
 
@@ -28,9 +27,8 @@
 
     <div class="flex flex-wrap gap-2 mb-3">
         @if($task->status)
-            <button
-                wire:click="filterByStatus('{{ $task->status->value }}')"
-                class="inline-flex items-center px-2 py-1 text-xs font-medium rounded hover:opacity-80 cursor-pointer transition-opacity {{ match($task->status->value) {
+            <span
+                class="inline-flex items-center px-2 py-1 text-xs font-medium rounded {{ match($task->status->value) {
                     'to_do' => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300',
                     'doing' => 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
                     'done' => 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
@@ -41,20 +39,19 @@
                     'doing' => 'In Progress',
                     'done' => 'Done',
                 } }}
-            </button>
+            </span>
         @endif
 
         @if($task->complexity)
-            <button
-                wire:click="filterByComplexity('{{ $task->complexity->value }}')"
-                class="inline-flex items-center px-2 py-1 text-xs font-medium rounded hover:opacity-80 cursor-pointer transition-opacity {{ match($task->complexity->value) {
+            <span
+                class="inline-flex items-center px-2 py-1 text-xs font-medium rounded {{ match($task->complexity->value) {
                     'simple' => 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
                     'moderate' => 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300',
                     'complex' => 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
                 } }}"
             >
                 {{ ucfirst($task->complexity->value) }}
-            </button>
+            </span>
         @endif
     </div>
 
@@ -71,27 +68,23 @@
         @endif
 
         @if($task->project)
-            <button
-                wire:click="filterByProject({{ $task->project->id }})"
-                class="flex items-center gap-1 hover:opacity-80 cursor-pointer transition-opacity"
-            >
+            <div class="flex items-center gap-1">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                 </svg>
                 <span class="truncate">{{ $task->project->name }}</span>
-            </button>
+            </div>
         @endif
     </div>
 
     @if($task->tags->isNotEmpty())
         <div class="flex flex-wrap gap-1 mb-3">
             @foreach($task->tags->take(3) as $tag)
-                <button
-                    wire:click="toggleTagFilter('{{ $tag->name }}')"
-                    class="inline-flex items-center px-2 py-0.5 text-xs rounded bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 hover:opacity-80 cursor-pointer transition-opacity"
+                <span
+                    class="inline-flex items-center px-2 py-0.5 text-xs rounded bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300"
                 >
                     {{ $tag->name }}
-                </button>
+                </span>
             @endforeach
             @if($task->tags->count() > 3)
                 <span class="inline-flex items-center px-2 py-0.5 text-xs rounded bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400">

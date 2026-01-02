@@ -49,12 +49,11 @@
     @if($project->tags->isNotEmpty())
         <div class="flex flex-wrap gap-1 mb-3">
             @foreach($project->tags->take(3) as $tag)
-                <button
-                    wire:click="toggleTagFilter('{{ $tag->name }}')"
-                    class="inline-flex items-center px-2 py-0.5 text-xs rounded bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 hover:opacity-80 cursor-pointer transition-opacity"
+                <span
+                    class="inline-flex items-center px-2 py-0.5 text-xs rounded bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300"
                 >
                     {{ $tag->name }}
-                </button>
+                </span>
             @endforeach
             @if($project->tags->count() > 3)
                 <span class="inline-flex items-center px-2 py-0.5 text-xs rounded bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400">
