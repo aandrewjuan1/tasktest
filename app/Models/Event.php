@@ -48,6 +48,11 @@ class Event extends Model
                 $event->status = EventStatus::Scheduled;
             }
 
+            // Set default start_datetime to current datetime if not provided
+            if (is_null($event->start_datetime)) {
+                $event->start_datetime = now();
+            }
+
             // Auto-calculate end_datetime if not provided
             if (is_null($event->end_datetime) && $event->start_datetime) {
                 $event->end_datetime = $event->start_datetime->copy()->addHour();

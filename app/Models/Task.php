@@ -61,6 +61,12 @@ class Task extends Model
             if (is_null($task->complexity)) {
                 $task->complexity = TaskComplexity::Moderate;
             }
+            if (is_null($task->duration)) {
+                $task->duration = 60;
+            }
+            if (is_null($task->start_date)) {
+                $task->start_date = \Illuminate\Support\Carbon::today()->toDateString();
+            }
         });
     }
 

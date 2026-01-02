@@ -24,7 +24,7 @@ new class extends Component
     public ?string $taskStatus = 'to_do';
     public ?string $taskPriority = 'medium';
     public ?string $taskComplexity = 'moderate';
-    public ?int $taskDuration = null;
+    public ?int $taskDuration = 60;
     public ?string $taskStartDate = null;
     public ?string $taskStartTime = null;
     public ?string $taskEndDate = null;
@@ -64,8 +64,8 @@ new class extends Component
         $this->taskStatus = 'to_do';
         $this->taskPriority = 'medium';
         $this->taskComplexity = 'moderate';
-        $this->taskDuration = null;
-        $this->taskStartDate = null;
+        $this->taskDuration = 60;
+        $this->taskStartDate = Carbon::today()->toDateString();
         $this->taskStartTime = null;
         $this->taskEndDate = null;
         $this->taskProjectId = null;
@@ -73,14 +73,14 @@ new class extends Component
 
         $this->eventTitle = '';
         $this->eventStatus = 'scheduled';
-        $this->eventStartDatetime = null;
+        $this->eventStartDatetime = Carbon::now()->format('Y-m-d\TH:i');
         $this->eventEndDatetime = null;
         $this->eventLocation = null;
         $this->eventColor = null;
         $this->eventTagIds = [];
 
         $this->projectName = '';
-        $this->projectStartDate = null;
+        $this->projectStartDate = Carbon::today()->toDateString();
         $this->projectEndDate = null;
         $this->projectTagIds = [];
     }

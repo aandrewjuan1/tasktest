@@ -31,6 +31,16 @@ class Project extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::creating(function (Project $project) {
+            // Set default start_date to current date if not provided
+            if (is_null($project->start_date)) {
+                $project->start_date = \Illuminate\Support\Carbon::today()->toDateString();
+            }
+        });
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
