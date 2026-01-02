@@ -224,11 +224,7 @@ new class extends Component {
                                             </p>
                                         @endif
                                     </div>
-                                    <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded ml-3 {{ match($task->status->value) {
-                                        'to_do' => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300',
-                                        'doing' => 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
-                                        'done' => 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
-                                    } }}">
+                                    <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded ml-3 {{ $task->status->badgeColor() }}">
                                         {{ match($task->status->value) {
                                             'to_do' => 'To Do',
                                             'doing' => 'In Progress',

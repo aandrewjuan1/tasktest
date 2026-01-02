@@ -454,7 +454,7 @@ new class extends Component
     }
 }; ?>
 
-<div class="space-y-4" wire:loading.class="opacity-50" wire:target="switchView,goToTodayDate,previousDay,nextDay,updateCurrentDate">
+<div class="space-y-4 px-4" wire:loading.class="opacity-50" wire:target="switchView,goToTodayDate,previousDay,nextDay,updateCurrentDate">
     <!-- View Switcher -->
     <div class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
         <div class="flex gap-2" role="group" aria-label="View mode selection">

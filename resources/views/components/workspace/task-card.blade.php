@@ -1,6 +1,12 @@
 @props(['task'])
 
-<div class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 hover:shadow-md transition-shadow">
+<div
+    class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 cursor-pointer hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-600 transition-all"
+    wire:click="$dispatch('view-task-detail', { id: {{ $task->id }} })"
+    role="button"
+    tabindex="0"
+    aria-label="View task details: {{ $task->title }}"
+>
     <div class="flex items-start justify-between gap-3 mb-3">
         <h3 class="font-semibold text-zinc-900 dark:text-zinc-100 line-clamp-2 flex-1">
             {{ $task->title }}
@@ -8,12 +14,7 @@
 
         @if($task->priority)
             <span
-                class="flex-shrink-0 w-3 h-3 rounded-full {{ match($task->priority->value) {
-                    'low' => 'bg-zinc-400',
-                    'medium' => 'bg-yellow-400',
-                    'high' => 'bg-orange-500',
-                    'urgent' => 'bg-red-500',
-                } }}"
+                class="flex-shrink-0 w-3 h-3 rounded-full {{ $task->priority->dotColor() }}"
                 title="{{ ucfirst($task->priority->value) }} priority"
             ></span>
         @endif
@@ -28,11 +29,7 @@
     <div class="flex flex-wrap gap-2 mb-3">
         @if($task->status)
             <span
-                class="inline-flex items-center px-2 py-1 text-xs font-medium rounded {{ match($task->status->value) {
-                    'to_do' => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300',
-                    'doing' => 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
-                    'done' => 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
-                } }}"
+                class="inline-flex items-center px-2 py-1 text-xs font-medium rounded {{ $task->status->badgeColor() }}"
             >
                 {{ match($task->status->value) {
                     'to_do' => 'To Do',
@@ -44,11 +41,7 @@
 
         @if($task->complexity)
             <span
-                class="inline-flex items-center px-2 py-1 text-xs font-medium rounded {{ match($task->complexity->value) {
-                    'simple' => 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
-                    'moderate' => 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300',
-                    'complex' => 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
-                } }}"
+                class="inline-flex items-center px-2 py-1 text-xs font-medium rounded {{ $task->complexity->badgeColor() }}"
             >
                 {{ ucfirst($task->complexity->value) }}
             </span>
@@ -93,10 +86,4 @@
             @endif
         </div>
     @endif
-
-    <div class="flex justify-end">
-        <flux:button variant="ghost" size="sm" wire:click="$dispatch('view-task-detail', { id: {{ $task->id }} })">
-            View Details
-        </flux:button>
-    </div>
 </div>

@@ -206,11 +206,7 @@ new class extends Component
                             </flux:select>
                         @else
                             <flux:heading size="sm">Status</flux:heading>
-                            <span class="inline-flex items-center px-3 py-1 text-sm font-medium rounded mt-2 {{ match($task->status->value) {
-                                'to_do' => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300',
-                                'doing' => 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
-                                'done' => 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
-                            } }}">
+                            <span class="inline-flex items-center px-3 py-1 text-sm font-medium rounded mt-2 {{ $task->status->badgeColor() }}">
                                 {{ match($task->status->value) {
                                     'to_do' => 'To Do',
                                     'doing' => 'In Progress',
@@ -234,12 +230,7 @@ new class extends Component
                             <flux:heading size="sm">Priority</flux:heading>
                             @if($task->priority)
                                 <span class="inline-flex items-center gap-2 mt-2">
-                                    <span class="w-3 h-3 rounded-full {{ match($task->priority->value) {
-                                        'low' => 'bg-zinc-400',
-                                        'medium' => 'bg-yellow-400',
-                                        'high' => 'bg-orange-500',
-                                        'urgent' => 'bg-red-500',
-                                    } }}"></span>
+                                    <span class="w-3 h-3 rounded-full {{ $task->priority->dotColor() }}"></span>
                                     <span class="text-sm">{{ ucfirst($task->priority->value) }}</span>
                                 </span>
                             @else
@@ -260,11 +251,7 @@ new class extends Component
                         @else
                             <flux:heading size="sm">Complexity</flux:heading>
                             @if($task->complexity)
-                                <span class="inline-flex items-center px-3 py-1 text-sm font-medium rounded mt-2 {{ match($task->complexity->value) {
-                                    'simple' => 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
-                                    'moderate' => 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300',
-                                    'complex' => 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
-                                } }}">
+                                <span class="inline-flex items-center px-3 py-1 text-sm font-medium rounded mt-2 {{ $task->complexity->badgeColor() }}">
                                     {{ ucfirst($task->complexity->value) }}
                                 </span>
                             @else

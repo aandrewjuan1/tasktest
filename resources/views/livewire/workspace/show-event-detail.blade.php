@@ -230,12 +230,7 @@ new class extends Component
                             </flux:select>
                         @else
                             <flux:heading size="sm">Status</flux:heading>
-                            <span class="inline-flex items-center px-3 py-1 text-sm font-medium rounded mt-2 {{ match($event->status->value) {
-                                'scheduled' => 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
-                                'cancelled' => 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
-                                'completed' => 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
-                                'tentative' => 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300',
-                            } }}">
+                            <span class="inline-flex items-center px-3 py-1 text-sm font-medium rounded mt-2 {{ $event->status->badgeColor() }}">
                                 {{ ucfirst($event->status->value) }}
                             </span>
                         @endif

@@ -1,6 +1,12 @@
 @props(['project'])
 
-<div class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 hover:shadow-md transition-shadow">
+<div
+    class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 cursor-pointer hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-600 transition-all"
+    wire:click="$dispatch('view-project-detail', { id: {{ $project->id }} })"
+    role="button"
+    tabindex="0"
+    aria-label="View project details: {{ $project->name }}"
+>
     <div class="flex items-start justify-between gap-3 mb-3">
         <h3 class="font-semibold text-zinc-900 dark:text-zinc-100 line-clamp-2 flex-1">
             {{ $project->name }}
@@ -62,10 +68,4 @@
             @endif
         </div>
     @endif
-
-    <div class="flex justify-end">
-        <flux:button variant="ghost" size="sm" wire:click="$dispatch('view-project-detail', { id: {{ $project->id }} })">
-            View Details
-        </flux:button>
-    </div>
 </div>

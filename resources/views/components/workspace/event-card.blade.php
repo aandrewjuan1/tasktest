@@ -1,6 +1,16 @@
 @props(['event'])
 
-<div class="bg-white dark:bg-zinc-800 rounded-lg border-l-4 border-zinc-200 dark:border-zinc-700 p-4 hover:shadow-md transition-shadow" style="border-left-color: {{ $event->color ?? '#6b7280' }}">
+<div
+    class="bg-white dark:bg-zinc-800 rounded-lg border-l-4 border-zinc-200 dark:border-zinc-700 p-4 cursor-pointer hover:shadow-lg transition-all"
+    style="border-left-color: {{ $event->color ?? '#6b7280' }}"
+    wire:click="$dispatch('view-event-detail', { id: {{ $event->id }} })"
+    role="button"
+    tabindex="0"
+    aria-label="View event details: {{ $event->title }}"
+    x-data="{ originalColor: '{{ $event->color ?? '#6b7280' }}' }"
+    @mouseenter="$el.style.borderLeftColor = 'rgb(147 197 253)'"
+    @mouseleave="$el.style.borderLeftColor = originalColor"
+>
     <div class="flex items-start justify-between gap-3 mb-3">
         <h3 class="font-semibold text-zinc-900 dark:text-zinc-100 line-clamp-2 flex-1">
             {{ $event->title }}
@@ -16,12 +26,7 @@
     <div class="flex flex-wrap gap-2 mb-3">
         @if($event->status)
             <span
-                class="inline-flex items-center px-2 py-1 text-xs font-medium rounded {{ match($event->status->value) {
-                    'scheduled' => 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
-                    'cancelled' => 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
-                    'completed' => 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
-                    'tentative' => 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300',
-                } }}"
+                class="inline-flex items-center px-2 py-1 text-xs font-medium rounded {{ $event->status->badgeColor() }}"
             >
                 {{ ucfirst($event->status->value) }}
             </span>
@@ -82,10 +87,4 @@
             @endif
         </div>
     @endif
-
-    <div class="flex justify-end">
-        <flux:button variant="ghost" size="sm" wire:click="$dispatch('view-event-detail', { id: {{ $event->id }} })">
-            View Details
-        </flux:button>
-    </div>
 </div>
