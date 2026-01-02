@@ -35,11 +35,6 @@ new class extends Component
         $this->dispatch('date-focused', date: $this->currentDate->format('Y-m-d'));
     }
 
-    public function openCreateModal(): void
-    {
-        $this->dispatch('open-create-modal');
-    }
-
     public function switchView(string $mode): void
     {
         $this->viewMode = $mode;
@@ -578,10 +573,6 @@ new class extends Component
         @endif
     </div>
 
-    <!-- Floating Action Button -->
-    <div class="fixed bottom-8 right-8">
-        <flux:button variant="primary" icon="plus" wire:click="openCreateModal">
-            Create
-        </flux:button>
-    </div>
+    <!-- Create Item Modal -->
+    <livewire:workspace.create-item-modal />
 </div>

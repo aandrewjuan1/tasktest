@@ -45,9 +45,6 @@ class extends Component {
         </div>
     </div>
 
-    <!-- Create Modal -->
-    <livewire:workspace.create-item-modal />
-
     <!-- Detail View Modals -->
     <livewire:workspace.show-task-detail />
     <livewire:workspace.show-event-detail />
