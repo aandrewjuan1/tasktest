@@ -83,127 +83,162 @@ new class extends Component
         $this->projectStartDate = Carbon::today()->toDateString();
         $this->projectEndDate = null;
         $this->projectTagIds = [];
+
+        $this->resetValidation();
     }
 
     public function createTask(): void
     {
-        $validated = $this->validate([
-            'taskTitle' => ['required', 'string', 'max:255'],
-            'taskStatus' => ['nullable', 'string', 'in:to_do,doing,done'],
-            'taskPriority' => ['nullable', 'string', 'in:low,medium,high,urgent'],
-            'taskComplexity' => ['nullable', 'string', 'in:simple,moderate,complex'],
-            'taskDuration' => ['nullable', 'integer', 'min:1'],
-            'taskStartDate' => ['nullable', 'date'],
-            'taskStartTime' => ['nullable', 'date_format:H:i'],
-            'taskEndDate' => ['nullable', 'date', 'after_or_equal:taskStartDate'],
-            'taskProjectId' => ['nullable', 'exists:projects,id'],
-            'taskTagIds' => ['nullable', 'array'],
-            'taskTagIds.*' => ['exists:tags,id'],
-        ], [], [
-            'taskTitle' => 'title',
-            'taskStatus' => 'status',
-            'taskPriority' => 'priority',
-            'taskComplexity' => 'complexity',
-            'taskDuration' => 'duration',
-            'taskStartDate' => 'start date',
-            'taskStartTime' => 'start time',
-            'taskEndDate' => 'end date',
-            'taskProjectId' => 'project',
-        ]);
+        $this->authorize('create', Task::class);
 
-        $task = Task::create([
-            'user_id' => auth()->id(),
-            'title' => $validated['taskTitle'],
-            'status' => $validated['taskStatus'] ? TaskStatus::from($validated['taskStatus']) : null,
-            'priority' => $validated['taskPriority'] ? TaskPriority::from($validated['taskPriority']) : null,
-            'complexity' => $validated['taskComplexity'] ? TaskComplexity::from($validated['taskComplexity']) : null,
-            'duration' => $validated['taskDuration'] ?? null,
-            'start_date' => $validated['taskStartDate'] ?? null,
-            'start_time' => $validated['taskStartTime'] ?? null,
-            'end_date' => $validated['taskEndDate'] ?? null,
-            'project_id' => $validated['taskProjectId'] ?? null,
-        ]);
+        try {
+            $validated = $this->validate([
+                'taskTitle' => ['required', 'string', 'max:255'],
+                'taskStatus' => ['nullable', 'string', 'in:to_do,doing,done'],
+                'taskPriority' => ['nullable', 'string', 'in:low,medium,high,urgent'],
+                'taskComplexity' => ['nullable', 'string', 'in:simple,moderate,complex'],
+                'taskDuration' => ['nullable', 'integer', 'min:1'],
+                'taskStartDate' => ['nullable', 'date'],
+                'taskStartTime' => ['nullable', 'date_format:H:i'],
+                'taskEndDate' => ['nullable', 'date', 'after_or_equal:taskStartDate'],
+                'taskProjectId' => ['nullable', 'exists:projects,id'],
+                'taskTagIds' => ['nullable', 'array'],
+                'taskTagIds.*' => ['exists:tags,id'],
+            ], [], [
+                'taskTitle' => 'title',
+                'taskStatus' => 'status',
+                'taskPriority' => 'priority',
+                'taskComplexity' => 'complexity',
+                'taskDuration' => 'duration',
+                'taskStartDate' => 'start date',
+                'taskStartTime' => 'start time',
+                'taskEndDate' => 'end date',
+                'taskProjectId' => 'project',
+            ]);
 
-        if (!empty($validated['taskTagIds'])) {
-            $task->tags()->attach($validated['taskTagIds']);
+            $task = Task::create([
+                'user_id' => auth()->id(),
+                'title' => $validated['taskTitle'],
+                'status' => $validated['taskStatus'] ? TaskStatus::from($validated['taskStatus']) : null,
+                'priority' => $validated['taskPriority'] ? TaskPriority::from($validated['taskPriority']) : null,
+                'complexity' => $validated['taskComplexity'] ? TaskComplexity::from($validated['taskComplexity']) : null,
+                'duration' => $validated['taskDuration'] ?? null,
+                'start_date' => $validated['taskStartDate'] ?? null,
+                'start_time' => $validated['taskStartTime'] ?? null,
+                'end_date' => $validated['taskEndDate'] ?? null,
+                'project_id' => $validated['taskProjectId'] ?? null,
+            ]);
+
+            if (!empty($validated['taskTagIds'])) {
+                $task->tags()->attach($validated['taskTagIds']);
+            }
+
+            $this->resetForm();
+            $this->dispatch('notify', message: 'Task created successfully', type: 'success');
+            $this->dispatch('item-created');
+        } catch (\Exception $e) {
+            \Log::error('Failed to create task', [
+                'error' => $e->getMessage(),
+                'user_id' => auth()->id(),
+            ]);
+
+            $this->dispatch('notify', message: 'Failed to create task. Please try again.', type: 'error');
         }
-
-        $this->dispatch('item-updated');
-        $this->dispatch('notify', message: 'Task created successfully', type: 'success');
-        $this->dispatch('close-create-modal');
     }
 
     public function createEvent(): void
     {
-        $validated = $this->validate([
-            'eventTitle' => ['required', 'string', 'max:255'],
-            'eventStatus' => ['nullable', 'string', 'in:scheduled,cancelled,completed,tentative'],
-            'eventStartDatetime' => ['nullable', 'date'],
-            'eventEndDatetime' => ['nullable', 'date', 'after:eventStartDatetime'],
-            'eventLocation' => ['nullable', 'string', 'max:255'],
-            'eventColor' => ['nullable', 'string', 'max:7'],
-            'eventTagIds' => ['nullable', 'array'],
-            'eventTagIds.*' => ['exists:tags,id'],
-        ], [], [
-            'eventTitle' => 'title',
-            'eventStatus' => 'status',
-            'eventStartDatetime' => 'start datetime',
-            'eventEndDatetime' => 'end datetime',
-            'eventLocation' => 'location',
-            'eventColor' => 'color',
-        ]);
+        $this->authorize('create', Event::class);
 
-        $startDatetime = $validated['eventStartDatetime'] ? Carbon::parse($validated['eventStartDatetime']) : null;
-        $endDatetime = $validated['eventEndDatetime'] ? Carbon::parse($validated['eventEndDatetime']) : null;
+        try {
+            $validated = $this->validate([
+                'eventTitle' => ['required', 'string', 'max:255'],
+                'eventStatus' => ['nullable', 'string', 'in:scheduled,cancelled,completed,tentative'],
+                'eventStartDatetime' => ['nullable', 'date'],
+                'eventEndDatetime' => ['nullable', 'date', 'after:eventStartDatetime'],
+                'eventLocation' => ['nullable', 'string', 'max:255'],
+                'eventColor' => ['nullable', 'string', 'max:7'],
+                'eventTagIds' => ['nullable', 'array'],
+                'eventTagIds.*' => ['exists:tags,id'],
+            ], [], [
+                'eventTitle' => 'title',
+                'eventStatus' => 'status',
+                'eventStartDatetime' => 'start datetime',
+                'eventEndDatetime' => 'end datetime',
+                'eventLocation' => 'location',
+                'eventColor' => 'color',
+            ]);
 
-        $event = Event::create([
-            'user_id' => auth()->id(),
-            'title' => $validated['eventTitle'],
-            'status' => $validated['eventStatus'] ? EventStatus::from($validated['eventStatus']) : null,
-            'start_datetime' => $startDatetime,
-            'end_datetime' => $endDatetime,
-            'location' => $validated['eventLocation'] ?? null,
-            'color' => $validated['eventColor'] ?? null,
-            'timezone' => config('app.timezone'),
-        ]);
+            $startDatetime = $validated['eventStartDatetime'] ? Carbon::parse($validated['eventStartDatetime']) : null;
+            $endDatetime = $validated['eventEndDatetime'] ? Carbon::parse($validated['eventEndDatetime']) : null;
 
-        if (!empty($validated['eventTagIds'])) {
-            $event->tags()->attach($validated['eventTagIds']);
+            $event = Event::create([
+                'user_id' => auth()->id(),
+                'title' => $validated['eventTitle'],
+                'status' => $validated['eventStatus'] ? EventStatus::from($validated['eventStatus']) : null,
+                'start_datetime' => $startDatetime,
+                'end_datetime' => $endDatetime,
+                'location' => $validated['eventLocation'] ?? null,
+                'color' => $validated['eventColor'] ?? null,
+                'timezone' => config('app.timezone'),
+            ]);
+
+            if (!empty($validated['eventTagIds'])) {
+                $event->tags()->attach($validated['eventTagIds']);
+            }
+
+            $this->resetForm();
+            $this->dispatch('notify', message: 'Event created successfully', type: 'success');
+            $this->dispatch('item-created');
+        } catch (\Exception $e) {
+            \Log::error('Failed to create event', [
+                'error' => $e->getMessage(),
+                'user_id' => auth()->id(),
+            ]);
+
+            $this->dispatch('notify', message: 'Failed to create event. Please try again.', type: 'error');
         }
-
-        $this->dispatch('item-updated');
-        $this->dispatch('notify', message: 'Event created successfully', type: 'success');
-        $this->dispatch('close-create-modal');
     }
 
     public function createProject(): void
     {
-        $validated = $this->validate([
-            'projectName' => ['required', 'string', 'max:255'],
-            'projectStartDate' => ['nullable', 'date'],
-            'projectEndDate' => ['nullable', 'date', 'after_or_equal:projectStartDate'],
-            'projectTagIds' => ['nullable', 'array'],
-            'projectTagIds.*' => ['exists:tags,id'],
-        ], [], [
-            'projectName' => 'name',
-            'projectStartDate' => 'start date',
-            'projectEndDate' => 'end date',
-        ]);
+        $this->authorize('create', Project::class);
 
-        $project = Project::create([
-            'user_id' => auth()->id(),
-            'name' => $validated['projectName'],
-            'start_date' => $validated['projectStartDate'] ?? null,
-            'end_date' => $validated['projectEndDate'] ?? null,
-        ]);
+        try {
+            $validated = $this->validate([
+                'projectName' => ['required', 'string', 'max:255'],
+                'projectStartDate' => ['nullable', 'date'],
+                'projectEndDate' => ['nullable', 'date', 'after_or_equal:projectStartDate'],
+                'projectTagIds' => ['nullable', 'array'],
+                'projectTagIds.*' => ['exists:tags,id'],
+            ], [], [
+                'projectName' => 'name',
+                'projectStartDate' => 'start date',
+                'projectEndDate' => 'end date',
+            ]);
 
-        if (!empty($validated['projectTagIds'])) {
-            $project->tags()->attach($validated['projectTagIds']);
+            $project = Project::create([
+                'user_id' => auth()->id(),
+                'name' => $validated['projectName'],
+                'start_date' => $validated['projectStartDate'] ?? null,
+                'end_date' => $validated['projectEndDate'] ?? null,
+            ]);
+
+            if (!empty($validated['projectTagIds'])) {
+                $project->tags()->attach($validated['projectTagIds']);
+            }
+
+            $this->resetForm();
+            $this->dispatch('notify', message: 'Project created successfully', type: 'success');
+            $this->dispatch('item-created');
+        } catch (\Exception $e) {
+            \Log::error('Failed to create project', [
+                'error' => $e->getMessage(),
+                'user_id' => auth()->id(),
+            ]);
+
+            $this->dispatch('notify', message: 'Failed to create project. Please try again.', type: 'error');
         }
-
-        $this->dispatch('item-updated');
-        $this->dispatch('notify', message: 'Project created successfully', type: 'success');
-        $this->dispatch('close-create-modal');
     }
 
     #[Computed]
@@ -245,7 +280,6 @@ new class extends Component
         $flux.modal('create-item').close();
         this.openDropdown = null;
         $wire.call('resetForm');
-        $wire.resetValidation();
     },
     switchTab(tab) {
         this.activeTab = tab;
@@ -259,7 +293,8 @@ new class extends Component
     }
 }"
      @open-create-modal.window="openModal()"
-     @close-create-modal.window="closeModal()">
+     @close-create-modal.window="closeModal()"
+     @item-created.window="closeModal()">
     <flux:modal name="create-item" class="max-w-2xl">
         <div class="space-y-6">
             <!-- Tabs -->
@@ -551,6 +586,7 @@ new class extends Component
                                 </button>
                                 @foreach($this->availableProjects as $project)
                                 <button
+                                    wire:key="project-{{ $project->id }}"
                                     wire:click="$set('taskProjectId', {{ $project->id }}); openDropdown = null"
                                     class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $taskProjectId === $project->id ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
                                 >
@@ -576,15 +612,15 @@ new class extends Component
                                 {{ count($taskTagIds) > 0 ? count($taskTagIds) . ' selected' : 'None' }}
                             </span>
                         </button>
-                        <template x-if="open">
+                        <template x-if="isOpen('task-tags')">
                             <div
                                 x-cloak
                                 x-transition
                                 class="absolute z-50 mt-1 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 max-h-60 overflow-y-auto"
-                                @click.away="open = false"
+                                @click.away="openDropdown = null"
                             >
                                 @foreach($this->availableTags as $tag)
-                                    <label class="flex items-center px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer">
+                                    <label wire:key="task-tag-{{ $tag->id }}" class="flex items-center px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer">
                                         <input
                                             type="checkbox"
                                             wire:model="taskTagIds"
@@ -781,7 +817,7 @@ new class extends Component
                                 @click.away="openDropdown = null"
                             >
                                 @foreach($this->availableTags as $tag)
-                                    <label class="flex items-center px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer">
+                                    <label wire:key="event-tag-{{ $tag->id }}" class="flex items-center px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer">
                                         <input
                                             type="checkbox"
                                             wire:model="eventTagIds"
@@ -865,7 +901,7 @@ new class extends Component
                                 @click.away="openDropdown = null"
                             >
                                 @foreach($this->availableTags as $tag)
-                                    <label class="flex items-center px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer">
+                                    <label wire:key="project-tag-{{ $tag->id }}" class="flex items-center px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer">
                                         <input
                                             type="checkbox"
                                             wire:model="projectTagIds"
@@ -887,17 +923,56 @@ new class extends Component
 
             <!-- Actions -->
             <div class="flex justify-end gap-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
-                <flux:button variant="ghost" @click="$flux.modal('create-item').close(); $wire.call('resetForm'); $wire.resetValidation();">
+                <flux:button variant="ghost" @click="$flux.modal('create-item').close(); $wire.call('resetForm');">
                     Cancel
                 </flux:button>
-                <flux:button x-show="activeTab === 'task'" variant="primary" wire:click="createTask">
-                    Create Task
+                <flux:button
+                    x-show="activeTab === 'task'"
+                    variant="primary"
+                    wire:click="createTask"
+                    wire:loading.attr="disabled"
+                    wire:target="createTask"
+                >
+                    <span wire:loading.remove wire:target="createTask">Create Task</span>
+                    <span wire:loading wire:target="createTask" class="flex items-center gap-2">
+                        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Creating...
+                    </span>
                 </flux:button>
-                <flux:button x-show="activeTab === 'event'" variant="primary" wire:click="createEvent">
-                    Create Event
+                <flux:button
+                    x-show="activeTab === 'event'"
+                    variant="primary"
+                    wire:click="createEvent"
+                    wire:loading.attr="disabled"
+                    wire:target="createEvent"
+                >
+                    <span wire:loading.remove wire:target="createEvent">Create Event</span>
+                    <span wire:loading wire:target="createEvent" class="flex items-center gap-2">
+                        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Creating...
+                    </span>
                 </flux:button>
-                <flux:button x-show="activeTab === 'project'" variant="primary" wire:click="createProject">
-                    Create Project
+                <flux:button
+                    x-show="activeTab === 'project'"
+                    variant="primary"
+                    wire:click="createProject"
+                    wire:loading.attr="disabled"
+                    wire:target="createProject"
+                >
+                    <span wire:loading.remove wire:target="createProject">Create Project</span>
+                    <span wire:loading wire:target="createProject" class="flex items-center gap-2">
+                        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Creating...
+                    </span>
                 </flux:button>
             </div>
         </div>

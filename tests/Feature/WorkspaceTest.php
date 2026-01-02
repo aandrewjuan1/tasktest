@@ -310,6 +310,103 @@ test('can open and view task detail modal', function () {
         ->assertSee('Detail Task');
 });
 
+test('list view updates after creating new task and does not disappear', function () {
+    // Create an existing task to ensure it remains visible
+    $existingTask = Task::factory()->create([
+        'user_id' => $this->user->id,
+        'title' => 'Existing Task',
+        'status' => 'to_do',
+        'start_date' => now()->toDateString(),
+    ]);
+
+    actingAs($this->user);
+
+    // Test show-items component initially shows existing task
+    $component = Livewire::test('workspace.show-items')
+        ->assertSee('Existing Task')
+        ->assertSet('viewMode', 'list');
+
+    // Create a new task via the modal
+    Livewire::test('workspace.create-item-modal')
+        ->set('activeTab', 'task')
+        ->set('taskTitle', 'New Task After Creation')
+        ->set('taskStatus', 'to_do')
+        ->set('taskStartDate', now()->toDateString())
+        ->call('createTask')
+        ->assertDispatched('item-updated');
+
+    // Verify the new task exists in database
+    expect(Task::where('title', 'New Task After Creation')->exists())->toBeTrue();
+
+    // Test show-items component again - it should refresh and show both tasks
+    // We dispatch the item-updated event to simulate what happens in real usage
+    $component->dispatch('item-updated')
+        ->assertSee('Existing Task')
+        ->assertSee('New Task After Creation');
+});
+
+test('list view updates after creating new event and does not disappear', function () {
+    // Create an existing event
+    $existingEvent = Event::factory()->create([
+        'user_id' => $this->user->id,
+        'title' => 'Existing Event',
+        'start_datetime' => now()->addDay(),
+        'end_datetime' => now()->addDay()->addHour(),
+    ]);
+
+    actingAs($this->user);
+
+    $component = Livewire::test('workspace.show-items')
+        ->assertSee('Existing Event')
+        ->assertSet('viewMode', 'list');
+
+    // Create a new event
+    Livewire::test('workspace.create-item-modal')
+        ->set('activeTab', 'event')
+        ->set('eventTitle', 'New Event After Creation')
+        ->set('eventStartDatetime', now()->addDays(2)->format('Y-m-d\TH:i'))
+        ->set('eventEndDatetime', now()->addDays(2)->addHour()->format('Y-m-d\TH:i'))
+        ->call('createEvent')
+        ->assertDispatched('item-updated');
+
+    expect(Event::where('title', 'New Event After Creation')->exists())->toBeTrue();
+
+    // Verify both events are visible after refresh
+    $component->dispatch('item-updated')
+        ->assertSee('Existing Event')
+        ->assertSee('New Event After Creation');
+});
+
+test('list view updates after creating new project and does not disappear', function () {
+    // Create an existing project
+    $existingProject = Project::factory()->create([
+        'user_id' => $this->user->id,
+        'name' => 'Existing Project',
+        'start_date' => now()->toDateString(),
+    ]);
+
+    actingAs($this->user);
+
+    $component = Livewire::test('workspace.show-items')
+        ->assertSee('Existing Project')
+        ->assertSet('viewMode', 'list');
+
+    // Create a new project
+    Livewire::test('workspace.create-item-modal')
+        ->set('activeTab', 'project')
+        ->set('projectName', 'New Project After Creation')
+        ->set('projectStartDate', now()->toDateString())
+        ->call('createProject')
+        ->assertDispatched('item-updated');
+
+    expect(Project::where('name', 'New Project After Creation')->exists())->toBeTrue();
+
+    // Verify both projects are visible after refresh
+    $component->dispatch('item-updated')
+        ->assertSee('Existing Project')
+        ->assertSee('New Project After Creation');
+});
+
 test('can edit task in detail modal', function () {
     $task = Task::factory()->create([
         'user_id' => $this->user->id,

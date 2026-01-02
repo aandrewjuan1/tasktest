@@ -7,13 +7,6 @@ use Livewire\Attributes\On;
 new
 #[Title('Workspace')]
 class extends Component {
-    #[On('task-created')]
-    #[On('event-created')]
-    #[On('project-created')]
-    public function refreshItems(): void
-    {
-        // This will trigger a re-render of child components
-    }
 }; ?>
 
 <div class="h-screen flex flex-col overflow-hidden">
@@ -36,12 +29,12 @@ class extends Component {
     <div class="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-6 overflow-hidden">
         <!-- Left Column: Tasks, Events, Projects (75%) -->
         <div class="lg:col-span-3 overflow-y-auto">
-            <livewire:workspace.show-items :key="'show-items-'.now()" />
+            <livewire:workspace.show-items />
         </div>
 
         <!-- Right Column: Calendar (25%) -->
         <div class="lg:col-span-1 overflow-y-auto">
-            <livewire:workspace.calendar-view :key="'calendar-'.now()" />
+            <livewire:workspace.calendar-view />
         </div>
     </div>
 

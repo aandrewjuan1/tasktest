@@ -128,7 +128,7 @@ new class extends Component
          wire:key="kanban-{{ $currentDate?->format('Y-m-d') ?? 'default' }}">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4" aria-label="Kanban board">
     @foreach(['to_do', 'doing', 'done'] as $status)
-        <div class="bg-zinc-100 dark:bg-zinc-900 rounded-lg p-4"
+        <div wire:key="kanban-column-{{ $status }}" class="bg-zinc-100 dark:bg-zinc-900 rounded-lg p-4"
              draggable="false"
              role="region"
              aria-label="{{ match($status) {
@@ -198,9 +198,6 @@ new class extends Component
                         "
                         @dragend="
                             $el.classList.remove('opacity-50', 'ring-2', 'ring-blue-500');
-                        "
-                        @keydown.enter.prevent="
-                            // Allow keyboard activation for drag (would need additional implementation)
                         "
                         class="cursor-move relative transition-all"
                     >

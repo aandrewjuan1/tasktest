@@ -1,7 +1,9 @@
 <?php
 
+use App\Enums\TaskPriority;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Reactive;
 use Livewire\Volt\Component;
 
@@ -17,6 +19,45 @@ new class extends Component
     {
         $this->items = $items;
         $this->currentDate = $currentDate ?? now();
+    }
+
+    #[Computed]
+    public function sortedItems(): Collection
+    {
+        return $this->items->sort(function ($a, $b) {
+            // First, compare by priority (only tasks have priority)
+            $priorityA = $this->getPriorityOrder($a);
+            $priorityB = $this->getPriorityOrder($b);
+
+            if ($priorityA !== $priorityB) {
+                // Higher priority comes first (descending order)
+                return $priorityB <=> $priorityA;
+            }
+
+            // If priorities are the same, compare by creation date (newest first)
+            $dateA = $a->created_at ? $a->created_at->timestamp : 0;
+            $dateB = $b->created_at ? $b->created_at->timestamp : 0;
+
+            return $dateB <=> $dateA;
+        })->values();
+    }
+
+    private function getPriorityOrder($item): int
+    {
+        // Only tasks have priority
+        if ($item->item_type !== 'task' || ! $item->priority) {
+            // Items without priority go to the end (lowest priority order)
+            return 0;
+        }
+
+        // Map priority to numeric order: urgent=4, high=3, medium=2, low=1
+        return match ($item->priority) {
+            TaskPriority::Urgent => 4,
+            TaskPriority::High => 3,
+            TaskPriority::Medium => 2,
+            TaskPriority::Low => 1,
+            default => 0,
+        };
     }
 }; ?>
 
@@ -94,7 +135,7 @@ new class extends Component
         </div>
     </div>
 
-    <div wire:transition="fade" wire:loading.class="opacity-50" wire:target="goToTodayDate,previousDay,nextDay,updateCurrentDate">
+    <div wire:loading.class="opacity-50" wire:target="goToTodayDate,previousDay,nextDay,updateCurrentDate">
         <div class="space-y-4">
             <!-- Create New Item CTA -->
             <button
@@ -106,7 +147,7 @@ new class extends Component
                 </svg>
             </button>
 
-            @forelse($this->items as $item)
+            @forelse($this->sortedItems as $item)
             @if($item->item_type === 'task')
                 <x-workspace.task-card :task="$item" />
             @elseif($item->item_type === 'event')
