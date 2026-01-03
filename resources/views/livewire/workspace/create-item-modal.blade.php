@@ -287,6 +287,35 @@ new class extends Component
 <div x-data="{
     activeTab: 'task',
     openDropdown: null,
+    formData: {
+        task: {
+            title: '',
+            status: 'to_do',
+            priority: 'medium',
+            complexity: 'moderate',
+            duration: 60,
+            startDate: '{{ Carbon::today()->toDateString() }}',
+            startTime: null,
+            endDate: null,
+            projectId: null,
+            tagIds: []
+        },
+        event: {
+            title: '',
+            status: 'scheduled',
+            startDatetime: '{{ Carbon::now()->format('Y-m-d\TH:i') }}',
+            endDatetime: null,
+            location: null,
+            color: null,
+            tagIds: []
+        },
+        project: {
+            name: '',
+            startDate: '{{ Carbon::today()->toDateString() }}',
+            endDate: null,
+            tagIds: []
+        }
+    },
     openModal() {
         this.activeTab = 'task';
         this.openDropdown = null;
@@ -305,11 +334,92 @@ new class extends Component
     },
     isOpen(id) {
         return this.openDropdown === id;
+    },
+    resetFormData() {
+        this.formData = {
+            task: {
+                title: '',
+                status: 'to_do',
+                priority: 'medium',
+                complexity: 'moderate',
+                duration: 60,
+                startDate: '{{ Carbon::today()->toDateString() }}',
+                startTime: null,
+                endDate: null,
+                projectId: null,
+                tagIds: []
+            },
+            event: {
+                title: '',
+                status: 'scheduled',
+                startDatetime: '{{ Carbon::now()->format('Y-m-d\TH:i') }}',
+                endDatetime: null,
+                location: null,
+                color: null,
+                tagIds: []
+            },
+            project: {
+                name: '',
+                startDate: '{{ Carbon::today()->toDateString() }}',
+                endDate: null,
+                tagIds: []
+            }
+        };
+    },
+    syncToLivewire() {
+        // Directly set properties on $wire object to avoid multiple requests
+        $wire.taskTitle = this.formData.task.title;
+        $wire.taskStatus = this.formData.task.status;
+        $wire.taskPriority = this.formData.task.priority;
+        $wire.taskComplexity = this.formData.task.complexity;
+        $wire.taskDuration = this.formData.task.duration;
+        $wire.taskStartDate = this.formData.task.startDate;
+        $wire.taskStartTime = this.formData.task.startTime;
+        $wire.taskEndDate = this.formData.task.endDate;
+        $wire.taskProjectId = this.formData.task.projectId;
+        $wire.taskTagIds = this.formData.task.tagIds;
+
+        $wire.eventTitle = this.formData.event.title;
+        $wire.eventStatus = this.formData.event.status;
+        $wire.eventStartDatetime = this.formData.event.startDatetime;
+        $wire.eventEndDatetime = this.formData.event.endDatetime;
+        $wire.eventLocation = this.formData.event.location;
+        $wire.eventColor = this.formData.event.color;
+        $wire.eventTagIds = this.formData.event.tagIds;
+
+        $wire.projectName = this.formData.project.name;
+        $wire.projectStartDate = this.formData.project.startDate;
+        $wire.projectEndDate = this.formData.project.endDate;
+        $wire.projectTagIds = this.formData.project.tagIds;
+    },
+    submitTask() {
+        this.syncToLivewire();
+        $wire.createTask();
+    },
+    submitEvent() {
+        this.syncToLivewire();
+        $wire.createEvent();
+    },
+    submitProject() {
+        this.syncToLivewire();
+        $wire.createProject();
+    },
+    toggleTag(tagId, type) {
+        const tagIds = this.formData[type].tagIds;
+        const index = tagIds.indexOf(tagId);
+        if (index > -1) {
+            tagIds.splice(index, 1);
+        } else {
+            tagIds.push(tagId);
+        }
+    },
+    isTagSelected(tagId, type) {
+        return this.formData[type].tagIds.includes(tagId);
     }
 }"
      @open-create-modal.window="openModal()"
      @close-create-modal.window="closeModal()"
-     @item-created.window="closeModal()">
+     @item-created.window="resetFormData(); closeModal();">
     <flux:modal name="create-item" class="max-w-2xl">
         <div class="space-y-6">
             <!-- Tabs -->
@@ -340,13 +450,13 @@ new class extends Component
             <!-- Title Input -->
             <div>
                 <div x-show="activeTab === 'task'">
-                    <flux:input wire:model="taskTitle" label="Title" placeholder="Enter task title" required />
+                    <flux:input x-model="formData.task.title" @keydown.enter.prevent="submitTask()" label="Title" placeholder="Enter task title" required />
                 </div>
                 <div x-show="activeTab === 'event'">
-                    <flux:input wire:model="eventTitle" label="Title" placeholder="Enter event title" required />
+                    <flux:input x-model="formData.event.title" @keydown.enter.prevent="submitEvent()" label="Title" placeholder="Enter event title" required />
                 </div>
                 <div x-show="activeTab === 'project'">
-                    <flux:input wire:model="projectName" label="Name" placeholder="Enter project name" required />
+                    <flux:input x-model="formData.project.name" @keydown.enter.prevent="submitProject()" label="Name" placeholder="Enter project name" required />
                 </div>
             </div>
 
@@ -365,14 +475,7 @@ new class extends Component
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
                             </svg>
                             <span class="text-sm font-medium">Status</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400">
-                                {{ match($taskStatus) {
-                                    'to_do' => 'To Do',
-                                    'doing' => 'In Progress',
-                                    'done' => 'Done',
-                                    default => 'To Do'
-                                } }}
-                            </span>
+                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.task.status === 'to_do' ? 'To Do' : (formData.task.status === 'doing' ? 'In Progress' : 'Done')"></span>
                         </button>
                         <div
                             x-show="isOpen('task-status')"
@@ -381,20 +484,23 @@ new class extends Component
                             class="absolute z-50 mt-1 w-48 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1"
                         >
                             <button
-                                wire:click="$set('taskStatus', 'to_do'); openDropdown = null"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $taskStatus === 'to_do' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                                @click="formData.task.status = 'to_do'; openDropdown = null"
+                                :class="formData.task.status === 'to_do' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 To Do
                             </button>
                             <button
-                                wire:click="$set('taskStatus', 'doing'); openDropdown = null"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $taskStatus === 'doing' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                                @click="formData.task.status = 'doing'; openDropdown = null"
+                                :class="formData.task.status === 'doing' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 In Progress
                             </button>
                             <button
-                                wire:click="$set('taskStatus', 'done'); openDropdown = null"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $taskStatus === 'done' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                                @click="formData.task.status = 'done'; openDropdown = null"
+                                :class="formData.task.status === 'done' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 Done
                             </button>
@@ -412,7 +518,7 @@ new class extends Component
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
                             <span class="text-sm font-medium">Priority</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400 capitalize">{{ $taskPriority ?? 'Medium' }}</span>
+                            <span class="text-xs text-zinc-500 dark:text-zinc-400 capitalize" x-text="formData.task.priority || 'Medium'"></span>
                         </button>
                         <div
                             x-show="isOpen('task-priority')"
@@ -421,26 +527,30 @@ new class extends Component
                             class="absolute z-50 mt-1 w-48 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1"
                         >
                             <button
-                                wire:click="$set('taskPriority', 'low'); openDropdown = null"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $taskPriority === 'low' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                                @click="formData.task.priority = 'low'; openDropdown = null"
+                                :class="formData.task.priority === 'low' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 Low
                             </button>
                             <button
-                                wire:click="$set('taskPriority', 'medium'); openDropdown = null"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $taskPriority === 'medium' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                                @click="formData.task.priority = 'medium'; openDropdown = null"
+                                :class="formData.task.priority === 'medium' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 Medium
                             </button>
                             <button
-                                wire:click="$set('taskPriority', 'high'); openDropdown = null"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $taskPriority === 'high' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                                @click="formData.task.priority = 'high'; openDropdown = null"
+                                :class="formData.task.priority === 'high' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 High
                             </button>
                             <button
-                                wire:click="$set('taskPriority', 'urgent'); openDropdown = null"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $taskPriority === 'urgent' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                                @click="formData.task.priority = 'urgent'; openDropdown = null"
+                                :class="formData.task.priority === 'urgent' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 Urgent
                             </button>
@@ -458,7 +568,7 @@ new class extends Component
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                             </svg>
                             <span class="text-sm font-medium">Complexity</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400 capitalize">{{ $taskComplexity ?? 'Moderate' }}</span>
+                            <span class="text-xs text-zinc-500 dark:text-zinc-400 capitalize" x-text="formData.task.complexity || 'Moderate'"></span>
                         </button>
                         <div
                             x-show="isOpen('task-complexity')"
@@ -467,20 +577,23 @@ new class extends Component
                             class="absolute z-50 mt-1 w-48 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1"
                         >
                             <button
-                                wire:click="$set('taskComplexity', 'simple'); openDropdown = null"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $taskComplexity === 'simple' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                                @click="formData.task.complexity = 'simple'; openDropdown = null"
+                                :class="formData.task.complexity === 'simple' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 Simple
                             </button>
                             <button
-                                wire:click="$set('taskComplexity', 'moderate'); openDropdown = null"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $taskComplexity === 'moderate' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                                @click="formData.task.complexity = 'moderate'; openDropdown = null"
+                                :class="formData.task.complexity === 'moderate' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 Moderate
                             </button>
                             <button
-                                wire:click="$set('taskComplexity', 'complex'); openDropdown = null"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $taskComplexity === 'complex' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                                @click="formData.task.complexity = 'complex'; openDropdown = null"
+                                :class="formData.task.complexity === 'complex' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 Complex
                             </button>
@@ -498,9 +611,7 @@ new class extends Component
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             <span class="text-sm font-medium">Duration</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400">
-                                {{ $taskDuration ? $taskDuration . ' min' : 'Not set' }}
-                            </span>
+                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.task.duration ? formData.task.duration + ' min' : 'Not set'"></span>
                         </button>
                         <div
                             x-show="isOpen('task-duration')"
@@ -511,15 +622,17 @@ new class extends Component
                         >
                             @foreach([15, 30, 45, 60, 90, 120, 180, 240, 300] as $minutes)
                                 <button
-                                    wire:click="$set('taskDuration', {{ $minutes }}); openDropdown = null"
-                                    class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $taskDuration === $minutes ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                                    @click="formData.task.duration = {{ $minutes }}; openDropdown = null"
+                                    :class="formData.task.duration === {{ $minutes }} ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                                    class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                                 >
                                     {{ $minutes }} minutes
                                 </button>
                             @endforeach
                             <button
-                                wire:click="$set('taskDuration', null); openDropdown = null"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $taskDuration === null ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                                @click="formData.task.duration = null; openDropdown = null"
+                                :class="formData.task.duration === null ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 Clear
                             </button>
@@ -537,9 +650,7 @@ new class extends Component
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                             <span class="text-sm font-medium">Dates</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400">
-                                {{ $taskStartDate || $taskEndDate ? 'Set' : 'Not set' }}
-                            </span>
+                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="(formData.task.startDate || formData.task.endDate) ? 'Set' : 'Not set'"></span>
                         </button>
                         <div
                             x-show="isOpen('task-dates')"
@@ -551,18 +662,18 @@ new class extends Component
                             <div class="space-y-3">
                                 <div>
                                     <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Start Date</label>
-                                    <flux:input wire:model="taskStartDate" type="date" />
+                                    <flux:input x-model="formData.task.startDate" type="date" />
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Start Time</label>
-                                    <flux:input wire:model="taskStartTime" type="time" />
+                                    <flux:input x-model="formData.task.startTime" type="time" />
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">End Date</label>
-                                    <flux:input wire:model="taskEndDate" type="date" />
+                                    <flux:input x-model="formData.task.endDate" type="date" />
                                 </div>
                                 <button
-                                    wire:click="$set('taskStartDate', null); $set('taskStartTime', null); $set('taskEndDate', null)"
+                                    @click="formData.task.startDate = null; formData.task.startTime = null; formData.task.endDate = null"
                                     class="w-full px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
                                 >
                                     Clear all
@@ -582,9 +693,7 @@ new class extends Component
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                             </svg>
                             <span class="text-sm font-medium">Project</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400">
-                                {{ $taskProjectId ? 'Selected' : 'None' }}
-                            </span>
+                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.task.projectId ? 'Selected' : 'None'"></span>
                         </button>
                         <template x-if="isOpen('task-project')">
                             <div
@@ -594,16 +703,18 @@ new class extends Component
                                 @click.away="openDropdown = null"
                             >
                                 <button
-                                    wire:click="$set('taskProjectId', null); openDropdown = null"
-                                    class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $taskProjectId === null ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                                    @click="formData.task.projectId = null; openDropdown = null"
+                                    :class="formData.task.projectId === null ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                                    class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                                 >
                                     None
                                 </button>
                                 @foreach($this->availableProjects as $project)
                                 <button
                                     wire:key="project-{{ $project->id }}"
-                                    wire:click="$set('taskProjectId', {{ $project->id }}); openDropdown = null"
-                                    class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $taskProjectId === $project->id ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                                    @click="formData.task.projectId = {{ $project->id }}; openDropdown = null"
+                                    :class="formData.task.projectId === {{ $project->id }} ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                                    class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                                 >
                                     {{ $project->name }}
                                 </button>
@@ -623,9 +734,7 @@ new class extends Component
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                             </svg>
                             <span class="text-sm font-medium">Tags</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400">
-                                {{ count($taskTagIds) > 0 ? count($taskTagIds) . ' selected' : 'None' }}
-                            </span>
+                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.task.tagIds.length > 0 ? formData.task.tagIds.length + ' selected' : 'None'"></span>
                         </button>
                         <template x-if="isOpen('task-tags')">
                             <div
@@ -638,8 +747,8 @@ new class extends Component
                                     <label wire:key="task-tag-{{ $tag->id }}" class="flex items-center px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer">
                                         <input
                                             type="checkbox"
-                                            wire:model="taskTagIds"
-                                            value="{{ $tag->id }}"
+                                            :checked="isTagSelected({{ $tag->id }}, 'task')"
+                                            @change="toggleTag({{ $tag->id }}, 'task')"
                                             class="rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
                                         />
                                         <span class="ml-2 text-sm">{{ $tag->name }}</span>
@@ -666,7 +775,7 @@ new class extends Component
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
                             </svg>
                             <span class="text-sm font-medium">Status</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400 capitalize">{{ $eventStatus ?? 'Scheduled' }}</span>
+                            <span class="text-xs text-zinc-500 dark:text-zinc-400 capitalize" x-text="formData.event.status || 'Scheduled'"></span>
                         </button>
                         <div
                             x-show="isOpen('event-status')"
@@ -675,26 +784,30 @@ new class extends Component
                             class="absolute z-50 mt-1 w-48 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1"
                         >
                             <button
-                                wire:click="$set('eventStatus', 'scheduled'); openDropdown = null"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $eventStatus === 'scheduled' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                                @click="formData.event.status = 'scheduled'; openDropdown = null"
+                                :class="formData.event.status === 'scheduled' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 Scheduled
                             </button>
                             <button
-                                wire:click="$set('eventStatus', 'tentative'); openDropdown = null"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $eventStatus === 'tentative' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                                @click="formData.event.status = 'tentative'; openDropdown = null"
+                                :class="formData.event.status === 'tentative' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 Tentative
                             </button>
                             <button
-                                wire:click="$set('eventStatus', 'completed'); openDropdown = null"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $eventStatus === 'completed' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                                @click="formData.event.status = 'completed'; openDropdown = null"
+                                :class="formData.event.status === 'completed' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 Completed
                             </button>
                             <button
-                                wire:click="$set('eventStatus', 'cancelled'); openDropdown = null"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $eventStatus === 'cancelled' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                                @click="formData.event.status = 'cancelled'; openDropdown = null"
+                                :class="formData.event.status === 'cancelled' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 Cancelled
                             </button>
@@ -712,9 +825,7 @@ new class extends Component
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                             <span class="text-sm font-medium">Dates</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400">
-                                {{ $eventStartDatetime || $eventEndDatetime ? 'Set' : 'Not set' }}
-                            </span>
+                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="(formData.event.startDatetime || formData.event.endDatetime) ? 'Set' : 'Not set'"></span>
                         </button>
                         <div
                             x-show="isOpen('event-dates')"
@@ -726,14 +837,14 @@ new class extends Component
                             <div class="space-y-3">
                                 <div>
                                     <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Start Date & Time</label>
-                                    <flux:input wire:model="eventStartDatetime" type="datetime-local" />
+                                    <flux:input x-model="formData.event.startDatetime" type="datetime-local" />
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">End Date & Time</label>
-                                    <flux:input wire:model="eventEndDatetime" type="datetime-local" />
+                                    <flux:input x-model="formData.event.endDatetime" type="datetime-local" />
                                 </div>
                                 <button
-                                    wire:click="$set('eventStartDatetime', null); $set('eventEndDatetime', null)"
+                                    @click="formData.event.startDatetime = null; formData.event.endDatetime = null"
                                     class="w-full px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
                                 >
                                     Clear all
@@ -754,9 +865,7 @@ new class extends Component
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                             </svg>
                             <span class="text-sm font-medium">Location</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400">
-                                {{ $eventLocation ? Str::limit($eventLocation, 15) : 'Not set' }}
-                            </span>
+                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.event.location ? (formData.event.location.length > 15 ? formData.event.location.substring(0, 15) + '...' : formData.event.location) : 'Not set'"></span>
                         </button>
                         <div
                             x-show="isOpen('event-location')"
@@ -765,7 +874,7 @@ new class extends Component
                             class="absolute z-50 mt-1 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 p-4"
                             @click.away="openDropdown = null"
                         >
-                            <flux:input wire:model="eventLocation" placeholder="Enter location" />
+                            <flux:input x-model="formData.event.location" placeholder="Enter location" />
                         </div>
                     </div>
 
@@ -780,9 +889,7 @@ new class extends Component
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
                             </svg>
                             <span class="text-sm font-medium">Color</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400">
-                                {{ $eventColor ? 'Set' : 'Not set' }}
-                            </span>
+                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.event.color ? 'Set' : 'Not set'"></span>
                         </button>
                         <div
                             x-show="isOpen('event-color')"
@@ -794,14 +901,15 @@ new class extends Component
                             <div class="grid grid-cols-6 gap-2">
                                 @foreach(['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1', '#14b8a6', '#64748b'] as $color)
                                     <button
-                                        wire:click="$set('eventColor', '{{ $color }}'); openDropdown = null"
-                                        class="w-8 h-8 rounded border-2 {{ $eventColor === $color ? 'border-zinc-900 dark:border-zinc-100 ring-2 ring-offset-2' : 'border-zinc-300 dark:border-zinc-600' }}"
+                                        @click="formData.event.color = '{{ $color }}'; openDropdown = null"
+                                        :class="formData.event.color === '{{ $color }}' ? 'border-zinc-900 dark:border-zinc-100 ring-2 ring-offset-2' : 'border-zinc-300 dark:border-zinc-600'"
+                                        class="w-8 h-8 rounded border-2"
                                         style="background-color: {{ $color }}"
                                     ></button>
                                 @endforeach
                             </div>
                             <button
-                                wire:click="$set('eventColor', null); openDropdown = null"
+                                @click="formData.event.color = null; openDropdown = null"
                                 class="mt-2 w-full px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
                             >
                                 Clear
@@ -820,9 +928,7 @@ new class extends Component
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                             </svg>
                             <span class="text-sm font-medium">Tags</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400">
-                                {{ count($eventTagIds) > 0 ? count($eventTagIds) . ' selected' : 'None' }}
-                            </span>
+                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.event.tagIds.length > 0 ? formData.event.tagIds.length + ' selected' : 'None'"></span>
                         </button>
                         <template x-if="isOpen('event-tags')">
                             <div
@@ -835,8 +941,8 @@ new class extends Component
                                     <label wire:key="event-tag-{{ $tag->id }}" class="flex items-center px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer">
                                         <input
                                             type="checkbox"
-                                            wire:model="eventTagIds"
-                                            value="{{ $tag->id }}"
+                                            :checked="isTagSelected({{ $tag->id }}, 'event')"
+                                            @change="toggleTag({{ $tag->id }}, 'event')"
                                             class="rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
                                         />
                                         <span class="ml-2 text-sm">{{ $tag->name }}</span>
@@ -863,9 +969,7 @@ new class extends Component
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                             <span class="text-sm font-medium">Dates</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400">
-                                {{ $projectStartDate || $projectEndDate ? 'Set' : 'Not set' }}
-                            </span>
+                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="(formData.project.startDate || formData.project.endDate) ? 'Set' : 'Not set'"></span>
                         </button>
                         <div
                             x-show="isOpen('project-dates')"
@@ -877,14 +981,14 @@ new class extends Component
                             <div class="space-y-3">
                                 <div>
                                     <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Start Date</label>
-                                    <flux:input wire:model="projectStartDate" type="date" />
+                                    <flux:input x-model="formData.project.startDate" type="date" />
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">End Date</label>
-                                    <flux:input wire:model="projectEndDate" type="date" />
+                                    <flux:input x-model="formData.project.endDate" type="date" />
                                 </div>
                                 <button
-                                    wire:click="$set('projectStartDate', null); $set('projectEndDate', null)"
+                                    @click="formData.project.startDate = null; formData.project.endDate = null"
                                     class="w-full px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
                                 >
                                     Clear all
@@ -904,9 +1008,7 @@ new class extends Component
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                             </svg>
                             <span class="text-sm font-medium">Tags</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400">
-                                {{ count($projectTagIds) > 0 ? count($projectTagIds) . ' selected' : 'None' }}
-                            </span>
+                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.project.tagIds.length > 0 ? formData.project.tagIds.length + ' selected' : 'None'"></span>
                         </button>
                         <template x-if="isOpen('project-tags')">
                             <div
@@ -919,8 +1021,8 @@ new class extends Component
                                     <label wire:key="project-tag-{{ $tag->id }}" class="flex items-center px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer">
                                         <input
                                             type="checkbox"
-                                            wire:model="projectTagIds"
-                                            value="{{ $tag->id }}"
+                                            :checked="isTagSelected({{ $tag->id }}, 'project')"
+                                            @change="toggleTag({{ $tag->id }}, 'project')"
                                             class="rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
                                         />
                                         <span class="ml-2 text-sm">{{ $tag->name }}</span>
@@ -938,13 +1040,13 @@ new class extends Component
 
             <!-- Actions -->
             <div class="flex justify-end gap-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
-                <flux:button variant="ghost" @click="$flux.modal('create-item').close(); $wire.call('resetForm');">
+                <flux:button variant="ghost" @click="$flux.modal('create-item').close(); resetFormData(); $wire.call('resetForm');">
                     Cancel
                 </flux:button>
                 <flux:button
                     x-show="activeTab === 'task'"
                     variant="primary"
-                    wire:click="createTask"
+                    @click="submitTask()"
                     wire:loading.attr="disabled"
                     wire:target="createTask"
                 >
@@ -960,7 +1062,7 @@ new class extends Component
                 <flux:button
                     x-show="activeTab === 'event'"
                     variant="primary"
-                    wire:click="createEvent"
+                    @click="submitEvent()"
                     wire:loading.attr="disabled"
                     wire:target="createEvent"
                 >
@@ -976,7 +1078,7 @@ new class extends Component
                 <flux:button
                     x-show="activeTab === 'project'"
                     variant="primary"
-                    wire:click="createProject"
+                    @click="submitProject()"
                     wire:loading.attr="disabled"
                     wire:target="createProject"
                 >
