@@ -114,8 +114,13 @@ new class extends Component
     public function refreshItems(): void
     {
         // Clear computed property cache to force recalculation with fresh data
+        // Unsetting 'items' will automatically invalidate dependent computed properties
+        // (filteredItems, itemsByStatus) since they depend on $this->items
         unset($this->items);
-        unset($this->filteredItems);
+
+        // Also clear availableTags and availableProjects in case new tags/projects were created
+        unset($this->availableTags);
+        unset($this->availableProjects);
     }
 
     public function updateItemDateTime(int $itemId, string $itemType, string $newStart, ?string $newEnd = null): void

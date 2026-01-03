@@ -3,6 +3,7 @@
 use App\Models\Project;
 use App\Models\Task;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
@@ -108,46 +109,63 @@ new class extends Component
             $field => $validationRules,
         ]);
 
-        $updateData = [];
+        try {
+            DB::transaction(function () use ($field, $value) {
+                $updateData = [];
 
-        switch ($field) {
-            case 'title':
-                $updateData['title'] = $value;
-                break;
-            case 'description':
-                $updateData['description'] = $value ?: null;
-                break;
-            case 'status':
-                $updateData['status'] = $value ?: null;
-                break;
-            case 'priority':
-                $updateData['priority'] = $value ?: null;
-                break;
-            case 'complexity':
-                $updateData['complexity'] = $value ?: null;
-                break;
-            case 'duration':
-                $updateData['duration'] = $value ?: null;
-                break;
-            case 'startDate':
-                $updateData['start_date'] = $value ?: null;
-                break;
-            case 'startTime':
-                $updateData['start_time'] = $value ? $value.':00' : null;
-                break;
-            case 'endDate':
-                $updateData['end_date'] = $value ?: null;
-                break;
-            case 'projectId':
-                $updateData['project_id'] = $value ?: null;
-                break;
+                switch ($field) {
+                    case 'title':
+                        $updateData['title'] = $value;
+                        break;
+                    case 'description':
+                        $updateData['description'] = $value ?: null;
+                        break;
+                    case 'status':
+                        $updateData['status'] = $value ?: null;
+                        break;
+                    case 'priority':
+                        $updateData['priority'] = $value ?: null;
+                        break;
+                    case 'complexity':
+                        $updateData['complexity'] = $value ?: null;
+                        break;
+                    case 'duration':
+                        $updateData['duration'] = $value ?: null;
+                        break;
+                    case 'startDate':
+                        $updateData['start_date'] = $value ?: null;
+                        break;
+                    case 'startTime':
+                        $updateData['start_time'] = $value ? $value.':00' : null;
+                        break;
+                    case 'endDate':
+                        $updateData['end_date'] = $value ?: null;
+                        break;
+                    case 'projectId':
+                        $updateData['project_id'] = $value ?: null;
+                        break;
+                }
+
+                $this->task->update($updateData);
+                $this->task->refresh();
+            });
+
+            $this->loadTaskData();
+            $this->dispatch('task-updated');
+            $this->dispatch('item-updated');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            \Log::error('Failed to update task field', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'field' => $field,
+                'task_id' => $this->task->id,
+                'user_id' => auth()->id(),
+            ]);
+
+            $this->dispatch('notify', message: 'Failed to update task. Please try again.', type: 'error');
         }
-
-        $this->task->update($updateData);
-        $this->task->refresh();
-        $this->loadTaskData();
-        $this->dispatch('task-updated');
-        $this->dispatch('item-updated');
     }
 
     public function confirmDelete(): void
@@ -159,10 +177,24 @@ new class extends Component
     {
         $this->authorize('delete', $this->task);
 
-        $this->task->delete();
-        $this->closeModal();
-        $this->dispatch('task-deleted');
-        session()->flash('message', 'Task deleted successfully!');
+        try {
+            DB::transaction(function () {
+                $this->task->delete();
+            });
+
+            $this->closeModal();
+            $this->dispatch('task-deleted');
+            session()->flash('message', 'Task deleted successfully!');
+        } catch (\Exception $e) {
+            \Log::error('Failed to delete task', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'task_id' => $this->task->id,
+                'user_id' => auth()->id(),
+            ]);
+
+            $this->dispatch('notify', message: 'Failed to delete task. Please try again.', type: 'error');
+        }
     }
 
     #[Computed]

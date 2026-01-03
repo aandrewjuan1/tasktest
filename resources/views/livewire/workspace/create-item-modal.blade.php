@@ -10,6 +10,7 @@ use App\Models\Tag;
 use App\Models\Task;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
@@ -116,29 +117,34 @@ new class extends Component
                 'taskProjectId' => 'project',
             ]);
 
-            $task = Task::create([
-                'user_id' => auth()->id(),
-                'title' => $validated['taskTitle'],
-                'status' => $validated['taskStatus'] ? TaskStatus::from($validated['taskStatus']) : null,
-                'priority' => $validated['taskPriority'] ? TaskPriority::from($validated['taskPriority']) : null,
-                'complexity' => $validated['taskComplexity'] ? TaskComplexity::from($validated['taskComplexity']) : null,
-                'duration' => $validated['taskDuration'] ?? null,
-                'start_date' => $validated['taskStartDate'] ?? null,
-                'start_time' => $validated['taskStartTime'] ?? null,
-                'end_date' => $validated['taskEndDate'] ?? null,
-                'project_id' => $validated['taskProjectId'] ?? null,
-            ]);
+            DB::transaction(function () use ($validated) {
+                $task = Task::create([
+                    'user_id' => auth()->id(),
+                    'title' => $validated['taskTitle'],
+                    'status' => $validated['taskStatus'] ? TaskStatus::from($validated['taskStatus']) : null,
+                    'priority' => $validated['taskPriority'] ? TaskPriority::from($validated['taskPriority']) : null,
+                    'complexity' => $validated['taskComplexity'] ? TaskComplexity::from($validated['taskComplexity']) : null,
+                    'duration' => $validated['taskDuration'] ?? null,
+                    'start_date' => $validated['taskStartDate'] ?? null,
+                    'start_time' => $validated['taskStartTime'] ?? null,
+                    'end_date' => $validated['taskEndDate'] ?? null,
+                    'project_id' => $validated['taskProjectId'] ?? null,
+                ]);
 
-            if (!empty($validated['taskTagIds'])) {
-                $task->tags()->attach($validated['taskTagIds']);
-            }
+                if (!empty($validated['taskTagIds'])) {
+                    $task->tags()->attach($validated['taskTagIds']);
+                }
+            });
 
             $this->resetForm();
             $this->dispatch('notify', message: 'Task created successfully', type: 'success');
             $this->dispatch('item-created');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             \Log::error('Failed to create task', [
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
                 'user_id' => auth()->id(),
             ]);
 
@@ -172,27 +178,32 @@ new class extends Component
             $startDatetime = $validated['eventStartDatetime'] ? Carbon::parse($validated['eventStartDatetime']) : null;
             $endDatetime = $validated['eventEndDatetime'] ? Carbon::parse($validated['eventEndDatetime']) : null;
 
-            $event = Event::create([
-                'user_id' => auth()->id(),
-                'title' => $validated['eventTitle'],
-                'status' => $validated['eventStatus'] ? EventStatus::from($validated['eventStatus']) : null,
-                'start_datetime' => $startDatetime,
-                'end_datetime' => $endDatetime,
-                'location' => $validated['eventLocation'] ?? null,
-                'color' => $validated['eventColor'] ?? null,
-                'timezone' => config('app.timezone'),
-            ]);
+            DB::transaction(function () use ($validated, $startDatetime, $endDatetime) {
+                $event = Event::create([
+                    'user_id' => auth()->id(),
+                    'title' => $validated['eventTitle'],
+                    'status' => $validated['eventStatus'] ? EventStatus::from($validated['eventStatus']) : null,
+                    'start_datetime' => $startDatetime,
+                    'end_datetime' => $endDatetime,
+                    'location' => $validated['eventLocation'] ?? null,
+                    'color' => $validated['eventColor'] ?? null,
+                    'timezone' => config('app.timezone'),
+                ]);
 
-            if (!empty($validated['eventTagIds'])) {
-                $event->tags()->attach($validated['eventTagIds']);
-            }
+                if (!empty($validated['eventTagIds'])) {
+                    $event->tags()->attach($validated['eventTagIds']);
+                }
+            });
 
             $this->resetForm();
             $this->dispatch('notify', message: 'Event created successfully', type: 'success');
             $this->dispatch('item-created');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             \Log::error('Failed to create event', [
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
                 'user_id' => auth()->id(),
             ]);
 
@@ -217,23 +228,28 @@ new class extends Component
                 'projectEndDate' => 'end date',
             ]);
 
-            $project = Project::create([
-                'user_id' => auth()->id(),
-                'name' => $validated['projectName'],
-                'start_date' => $validated['projectStartDate'] ?? null,
-                'end_date' => $validated['projectEndDate'] ?? null,
-            ]);
+            DB::transaction(function () use ($validated) {
+                $project = Project::create([
+                    'user_id' => auth()->id(),
+                    'name' => $validated['projectName'],
+                    'start_date' => $validated['projectStartDate'] ?? null,
+                    'end_date' => $validated['projectEndDate'] ?? null,
+                ]);
 
-            if (!empty($validated['projectTagIds'])) {
-                $project->tags()->attach($validated['projectTagIds']);
-            }
+                if (!empty($validated['projectTagIds'])) {
+                    $project->tags()->attach($validated['projectTagIds']);
+                }
+            });
 
             $this->resetForm();
             $this->dispatch('notify', message: 'Project created successfully', type: 'success');
             $this->dispatch('item-created');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             \Log::error('Failed to create project', [
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
                 'user_id' => auth()->id(),
             ]);
 

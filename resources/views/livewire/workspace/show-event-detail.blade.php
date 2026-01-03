@@ -2,6 +2,7 @@
 
 use App\Models\Event;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
 
@@ -95,45 +96,62 @@ new class extends Component
             $field => $validationRules,
         ]);
 
-        $updateData = [];
+        try {
+            DB::transaction(function () use ($field, $value) {
+                $updateData = [];
 
-        switch ($field) {
-            case 'title':
-                $updateData['title'] = $value;
-                break;
-            case 'description':
-                $updateData['description'] = $value ?: null;
-                break;
-            case 'startDatetime':
-                $startDatetime = Carbon::parse($value);
-                $updateData['start_datetime'] = $startDatetime;
-                // Auto-calculate end_datetime if not provided
-                if (empty($this->endDatetime)) {
-                    $updateData['end_datetime'] = $startDatetime->copy()->addHour();
+                switch ($field) {
+                    case 'title':
+                        $updateData['title'] = $value;
+                        break;
+                    case 'description':
+                        $updateData['description'] = $value ?: null;
+                        break;
+                    case 'startDatetime':
+                        $startDatetime = Carbon::parse($value);
+                        $updateData['start_datetime'] = $startDatetime;
+                        // Auto-calculate end_datetime if not provided
+                        if (empty($this->endDatetime)) {
+                            $updateData['end_datetime'] = $startDatetime->copy()->addHour();
+                        }
+                        break;
+                    case 'endDatetime':
+                        $updateData['end_datetime'] = $value ? Carbon::parse($value) : null;
+                        break;
+                    case 'allDay':
+                        $updateData['all_day'] = (bool) $value;
+                        break;
+                    case 'location':
+                        $updateData['location'] = $value ?: null;
+                        break;
+                    case 'color':
+                        $updateData['color'] = $value;
+                        break;
+                    case 'status':
+                        $updateData['status'] = $value ?: 'scheduled';
+                        break;
                 }
-                break;
-            case 'endDatetime':
-                $updateData['end_datetime'] = $value ? Carbon::parse($value) : null;
-                break;
-            case 'allDay':
-                $updateData['all_day'] = (bool) $value;
-                break;
-            case 'location':
-                $updateData['location'] = $value ?: null;
-                break;
-            case 'color':
-                $updateData['color'] = $value;
-                break;
-            case 'status':
-                $updateData['status'] = $value ?: 'scheduled';
-                break;
-        }
 
-        $this->event->update($updateData);
-        $this->event->refresh();
-        $this->loadEventData();
-        $this->dispatch('event-updated');
-        $this->dispatch('item-updated');
+                $this->event->update($updateData);
+                $this->event->refresh();
+            });
+
+            $this->loadEventData();
+            $this->dispatch('event-updated');
+            $this->dispatch('item-updated');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            \Log::error('Failed to update event field', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'field' => $field,
+                'event_id' => $this->event->id,
+                'user_id' => auth()->id(),
+            ]);
+
+            $this->dispatch('notify', message: 'Failed to update event. Please try again.', type: 'error');
+        }
     }
 
     public function confirmDelete(): void
@@ -145,10 +163,24 @@ new class extends Component
     {
         $this->authorize('delete', $this->event);
 
-        $this->event->delete();
-        $this->closeModal();
-        $this->dispatch('event-deleted');
-        session()->flash('message', 'Event deleted successfully!');
+        try {
+            DB::transaction(function () {
+                $this->event->delete();
+            });
+
+            $this->closeModal();
+            $this->dispatch('event-deleted');
+            session()->flash('message', 'Event deleted successfully!');
+        } catch (\Exception $e) {
+            \Log::error('Failed to delete event', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'event_id' => $this->event->id,
+                'user_id' => auth()->id(),
+            ]);
+
+            $this->dispatch('notify', message: 'Failed to delete event. Please try again.', type: 'error');
+        }
     }
 }; ?>
 

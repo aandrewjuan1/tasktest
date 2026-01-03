@@ -1,11 +1,12 @@
 <?php
 
-use Livewire\Volt\Component;
-use Livewire\Attributes\On;
-use Livewire\Attributes\Computed;
+use App\Enums\TaskStatus;
 use App\Models\Project;
 use App\Models\Tag;
-use App\Enums\TaskStatus;
+use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
+use Livewire\Volt\Component;
 
 new class extends Component {
     public bool $isOpen = false;
@@ -82,28 +83,45 @@ new class extends Component {
             ]);
         }
 
-        $updateData = [];
+        try {
+            DB::transaction(function () use ($field, $value) {
+                $updateData = [];
 
-        switch ($field) {
-            case 'name':
-                $updateData['name'] = $value;
-                break;
-            case 'description':
-                $updateData['description'] = $value ?: null;
-                break;
-            case 'startDate':
-                $updateData['start_date'] = $value ?: null;
-                break;
-            case 'endDate':
-                $updateData['end_date'] = $value ?: null;
-                break;
+                switch ($field) {
+                    case 'name':
+                        $updateData['name'] = $value;
+                        break;
+                    case 'description':
+                        $updateData['description'] = $value ?: null;
+                        break;
+                    case 'startDate':
+                        $updateData['start_date'] = $value ?: null;
+                        break;
+                    case 'endDate':
+                        $updateData['end_date'] = $value ?: null;
+                        break;
+                }
+
+                $this->project->update($updateData);
+                $this->project->refresh();
+            });
+
+            $this->loadProjectData();
+            $this->dispatch('project-updated');
+            $this->dispatch('item-updated');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            \Log::error('Failed to update project field', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'field' => $field,
+                'project_id' => $this->project->id,
+                'user_id' => auth()->id(),
+            ]);
+
+            $this->dispatch('notify', message: 'Failed to update project. Please try again.', type: 'error');
         }
-
-        $this->project->update($updateData);
-        $this->project->refresh();
-        $this->loadProjectData();
-        $this->dispatch('project-updated');
-        $this->dispatch('item-updated');
     }
 
     public function confirmDelete(): void
@@ -115,10 +133,24 @@ new class extends Component {
     {
         $this->authorize('delete', $this->project);
 
-        $this->project->delete();
-        $this->closeModal();
-        $this->dispatch('project-deleted');
-        session()->flash('message', 'Project deleted successfully!');
+        try {
+            DB::transaction(function () {
+                $this->project->delete();
+            });
+
+            $this->closeModal();
+            $this->dispatch('project-deleted');
+            session()->flash('message', 'Project deleted successfully!');
+        } catch (\Exception $e) {
+            \Log::error('Failed to delete project', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'project_id' => $this->project->id,
+                'user_id' => auth()->id(),
+            ]);
+
+            $this->dispatch('notify', message: 'Failed to delete project. Please try again.', type: 'error');
+        }
     }
 
     #[Computed]
