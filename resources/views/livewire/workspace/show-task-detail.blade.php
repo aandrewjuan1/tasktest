@@ -147,6 +147,7 @@ new class extends Component
         $this->task->refresh();
         $this->loadTaskData();
         $this->dispatch('task-updated');
+        $this->dispatch('item-updated');
     }
 
     public function confirmDelete(): void

@@ -133,6 +133,7 @@ new class extends Component
         $this->event->refresh();
         $this->loadEventData();
         $this->dispatch('event-updated');
+        $this->dispatch('item-updated');
     }
 
     public function confirmDelete(): void

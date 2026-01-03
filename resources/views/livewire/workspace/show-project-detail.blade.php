@@ -103,6 +103,7 @@ new class extends Component {
         $this->project->refresh();
         $this->loadProjectData();
         $this->dispatch('project-updated');
+        $this->dispatch('item-updated');
     }
 
     public function confirmDelete(): void
