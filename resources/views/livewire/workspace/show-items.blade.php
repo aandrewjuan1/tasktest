@@ -452,6 +452,7 @@ new class extends Component
     wire:loading.class="opacity-50"
     wire:target="switchView,goToTodayDate,previousDay,nextDay,updateCurrentDate"
     x-data="{}"
+    x-cloak
 >
     <!-- View Switcher -->
     <div class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
@@ -523,7 +524,12 @@ new class extends Component
     </div>
 
     <!-- Loading Overlay for View Switching -->
-    <div wire:loading wire:target="switchView" class="fixed inset-0 bg-black/10 dark:bg-black/20 z-40 flex items-center justify-center pointer-events-none">
+    <div
+        wire:loading
+        wire:target="switchView"
+        x-cloak
+        class="fixed inset-0 bg-black/10 dark:bg-black/20 z-40 flex items-center justify-center pointer-events-none"
+    >
         <div class="bg-white dark:bg-zinc-800 rounded-lg p-4 shadow-lg flex items-center gap-2">
             <svg class="animate-spin h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -534,7 +540,12 @@ new class extends Component
     </div>
 
     <!-- Loading Overlay for Date Navigation -->
-    <div wire:loading wire:target="goToTodayDate,previousDay,nextDay,updateCurrentDate" class="fixed inset-0 bg-black/10 dark:bg-black/20 z-40 flex items-center justify-center pointer-events-none">
+    <div
+        wire:loading
+        wire:target="goToTodayDate,previousDay,nextDay,updateCurrentDate"
+        x-cloak
+        class="fixed inset-0 bg-black/10 dark:bg-black/20 z-40 flex items-center justify-center pointer-events-none"
+    >
         <div class="bg-white dark:bg-zinc-800 rounded-lg p-4 shadow-lg flex items-center gap-2">
             <svg class="animate-spin h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -545,36 +556,38 @@ new class extends Component
     </div>
 
     <!-- List View -->
-    <div>
-        @if($viewMode === 'list')
+    @if($viewMode === 'list')
+        <div wire:key="list-view-container-{{ $currentDate->format('Y-m-d') }}">
             <livewire:workspace.list-view
                 :items="$this->filteredItems"
                 :current-date="$currentDate"
                 wire:key="list-view-{{ $currentDate->format('Y-m-d') }}"
             />
-        @endif
-    </div>
+        </div>
+    @endif
 
     <!-- Kanban View -->
     @if($viewMode === 'kanban')
-        <livewire:workspace.kanban-view
-            :items="$this->filteredItems"
-            :items-by-status="$this->itemsByStatus"
-            :current-date="$currentDate"
-            wire:key="kanban-view-{{ $currentDate->format('Y-m-d') }}"
-        />
+        <div wire:key="kanban-view-container-{{ $currentDate->format('Y-m-d') }}">
+            <livewire:workspace.kanban-view
+                :items="$this->filteredItems"
+                :items-by-status="$this->itemsByStatus"
+                :current-date="$currentDate"
+                wire:key="kanban-view-{{ $currentDate->format('Y-m-d') }}"
+            />
+        </div>
     @endif
 
     <!-- Weekly Timegrid View -->
-    <div wire:transition="fade">
-        @if($viewMode === 'weekly')
+    @if($viewMode === 'weekly')
+        <div wire:key="weekly-view-container-{{ $weekStartDate->format('Y-m-d') }}" wire:transition="fade">
             <livewire:workspace.weekly-view
                 :items="$this->items"
                 :week-start-date="$weekStartDate"
                 wire:key="weekly-view-{{ $weekStartDate->format('Y-m-d') }}"
             />
-        @endif
-    </div>
+        </div>
+    @endif
 
     <!-- Create Item Modal -->
     <livewire:workspace.create-item-modal />

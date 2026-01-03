@@ -215,7 +215,7 @@ new class extends Component
                     Time
                 </div>
                 @foreach($this->weekDays as $day)
-                    <div class="p-2 text-center border-r border-zinc-200 dark:border-zinc-700">
+                    <div wire:key="day-header-{{ $day->format('Y-m-d') }}" class="p-2 text-center border-r border-zinc-200 dark:border-zinc-700">
                         <div class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
                             {{ $day->format('D') }}
                         </div>
@@ -236,9 +236,10 @@ new class extends Component
                         $dateKey = $day->format('Y-m-d');
                         $allDayItems = $this->weeklyItems[$dateKey]['all_day'] ?? collect();
                     @endphp
-                    <div class="p-1 min-h-[60px] border-r border-zinc-200 dark:border-zinc-700">
+                    <div wire:key="all-day-column-{{ $dateKey }}" class="p-1 min-h-[60px] border-r border-zinc-200 dark:border-zinc-700">
                         @foreach($allDayItems as $item)
-                            <div class="mb-1 text-xs p-1 rounded cursor-pointer {{ $item->item_type === 'task' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' : ($item->item_type === 'event' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200') }}"
+                            <div wire:key="all-day-item-{{ $item->item_type }}-{{ $item->id }}"
+                                 class="mb-1 text-xs p-1 rounded cursor-pointer {{ $item->item_type === 'task' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' : ($item->item_type === 'event' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200') }}"
                                  wire:click="$dispatch('view-{{ $item->item_type }}-detail', { id: {{ $item->id }} })">
                                 {{ Str::limit($item->title ?? $item->name, 15) }}
                             </div>
@@ -265,7 +266,7 @@ new class extends Component
                         $timedItems = $this->weeklyItems[$dateKey]['timed'] ?? collect();
                         $isToday = $day->isToday();
                     @endphp
-                    <div class="relative border-r border-zinc-200 dark:border-zinc-700 {{ $isToday ? 'bg-blue-50 dark:bg-blue-950/20' : '' }}"
+                    <div wire:key="day-column-{{ $dateKey }}" class="relative border-r border-zinc-200 dark:border-zinc-700 {{ $isToday ? 'bg-blue-50 dark:bg-blue-950/20' : '' }}"
                          role="gridcell"
                          aria-label="{{ $day->format('l, F j') }}"
                          x-data="{ draggingOver: false, isUpdating: false }"

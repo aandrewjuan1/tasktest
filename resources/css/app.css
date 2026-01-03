@@ -76,6 +76,11 @@ select:focus[data-flux-control] {
     opacity: 0;
 }
 
+/* Hide elements with x-cloak until Alpine is initialized */
+[x-cloak] {
+    display: none !important;
+}
+
 /* Skeleton loading animation */
 @keyframes skeleton-loading {
     0% {

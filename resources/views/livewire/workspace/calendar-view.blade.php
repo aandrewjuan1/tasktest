@@ -190,7 +190,7 @@ new class extends Component
     }
 }; ?>
 
-<div class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 h-full flex flex-col">
+<div class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 h-full flex flex-col" x-cloak>
     <!-- Calendar Header -->
     <div class="flex items-center justify-between mb-4">
         <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
