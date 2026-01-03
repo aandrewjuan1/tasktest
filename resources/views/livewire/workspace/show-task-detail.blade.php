@@ -13,7 +13,7 @@ new class extends Component
 
     public ?Task $task = null;
 
-    public bool $editMode = false;
+    public bool $showDeleteConfirm = false;
 
     // Edit fields
     public string $title = '';
@@ -47,7 +47,7 @@ new class extends Component
         $this->authorize('view', $this->task);
 
         $this->isOpen = true;
-        $this->editMode = false;
+        $this->showDeleteConfirm = false;
         $this->loadTaskData();
     }
 
@@ -55,16 +55,7 @@ new class extends Component
     {
         $this->isOpen = false;
         $this->task = null;
-        $this->editMode = false;
-        $this->resetValidation();
-    }
-
-    public function toggleEditMode(): void
-    {
-        $this->editMode = ! $this->editMode;
-        if ($this->editMode) {
-            $this->loadTaskData();
-        }
+        $this->showDeleteConfirm = false;
         $this->resetValidation();
     }
 
@@ -87,43 +78,80 @@ new class extends Component
         $this->eventId = (string) ($this->task->event_id ?? '');
     }
 
-    public function save(): void
+    public function updateField(string $field, mixed $value): void
     {
+        if (! $this->task) {
+            return;
+        }
+
         $this->authorize('update', $this->task);
 
-        $validated = $this->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'status' => 'nullable|string|in:to_do,doing,done',
-            'priority' => 'nullable|string|in:low,medium,high,urgent',
-            'complexity' => 'nullable|string|in:simple,moderate,complex',
-            'duration' => 'nullable|integer|min:1',
-            'startDate' => 'nullable|date',
-            'startTime' => 'nullable|date_format:H:i',
-            'endDate' => 'nullable|date|after_or_equal:startDate',
-            'projectId' => 'nullable|exists:projects,id',
+        $validationRules = match ($field) {
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'status' => ['nullable', 'string', 'in:to_do,doing,done'],
+            'priority' => ['nullable', 'string', 'in:low,medium,high,urgent'],
+            'complexity' => ['nullable', 'string', 'in:simple,moderate,complex'],
+            'duration' => ['nullable', 'integer', 'min:1'],
+            'startDate' => ['nullable', 'date'],
+            'startTime' => ['nullable', 'date_format:H:i'],
+            'endDate' => ['nullable', 'date'],
+            'projectId' => ['nullable', 'exists:projects,id'],
+            default => [],
+        };
+
+        if (empty($validationRules)) {
+            return;
+        }
+
+        $this->validate([
+            $field => $validationRules,
         ]);
 
-        // Convert H:i format to H:i:s for database storage
-        $startTime = $this->startTime ? $this->startTime.':00' : null;
+        $updateData = [];
 
-        $this->task->update([
-            'title' => $this->title,
-            'description' => $this->description ?: null,
-            'status' => $this->status ?: null,
-            'priority' => $this->priority ?: null,
-            'complexity' => $this->complexity ?: null,
-            'duration' => $this->duration ?: null,
-            'start_date' => $this->startDate ?: null,
-            'start_time' => $startTime,
-            'end_date' => $this->endDate ?: null,
-            'project_id' => $this->projectId ?: null,
-        ]);
+        switch ($field) {
+            case 'title':
+                $updateData['title'] = $value;
+                break;
+            case 'description':
+                $updateData['description'] = $value ?: null;
+                break;
+            case 'status':
+                $updateData['status'] = $value ?: null;
+                break;
+            case 'priority':
+                $updateData['priority'] = $value ?: null;
+                break;
+            case 'complexity':
+                $updateData['complexity'] = $value ?: null;
+                break;
+            case 'duration':
+                $updateData['duration'] = $value ?: null;
+                break;
+            case 'startDate':
+                $updateData['start_date'] = $value ?: null;
+                break;
+            case 'startTime':
+                $updateData['start_time'] = $value ? $value.':00' : null;
+                break;
+            case 'endDate':
+                $updateData['end_date'] = $value ?: null;
+                break;
+            case 'projectId':
+                $updateData['project_id'] = $value ?: null;
+                break;
+        }
 
+        $this->task->update($updateData);
         $this->task->refresh();
-        $this->editMode = false;
+        $this->loadTaskData();
         $this->dispatch('task-updated');
-        session()->flash('message', 'Task updated successfully!');
+    }
+
+    public function confirmDelete(): void
+    {
+        $this->showDeleteConfirm = true;
     }
 
     public function deleteTask(): void
@@ -146,195 +174,861 @@ new class extends Component
 }; ?>
 
 <div>
-    <flux:modal wire:model="isOpen" class="min-w-[700px]" variant="flyout">
+    <flux:modal wire:model="isOpen" class="min-w-[700px]" variant="flyout" closeable="false">
         @if($task)
             <div class="space-y-6">
                 <!-- Header -->
-                <div class="flex items-start justify-between">
-                    <div class="flex-1">
-                        @if($editMode)
-                            <flux:input wire:model="title" label="Title" required />
-                        @else
-                            <flux:heading size="lg">{{ $task->title }}</flux:heading>
-                        @endif
-                    </div>
-                    <div class="flex items-center gap-2 ml-4">
-                        @if($editMode)
-                            <flux:button variant="primary" wire:click="save">
-                                Save
-                            </flux:button>
-                            <flux:button variant="ghost" wire:click="toggleEditMode">
-                                Cancel
-                            </flux:button>
-                        @else
-                            <flux:button variant="ghost" wire:click="toggleEditMode">
-                                Edit
-                            </flux:button>
-                            <flux:button
-                                variant="danger"
-                                wire:click="deleteTask"
-                                wire:confirm="Are you sure you want to delete this task?"
-                            >
-                                Delete
-                            </flux:button>
-                        @endif
+                <div>
+                    <div class="flex-1"
+                         x-data="{
+                             editing: false,
+                             originalValue: @js($task->title),
+                             currentValue: @js($task->title),
+                             debounceTimer: null,
+                             mouseLeaveTimer: null,
+                             startEditing() {
+                                 this.editing = true;
+                                 this.currentValue = this.originalValue;
+                                 $wire.title = this.originalValue;
+                                 $nextTick(() => $refs.input?.focus());
+                             },
+                             cancelEditing() {
+                                 this.editing = false;
+                                 this.currentValue = this.originalValue;
+                                 $wire.title = this.originalValue;
+                                 if (this.debounceTimer) {
+                                     clearTimeout(this.debounceTimer);
+                                     this.debounceTimer = null;
+                                 }
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                             },
+                             handleInput() {
+                                 $wire.title = this.currentValue;
+                                 if (this.debounceTimer) {
+                                     clearTimeout(this.debounceTimer);
+                                 }
+                                 this.debounceTimer = setTimeout(() => {
+                                     if (this.currentValue !== this.originalValue) {
+                                         $wire.updateField('title', this.currentValue).then(() => {
+                                             this.originalValue = this.currentValue;
+                                             this.editing = false;
+                                         });
+                                     }
+                                 }, 500);
+                             },
+                             handleMouseLeave() {
+                                 if (!this.editing) return;
+                                 this.mouseLeaveTimer = setTimeout(() => {
+                                     this.saveIfChanged();
+                                 }, 300);
+                             },
+                             handleMouseEnter() {
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                             },
+                             saveIfChanged() {
+                                 if (this.debounceTimer) {
+                                     clearTimeout(this.debounceTimer);
+                                     this.debounceTimer = null;
+                                 }
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                                 if (this.currentValue !== this.originalValue) {
+                                     $wire.updateField('title', this.currentValue).then(() => {
+                                         this.originalValue = this.currentValue;
+                                         this.editing = false;
+                                     });
+                                 } else {
+                                     this.editing = false;
+                                 }
+                             }
+                         }"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()"
+                    >
+                        <div x-show="!editing" @click="startEditing()" class="cursor-pointer">
+                            <flux:heading size="lg" x-text="originalValue"></flux:heading>
+                        </div>
+                        <div x-show="editing" x-cloak>
+                            <flux:input
+                                x-ref="input"
+                                x-model="currentValue"
+                                x-on:input="handleInput()"
+                                @keydown.enter="saveIfChanged()"
+                                @keydown.escape="cancelEditing()"
+                                label="Title"
+                                required
+                            />
+                            @error('title')
+                                <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
                     </div>
                 </div>
 
                 <!-- Description -->
-                <div>
-                    @if($editMode)
-                        <flux:textarea wire:model="description" label="Description" rows="4" />
-                    @else
-                        <flux:heading size="sm" class="mb-2">Description</flux:heading>
-                        <p class="text-sm text-zinc-600 dark:text-zinc-400">
-                            {{ $task->description ?: 'No description provided.' }}
-                        </p>
-                    @endif
+                <div
+                     x-data="{
+                         editing: false,
+                         originalValue: @js($task->description ?? ''),
+                         currentValue: @js($task->description ?? ''),
+                         debounceTimer: null,
+                         mouseLeaveTimer: null,
+                         startEditing() {
+                             this.editing = true;
+                             this.currentValue = this.originalValue;
+                             $wire.description = this.originalValue;
+                             $nextTick(() => $refs.input?.focus());
+                         },
+                         cancelEditing() {
+                             this.editing = false;
+                             this.currentValue = this.originalValue;
+                             $wire.description = this.originalValue;
+                             if (this.debounceTimer) {
+                                 clearTimeout(this.debounceTimer);
+                                 this.debounceTimer = null;
+                             }
+                             if (this.mouseLeaveTimer) {
+                                 clearTimeout(this.mouseLeaveTimer);
+                                 this.mouseLeaveTimer = null;
+                             }
+                         },
+                         handleInput() {
+                             $wire.description = this.currentValue;
+                             if (this.debounceTimer) {
+                                 clearTimeout(this.debounceTimer);
+                             }
+                             this.debounceTimer = setTimeout(() => {
+                                 if (this.currentValue !== this.originalValue) {
+                                     $wire.updateField('description', this.currentValue).then(() => {
+                                         this.originalValue = this.currentValue;
+                                         this.editing = false;
+                                     });
+                                 }
+                             }, 500);
+                         },
+                         handleMouseLeave() {
+                             if (!this.editing) return;
+                             this.mouseLeaveTimer = setTimeout(() => {
+                                 this.saveIfChanged();
+                             }, 300);
+                         },
+                         handleMouseEnter() {
+                             if (this.mouseLeaveTimer) {
+                                 clearTimeout(this.mouseLeaveTimer);
+                                 this.mouseLeaveTimer = null;
+                             }
+                         },
+                         saveIfChanged() {
+                             if (this.debounceTimer) {
+                                 clearTimeout(this.debounceTimer);
+                                 this.debounceTimer = null;
+                             }
+                             if (this.mouseLeaveTimer) {
+                                 clearTimeout(this.mouseLeaveTimer);
+                                 this.mouseLeaveTimer = null;
+                             }
+                             if (this.currentValue !== this.originalValue) {
+                                 $wire.updateField('description', this.currentValue).then(() => {
+                                     this.originalValue = this.currentValue;
+                                     this.editing = false;
+                                 });
+                             } else {
+                                 this.editing = false;
+                             }
+                         }
+                     }"
+                     @mouseenter="handleMouseEnter()"
+                     @mouseleave="handleMouseLeave()"
+                >
+                    <div class="mb-2">
+                        <flux:heading size="sm">Description</flux:heading>
+                    </div>
+                    <div x-show="editing" x-cloak>
+                        <flux:textarea
+                            x-ref="input"
+                            x-model="currentValue"
+                            x-on:input="handleInput()"
+                            @keydown.enter="saveIfChanged()"
+                            @keydown.escape="cancelEditing()"
+                            rows="4"
+                        />
+                        @error('description')
+                            <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+                    <div x-show="!editing" @click="startEditing()" class="cursor-pointer">
+                        <p class="text-sm text-zinc-600 dark:text-zinc-400" x-text="originalValue || 'No description provided.'"></p>
+                    </div>
                 </div>
 
                 <!-- Task Details Grid -->
                 <div class="grid grid-cols-2 gap-4">
                     <!-- Status -->
-                    <div>
-                        @if($editMode)
-                            <flux:select wire:model="status" label="Status">
-                                <option value="">Select Status</option>
-                                <option value="to_do">To Do</option>
-                                <option value="doing">In Progress</option>
-                                <option value="done">Done</option>
-                            </flux:select>
-                        @else
+                    <div class="relative" @click.away="openDropdown = null"
+                         x-data="{
+                             openDropdown: null,
+                             mouseLeaveTimer: null,
+                             toggleDropdown() {
+                                 this.openDropdown = this.openDropdown === 'status' ? null : 'status';
+                             },
+                             isOpen() {
+                                 return this.openDropdown === 'status';
+                             },
+                             selectStatus(value) {
+                                 $wire.updateField('status', value).then(() => {
+                                     this.openDropdown = null;
+                                 });
+                             },
+                             handleMouseLeave() {
+                                 this.mouseLeaveTimer = setTimeout(() => {
+                                     this.openDropdown = null;
+                                 }, 300);
+                             },
+                             handleMouseEnter() {
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                             }
+                         }"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()"
+                    >
+                        <div class="flex items-center gap-2 mb-2">
                             <flux:heading size="sm">Status</flux:heading>
-                            <span class="inline-flex items-center px-3 py-1 text-sm font-medium rounded mt-2 {{ $task->status->badgeColor() }}">
-                                {{ match($task->status->value) {
+                        </div>
+                        <button
+                            type="button"
+                            @click.stop="toggleDropdown()"
+                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors w-full"
+                        >
+                            <span class="text-sm font-medium">
+                                {{ match($task->status?->value ?? 'to_do') {
                                     'to_do' => 'To Do',
                                     'doing' => 'In Progress',
                                     'done' => 'Done',
+                                    default => 'To Do'
                                 } }}
                             </span>
-                        @endif
+                        </button>
+                        <div
+                            x-show="isOpen()"
+                            x-cloak
+                            x-transition
+                            class="absolute z-50 mt-1 w-full bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1"
+                        >
+                            <button
+                                @click="selectStatus('to_do')"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ ($task->status?->value ?? 'to_do') === 'to_do' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                            >
+                                To Do
+                            </button>
+                            <button
+                                @click="selectStatus('doing')"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ ($task->status?->value ?? 'to_do') === 'doing' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                            >
+                                In Progress
+                            </button>
+                            <button
+                                @click="selectStatus('done')"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ ($task->status?->value ?? 'to_do') === 'done' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                            >
+                                Done
+                            </button>
+                        </div>
+                        @error('status')
+                            <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
+                        @enderror
                     </div>
 
                     <!-- Priority -->
-                    <div>
-                        @if($editMode)
-                            <flux:select wire:model="priority" label="Priority">
-                                <option value="">None</option>
-                                <option value="low">Low</option>
-                                <option value="medium">Medium</option>
-                                <option value="high">High</option>
-                                <option value="urgent">Urgent</option>
-                            </flux:select>
-                        @else
+                    <div class="relative" @click.away="openDropdown = null"
+                         x-data="{
+                             openDropdown: null,
+                             mouseLeaveTimer: null,
+                             toggleDropdown() {
+                                 this.openDropdown = this.openDropdown === 'priority' ? null : 'priority';
+                             },
+                             isOpen() {
+                                 return this.openDropdown === 'priority';
+                             },
+                             selectPriority(value) {
+                                 $wire.updateField('priority', value).then(() => {
+                                     this.openDropdown = null;
+                                 });
+                             },
+                             handleMouseLeave() {
+                                 this.mouseLeaveTimer = setTimeout(() => {
+                                     this.openDropdown = null;
+                                 }, 300);
+                             },
+                             handleMouseEnter() {
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                             }
+                         }"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()"
+                    >
+                        <div class="flex items-center gap-2 mb-2">
                             <flux:heading size="sm">Priority</flux:heading>
-                            @if($task->priority)
-                                <span class="inline-flex items-center gap-2 mt-2">
-                                    <span class="w-3 h-3 rounded-full {{ $task->priority->dotColor() }}"></span>
-                                    <span class="text-sm">{{ ucfirst($task->priority->value) }}</span>
-                                </span>
-                            @else
-                                <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">Not set</p>
-                            @endif
-                        @endif
+                        </div>
+                        <button
+                            type="button"
+                            @click.stop="toggleDropdown()"
+                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors w-full"
+                        >
+                            <span class="text-sm font-medium">
+                                @if($task->priority)
+                                    <span class="inline-flex items-center gap-2">
+                                        <span class="w-3 h-3 rounded-full {{ $task->priority->dotColor() }}"></span>
+                                        <span>{{ ucfirst($task->priority->value) }}</span>
+                                    </span>
+                                @else
+                                    <span class="text-zinc-500 dark:text-zinc-400">Not set</span>
+                                @endif
+                            </span>
+                        </button>
+                        <div
+                            x-show="isOpen()"
+                            x-cloak
+                            x-transition
+                            class="absolute z-50 mt-1 w-full bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1"
+                        >
+                            <button
+                                @click="selectPriority('low')"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $task->priority?->value === 'low' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                            >
+                                Low
+                            </button>
+                            <button
+                                @click="selectPriority('medium')"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $task->priority?->value === 'medium' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                            >
+                                Medium
+                            </button>
+                            <button
+                                @click="selectPriority('high')"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $task->priority?->value === 'high' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                            >
+                                High
+                            </button>
+                            <button
+                                @click="selectPriority('urgent')"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $task->priority?->value === 'urgent' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                            >
+                                Urgent
+                            </button>
+                        </div>
+                        @error('priority')
+                            <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
+                        @enderror
                     </div>
 
                     <!-- Complexity -->
-                    <div>
-                        @if($editMode)
-                            <flux:select wire:model="complexity" label="Complexity">
-                                <option value="">None</option>
-                                <option value="simple">Simple</option>
-                                <option value="moderate">Moderate</option>
-                                <option value="complex">Complex</option>
-                            </flux:select>
-                        @else
+                    <div class="relative" @click.away="openDropdown = null"
+                         x-data="{
+                             openDropdown: null,
+                             mouseLeaveTimer: null,
+                             toggleDropdown() {
+                                 this.openDropdown = this.openDropdown === 'complexity' ? null : 'complexity';
+                             },
+                             isOpen() {
+                                 return this.openDropdown === 'complexity';
+                             },
+                             selectComplexity(value) {
+                                 $wire.updateField('complexity', value).then(() => {
+                                     this.openDropdown = null;
+                                 });
+                             },
+                             handleMouseLeave() {
+                                 this.mouseLeaveTimer = setTimeout(() => {
+                                     this.openDropdown = null;
+                                 }, 300);
+                             },
+                             handleMouseEnter() {
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                             }
+                         }"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()"
+                    >
+                        <div class="flex items-center gap-2 mb-2">
                             <flux:heading size="sm">Complexity</flux:heading>
-                            @if($task->complexity)
-                                <span class="inline-flex items-center px-3 py-1 text-sm font-medium rounded mt-2 {{ $task->complexity->badgeColor() }}">
-                                    {{ ucfirst($task->complexity->value) }}
-                                </span>
-                            @else
-                                <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">Not set</p>
-                            @endif
-                        @endif
+                        </div>
+                        <button
+                            type="button"
+                            @click.stop="toggleDropdown()"
+                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors w-full"
+                        >
+                            <span class="text-sm font-medium">
+                                @if($task->complexity)
+                                    <span class="inline-flex items-center px-3 py-1 text-sm font-medium rounded {{ $task->complexity->badgeColor() }}">
+                                        {{ ucfirst($task->complexity->value) }}
+                                    </span>
+                                @else
+                                    <span class="text-zinc-500 dark:text-zinc-400">Not set</span>
+                                @endif
+                            </span>
+                        </button>
+                        <div
+                            x-show="isOpen()"
+                            x-cloak
+                            x-transition
+                            class="absolute z-50 mt-1 w-full bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1"
+                        >
+                            <button
+                                @click="selectComplexity('simple')"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $task->complexity?->value === 'simple' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                            >
+                                Simple
+                            </button>
+                            <button
+                                @click="selectComplexity('moderate')"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $task->complexity?->value === 'moderate' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                            >
+                                Moderate
+                            </button>
+                            <button
+                                @click="selectComplexity('complex')"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $task->complexity?->value === 'complex' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                            >
+                                Complex
+                            </button>
+                        </div>
+                        @error('complexity')
+                            <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
+                        @enderror
                     </div>
 
                     <!-- Duration -->
-                    <div>
-                        @if($editMode)
-                            <flux:input wire:model="duration" label="Duration (minutes)" type="number" min="1" />
-                        @else
+                    <div
+                         x-data="{
+                             editing: false,
+                             originalValue: @js($task->duration ? (string)$task->duration : ''),
+                             currentValue: @js($task->duration ? (string)$task->duration : ''),
+                             mouseLeaveTimer: null,
+                             startEditing() {
+                                 this.editing = true;
+                                 this.currentValue = this.originalValue;
+                                 $wire.duration = this.originalValue;
+                                 $nextTick(() => $refs.input?.focus());
+                             },
+                             cancelEditing() {
+                                 this.editing = false;
+                                 this.currentValue = this.originalValue;
+                                 $wire.duration = this.originalValue;
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                             },
+                             handleMouseLeave() {
+                                 if (!this.editing) return;
+                                 this.mouseLeaveTimer = setTimeout(() => {
+                                     this.saveIfChanged();
+                                 }, 300);
+                             },
+                             handleMouseEnter() {
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                             },
+                             saveIfChanged() {
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                                 if (this.currentValue !== this.originalValue) {
+                                     $wire.updateField('duration', this.currentValue).then(() => {
+                                         this.originalValue = this.currentValue;
+                                     });
+                                 } else {
+                                     this.editing = false;
+                                 }
+                             }
+                         }"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()"
+                    >
+                        <div class="flex items-center gap-2 mb-2">
                             <flux:heading size="sm">Duration</flux:heading>
-                            <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">{{ $task->duration ? $task->duration . ' minutes' : 'Not set' }}</p>
-                        @endif
+                            <button
+                                x-show="!editing"
+                                @click="startEditing()"
+                                class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                                type="button"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div x-show="editing" x-cloak>
+                            <flux:input
+                                x-ref="input"
+                                x-model="currentValue"
+                                x-on:input="$wire.duration = currentValue"
+                                wire:model.live="duration"
+                                @keydown.enter="saveIfChanged()"
+                                @keydown.escape="cancelEditing()"
+                                type="number"
+                                min="1"
+                            />
+                            @error('duration')
+                                <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div x-show="!editing">
+                            <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2" x-text="originalValue ? originalValue + ' minutes' : 'Not set'"></p>
+                        </div>
                     </div>
 
                     <!-- Start Date -->
-                    <div>
-                        @if($editMode)
-                            <flux:input wire:model="startDate" label="Start Date (optional)" type="date" />
-                        @else
+                    <div
+                         x-data="{
+                             editing: false,
+                             originalValue: @js($task->start_date?->format('Y-m-d') ?? ''),
+                             currentValue: @js($task->start_date?->format('Y-m-d') ?? ''),
+                             mouseLeaveTimer: null,
+                             startEditing() {
+                                 this.editing = true;
+                                 this.currentValue = this.originalValue;
+                                 $wire.startDate = this.originalValue;
+                                 $nextTick(() => $refs.input?.focus());
+                             },
+                             cancelEditing() {
+                                 this.editing = false;
+                                 this.currentValue = this.originalValue;
+                                 $wire.startDate = this.originalValue;
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                             },
+                             handleMouseLeave() {
+                                 if (!this.editing) return;
+                                 this.mouseLeaveTimer = setTimeout(() => {
+                                     this.saveIfChanged();
+                                 }, 300);
+                             },
+                             handleMouseEnter() {
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                             },
+                             saveIfChanged() {
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                                 if (this.currentValue !== this.originalValue) {
+                                     $wire.updateField('startDate', this.currentValue).then(() => {
+                                         this.originalValue = this.currentValue;
+                                     });
+                                 } else {
+                                     this.editing = false;
+                                 }
+                             }
+                         }"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()"
+                    >
+                        <div class="flex items-center gap-2 mb-2">
                             <flux:heading size="sm">Start Date</flux:heading>
+                            <button
+                                x-show="!editing"
+                                @click="startEditing()"
+                                class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                                type="button"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div x-show="editing" x-cloak>
+                            <flux:input
+                                x-ref="input"
+                                x-model="currentValue"
+                                x-on:input="$wire.startDate = currentValue"
+                                wire:model.live="startDate"
+                                @keydown.enter="saveIfChanged()"
+                                @keydown.escape="cancelEditing()"
+                                type="date"
+                            />
+                            @error('startDate')
+                                <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div x-show="!editing">
                             <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
                                 {{ $task->start_date?->format('M j, Y') ?? 'Not set' }}
                                 @if($task->start_time)
                                     <span class="text-zinc-500 dark:text-zinc-400">at {{ substr($task->start_time, 0, 5) }}</span>
                                 @endif
                             </p>
-                        @endif
+                        </div>
                     </div>
 
                     <!-- End Date -->
-                    <div>
-                        @if($editMode)
-                            <flux:input wire:model="endDate" label="Due Date (optional)" type="date" />
-                        @else
+                    <div
+                         x-data="{
+                             editing: false,
+                             originalValue: @js($task->end_date?->format('Y-m-d') ?? ''),
+                             currentValue: @js($task->end_date?->format('Y-m-d') ?? ''),
+                             mouseLeaveTimer: null,
+                             startEditing() {
+                                 this.editing = true;
+                                 this.currentValue = this.originalValue;
+                                 $wire.endDate = this.originalValue;
+                                 $nextTick(() => $refs.input?.focus());
+                             },
+                             cancelEditing() {
+                                 this.editing = false;
+                                 this.currentValue = this.originalValue;
+                                 $wire.endDate = this.originalValue;
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                             },
+                             handleMouseLeave() {
+                                 if (!this.editing) return;
+                                 this.mouseLeaveTimer = setTimeout(() => {
+                                     this.saveIfChanged();
+                                 }, 300);
+                             },
+                             handleMouseEnter() {
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                             },
+                             saveIfChanged() {
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                                 if (this.currentValue !== this.originalValue) {
+                                     $wire.updateField('endDate', this.currentValue).then(() => {
+                                         this.originalValue = this.currentValue;
+                                     });
+                                 } else {
+                                     this.editing = false;
+                                 }
+                             }
+                         }"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()"
+                    >
+                        <div class="flex items-center gap-2 mb-2">
                             <flux:heading size="sm">Due Date</flux:heading>
+                            <button
+                                x-show="!editing"
+                                @click="startEditing()"
+                                class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                                type="button"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div x-show="editing" x-cloak>
+                            <flux:input
+                                x-ref="input"
+                                x-model="currentValue"
+                                x-on:input="$wire.endDate = currentValue"
+                                wire:model.live="endDate"
+                                @keydown.enter="saveIfChanged()"
+                                @keydown.escape="cancelEditing()"
+                                type="date"
+                            />
+                            @error('endDate')
+                                <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div x-show="!editing">
                             <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2 {{ $task->end_date?->isPast() && $task->status->value !== 'done' ? 'text-red-600 dark:text-red-400 font-semibold' : '' }}">
                                 {{ $task->end_date?->format('M j, Y') ?? 'Not set' }}
                             </p>
-                        @endif
+                        </div>
                     </div>
 
                     <!-- Start Time -->
-                    <div>
-                        @if($editMode)
-                            <flux:input wire:model="startTime" label="Start Time (optional)" type="time" />
-                        @else
-                            @if($task->start_time)
-                                <flux:heading size="sm">Start Time</flux:heading>
-                                <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">{{ substr($task->start_time, 0, 5) }}</p>
-                            @endif
-                        @endif
+                    <div
+                         x-data="{
+                             editing: false,
+                             originalValue: @js($task->start_time ? substr($task->start_time, 0, 5) : ''),
+                             currentValue: @js($task->start_time ? substr($task->start_time, 0, 5) : ''),
+                             mouseLeaveTimer: null,
+                             startEditing() {
+                                 this.editing = true;
+                                 this.currentValue = this.originalValue;
+                                 $wire.startTime = this.originalValue;
+                                 $nextTick(() => $refs.input?.focus());
+                             },
+                             cancelEditing() {
+                                 this.editing = false;
+                                 this.currentValue = this.originalValue;
+                                 $wire.startTime = this.originalValue;
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                             },
+                             handleMouseLeave() {
+                                 if (!this.editing) return;
+                                 this.mouseLeaveTimer = setTimeout(() => {
+                                     this.saveIfChanged();
+                                 }, 300);
+                             },
+                             handleMouseEnter() {
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                             },
+                             saveIfChanged() {
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                                 if (this.currentValue !== this.originalValue) {
+                                     $wire.updateField('startTime', this.currentValue).then(() => {
+                                         this.originalValue = this.currentValue;
+                                     });
+                                 } else {
+                                     this.editing = false;
+                                 }
+                             }
+                         }"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()"
+                         x-show="$wire.startTime || editing"
+                    >
+                        <div class="flex items-center gap-2 mb-2">
+                            <flux:heading size="sm">Start Time</flux:heading>
+                            <button
+                                x-show="!editing"
+                                @click="startEditing()"
+                                class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                                type="button"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div x-show="editing" x-cloak>
+                            <flux:input
+                                x-ref="input"
+                                x-model="currentValue"
+                                x-on:input="$wire.startTime = currentValue"
+                                wire:model.live="startTime"
+                                @keydown.enter="saveIfChanged()"
+                                @keydown.escape="cancelEditing()"
+                                type="time"
+                            />
+                            @error('startTime')
+                                <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div x-show="!editing">
+                            <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2" x-text="originalValue || ''"></p>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Project -->
-                <div>
-                    @if($editMode)
-                        <flux:select wire:model="projectId" label="Project">
-                            <option value="">No Project</option>
-                            @foreach($this->projects as $project)
-                                <option value="{{ $project->id }}">{{ $project->name }}</option>
-                            @endforeach
-                        </flux:select>
-                    @else
+                <div class="relative" @click.away="openDropdown = null"
+                     x-data="{
+                         openDropdown: null,
+                         mouseLeaveTimer: null,
+                         toggleDropdown() {
+                             this.openDropdown = this.openDropdown === 'project' ? null : 'project';
+                         },
+                         isOpen() {
+                             return this.openDropdown === 'project';
+                         },
+                         selectProject(value) {
+                             $wire.updateField('projectId', value).then(() => {
+                                 this.openDropdown = null;
+                             });
+                         },
+                         handleMouseLeave() {
+                             this.mouseLeaveTimer = setTimeout(() => {
+                                 this.openDropdown = null;
+                             }, 300);
+                         },
+                         handleMouseEnter() {
+                             if (this.mouseLeaveTimer) {
+                                 clearTimeout(this.mouseLeaveTimer);
+                                 this.mouseLeaveTimer = null;
+                             }
+                         }
+                     }"
+                     @mouseenter="handleMouseEnter()"
+                     @mouseleave="handleMouseLeave()"
+                >
+                    <div class="flex items-center gap-2 mb-2">
                         <flux:heading size="sm">Project</flux:heading>
-                        @if($task->project)
-                            <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
-                                <a href="#" class="text-blue-600 dark:text-blue-400 hover:underline">
-                                    {{ $task->project->name }}
-                                </a>
-                            </p>
-                        @else
-                            <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">Not assigned to a project</p>
+                    </div>
+                    <button
+                        type="button"
+                        @click.stop="toggleDropdown()"
+                        class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors w-full"
+                    >
+                        <span class="text-sm font-medium">
+                            @if($task->project)
+                                <span class="text-blue-600 dark:text-blue-400">{{ $task->project->name }}</span>
+                            @else
+                                <span class="text-zinc-500 dark:text-zinc-400">Not assigned to a project</span>
+                            @endif
+                        </span>
+                    </button>
+                    <div
+                        x-show="isOpen()"
+                        x-cloak
+                        x-transition
+                        class="absolute z-50 mt-1 w-full bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 max-h-60 overflow-y-auto"
+                    >
+                        @foreach($this->projects as $project)
+                            <button
+                                wire:key="project-{{ $project->id }}"
+                                @click="selectProject('{{ $project->id }}')"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $task->project_id === $project->id ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                            >
+                                {{ $project->name }}
+                            </button>
+                        @endforeach
+                        @if($this->projects->isEmpty())
+                            <div class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400">No projects available</div>
                         @endif
-                    @endif
+                    </div>
+                    @error('projectId')
+                        <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 <!-- Tags -->
-                @if(!$editMode && $task->tags->isNotEmpty())
+                @if($task->tags->isNotEmpty())
                     <div>
                         <flux:heading size="sm">Tags</flux:heading>
                         <div class="flex flex-wrap gap-2 mt-2">
@@ -348,7 +1042,7 @@ new class extends Component
                 @endif
 
                 <!-- Reminders -->
-                @if(!$editMode && $task->reminders->isNotEmpty())
+                @if($task->reminders->isNotEmpty())
                     <div>
                         <flux:heading size="sm">Reminders</flux:heading>
                         <div class="mt-2 space-y-2">
@@ -365,7 +1059,7 @@ new class extends Component
                 @endif
 
                 <!-- Pomodoro Sessions -->
-                @if(!$editMode && $task->pomodoroSessions->isNotEmpty())
+                @if($task->pomodoroSessions->isNotEmpty())
                     <div>
                         <flux:heading size="sm">Pomodoro Sessions</flux:heading>
                         <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
@@ -375,15 +1069,39 @@ new class extends Component
                 @endif
 
                 <!-- Collaboration Placeholder -->
-                @if(!$editMode)
-                    <div class="border-t border-zinc-200 dark:border-zinc-700 pt-4">
-                        <flux:heading size="sm">Collaboration</flux:heading>
-                        <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">
-                            Collaboration features coming soon...
-                        </p>
-                    </div>
-                @endif
+                <div class="border-t border-zinc-200 dark:border-zinc-700 pt-4">
+                    <flux:heading size="sm">Collaboration</flux:heading>
+                    <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">
+                        Collaboration features coming soon...
+                    </p>
+                </div>
+
+                <!-- Delete Button -->
+                <div class="flex justify-end mt-6 mb-4">
+                    <flux:button
+                        variant="danger"
+                        @click="$wire.showDeleteConfirm = true"
+                    >
+                        Delete Task
+                    </flux:button>
+                </div>
             </div>
         @endif
+    </flux:modal>
+
+    <!-- Delete Confirmation Modal -->
+    <flux:modal wire:model="showDeleteConfirm" class="max-w-md">
+        <flux:heading size="lg" class="mb-4">Delete Task</flux:heading>
+        <p class="text-sm text-zinc-600 dark:text-zinc-400 mb-6">
+            Are you sure you want to delete "<strong>{{ $task?->title }}</strong>"? This action cannot be undone.
+        </p>
+        <div class="flex justify-end gap-2">
+            <flux:button variant="ghost" @click="$wire.showDeleteConfirm = false">
+                Cancel
+            </flux:button>
+            <flux:button variant="danger" wire:click="deleteTask">
+                Delete
+            </flux:button>
+        </div>
     </flux:modal>
 </div>

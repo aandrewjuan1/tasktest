@@ -11,7 +11,7 @@ new class extends Component
 
     public ?Event $event = null;
 
-    public bool $editMode = false;
+    public bool $showDeleteConfirm = false;
 
     // Edit fields
     public string $title = '';
@@ -39,7 +39,7 @@ new class extends Component
         $this->authorize('view', $this->event);
 
         $this->isOpen = true;
-        $this->editMode = false;
+        $this->showDeleteConfirm = false;
         $this->loadEventData();
     }
 
@@ -47,16 +47,7 @@ new class extends Component
     {
         $this->isOpen = false;
         $this->event = null;
-        $this->editMode = false;
-        $this->resetValidation();
-    }
-
-    public function toggleEditMode(): void
-    {
-        $this->editMode = ! $this->editMode;
-        if ($this->editMode) {
-            $this->loadEventData();
-        }
+        $this->showDeleteConfirm = false;
         $this->resetValidation();
     }
 
@@ -76,42 +67,77 @@ new class extends Component
         $this->status = $this->event->status?->value ?? 'scheduled';
     }
 
-    public function save(): void
+    public function updateField(string $field, mixed $value): void
     {
+        if (! $this->event) {
+            return;
+        }
+
         $this->authorize('update', $this->event);
 
-        $validated = $this->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'startDatetime' => 'required|date',
-            'endDatetime' => 'nullable|date|after:startDatetime',
-            'allDay' => 'boolean',
-            'location' => 'nullable|string|max:255',
-            'color' => 'nullable|string|max:7',
-            'status' => 'nullable|string|in:scheduled,cancelled,completed,tentative',
+        $validationRules = match ($field) {
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'startDatetime' => ['required', 'date'],
+            'endDatetime' => ['nullable', 'date'],
+            'allDay' => ['boolean'],
+            'location' => ['nullable', 'string', 'max:255'],
+            'color' => ['nullable', 'string', 'max:7'],
+            'status' => ['nullable', 'string', 'in:scheduled,cancelled,completed,tentative'],
+            default => [],
+        };
+
+        if (empty($validationRules)) {
+            return;
+        }
+
+        $this->validate([
+            $field => $validationRules,
         ]);
 
-        // Auto-calculate end_datetime if not provided
-        $startDatetime = Carbon::parse($this->startDatetime);
-        $endDatetime = $this->endDatetime
-            ? Carbon::parse($this->endDatetime)
-            : $startDatetime->copy()->addHour();
+        $updateData = [];
 
-        $this->event->update([
-            'title' => $this->title,
-            'description' => $this->description ?: null,
-            'start_datetime' => $startDatetime,
-            'end_datetime' => $endDatetime,
-            'all_day' => $this->allDay,
-            'location' => $this->location ?: null,
-            'color' => $this->color,
-            'status' => $this->status ?: 'scheduled',
-        ]);
+        switch ($field) {
+            case 'title':
+                $updateData['title'] = $value;
+                break;
+            case 'description':
+                $updateData['description'] = $value ?: null;
+                break;
+            case 'startDatetime':
+                $startDatetime = Carbon::parse($value);
+                $updateData['start_datetime'] = $startDatetime;
+                // Auto-calculate end_datetime if not provided
+                if (empty($this->endDatetime)) {
+                    $updateData['end_datetime'] = $startDatetime->copy()->addHour();
+                }
+                break;
+            case 'endDatetime':
+                $updateData['end_datetime'] = $value ? Carbon::parse($value) : null;
+                break;
+            case 'allDay':
+                $updateData['all_day'] = (bool) $value;
+                break;
+            case 'location':
+                $updateData['location'] = $value ?: null;
+                break;
+            case 'color':
+                $updateData['color'] = $value;
+                break;
+            case 'status':
+                $updateData['status'] = $value ?: 'scheduled';
+                break;
+        }
 
+        $this->event->update($updateData);
         $this->event->refresh();
-        $this->editMode = false;
+        $this->loadEventData();
         $this->dispatch('event-updated');
-        session()->flash('message', 'Event updated successfully!');
+    }
+
+    public function confirmDelete(): void
+    {
+        $this->showDeleteConfirm = true;
     }
 
     public function deleteEvent(): void
@@ -126,61 +152,283 @@ new class extends Component
 }; ?>
 
 <div>
-    <flux:modal wire:model="isOpen" class="min-w-[700px]" variant="flyout">
+    <flux:modal wire:model="isOpen" class="min-w-[700px]" variant="flyout" closeable="false">
         @if($event)
             <div class="space-y-6">
                 <!-- Header -->
-                <div class="flex items-start justify-between">
-                    <div class="flex-1">
-                        @if($editMode)
-                            <flux:input wire:model="title" label="Title" required />
-                        @else
-                            <flux:heading size="lg">{{ $event->title }}</flux:heading>
-                        @endif
-                    </div>
-                    <div class="flex items-center gap-2 ml-4">
-                        @if($editMode)
-                            <flux:button variant="primary" wire:click="save">
-                                Save
-                            </flux:button>
-                            <flux:button variant="ghost" wire:click="toggleEditMode">
-                                Cancel
-                            </flux:button>
-                        @else
-                            <flux:button variant="ghost" wire:click="toggleEditMode">
-                                Edit
-                            </flux:button>
-                            <flux:button
-                                variant="danger"
-                                wire:click="deleteEvent"
-                                wire:confirm="Are you sure you want to delete this event?"
-                            >
-                                Delete
-                            </flux:button>
-                        @endif
+                <div>
+                    <div class="flex-1"
+                         x-data="{
+                             editing: false,
+                             originalValue: @js($event->title),
+                             currentValue: @js($event->title),
+                             debounceTimer: null,
+                             mouseLeaveTimer: null,
+                             startEditing() {
+                                 this.editing = true;
+                                 this.currentValue = this.originalValue;
+                                 $wire.title = this.originalValue;
+                                 $nextTick(() => $refs.input?.focus());
+                             },
+                             cancelEditing() {
+                                 this.editing = false;
+                                 this.currentValue = this.originalValue;
+                                 $wire.title = this.originalValue;
+                                 if (this.debounceTimer) {
+                                     clearTimeout(this.debounceTimer);
+                                     this.debounceTimer = null;
+                                 }
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                             },
+                             handleInput() {
+                                 $wire.title = this.currentValue;
+                                 if (this.debounceTimer) {
+                                     clearTimeout(this.debounceTimer);
+                                 }
+                                 this.debounceTimer = setTimeout(() => {
+                                     if (this.currentValue !== this.originalValue) {
+                                         $wire.updateField('title', this.currentValue).then(() => {
+                                             this.originalValue = this.currentValue;
+                                             this.editing = false;
+                                         });
+                                     }
+                                 }, 500);
+                             },
+                             handleMouseLeave() {
+                                 if (!this.editing) return;
+                                 this.mouseLeaveTimer = setTimeout(() => {
+                                     this.saveIfChanged();
+                                 }, 300);
+                             },
+                             handleMouseEnter() {
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                             },
+                             saveIfChanged() {
+                                 if (this.debounceTimer) {
+                                     clearTimeout(this.debounceTimer);
+                                     this.debounceTimer = null;
+                                 }
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                                 if (this.currentValue !== this.originalValue) {
+                                     $wire.updateField('title', this.currentValue).then(() => {
+                                         this.originalValue = this.currentValue;
+                                         this.editing = false;
+                                     });
+                                 } else {
+                                     this.editing = false;
+                                 }
+                             }
+                         }"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()"
+                    >
+                        <div x-show="!editing" @click="startEditing()" class="cursor-pointer">
+                            <flux:heading size="lg" x-text="originalValue"></flux:heading>
+                        </div>
+                        <div x-show="editing" x-cloak>
+                            <flux:input
+                                x-ref="input"
+                                x-model="currentValue"
+                                x-on:input="handleInput()"
+                                @keydown.enter="saveIfChanged()"
+                                @keydown.escape="cancelEditing()"
+                                label="Title"
+                                required
+                            />
+                            @error('title')
+                                <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
                     </div>
                 </div>
 
                 <!-- Description -->
-                <div>
-                    @if($editMode)
-                        <flux:textarea wire:model="description" label="Description" rows="4" />
-                    @else
-                        <flux:heading size="sm" class="mb-2">Description</flux:heading>
-                        <p class="text-sm text-zinc-600 dark:text-zinc-400">
-                            {{ $event->description ?: 'No description provided.' }}
-                        </p>
-                    @endif
+                <div
+                     x-data="{
+                         editing: false,
+                         originalValue: @js($event->description ?? ''),
+                         currentValue: @js($event->description ?? ''),
+                         debounceTimer: null,
+                         mouseLeaveTimer: null,
+                         startEditing() {
+                             this.editing = true;
+                             this.currentValue = this.originalValue;
+                             $wire.description = this.originalValue;
+                             $nextTick(() => $refs.input?.focus());
+                         },
+                         cancelEditing() {
+                             this.editing = false;
+                             this.currentValue = this.originalValue;
+                             $wire.description = this.originalValue;
+                             if (this.debounceTimer) {
+                                 clearTimeout(this.debounceTimer);
+                                 this.debounceTimer = null;
+                             }
+                             if (this.mouseLeaveTimer) {
+                                 clearTimeout(this.mouseLeaveTimer);
+                                 this.mouseLeaveTimer = null;
+                             }
+                         },
+                         handleInput() {
+                             $wire.description = this.currentValue;
+                             if (this.debounceTimer) {
+                                 clearTimeout(this.debounceTimer);
+                             }
+                             this.debounceTimer = setTimeout(() => {
+                                 if (this.currentValue !== this.originalValue) {
+                                     $wire.updateField('description', this.currentValue).then(() => {
+                                         this.originalValue = this.currentValue;
+                                         this.editing = false;
+                                     });
+                                 }
+                             }, 500);
+                         },
+                         handleMouseLeave() {
+                             if (!this.editing) return;
+                             this.mouseLeaveTimer = setTimeout(() => {
+                                 this.saveIfChanged();
+                             }, 300);
+                         },
+                         handleMouseEnter() {
+                             if (this.mouseLeaveTimer) {
+                                 clearTimeout(this.mouseLeaveTimer);
+                                 this.mouseLeaveTimer = null;
+                             }
+                         },
+                         saveIfChanged() {
+                             if (this.debounceTimer) {
+                                 clearTimeout(this.debounceTimer);
+                                 this.debounceTimer = null;
+                             }
+                             if (this.mouseLeaveTimer) {
+                                 clearTimeout(this.mouseLeaveTimer);
+                                 this.mouseLeaveTimer = null;
+                             }
+                             if (this.currentValue !== this.originalValue) {
+                                 $wire.updateField('description', this.currentValue).then(() => {
+                                     this.originalValue = this.currentValue;
+                                     this.editing = false;
+                                 });
+                             } else {
+                                 this.editing = false;
+                             }
+                         }
+                     }"
+                     @mouseenter="handleMouseEnter()"
+                     @mouseleave="handleMouseLeave()"
+                >
+                    <div class="mb-2">
+                        <flux:heading size="sm">Description</flux:heading>
+                    </div>
+                    <div x-show="editing" x-cloak>
+                        <flux:textarea
+                            x-ref="input"
+                            x-model="currentValue"
+                            x-on:input="handleInput()"
+                            @keydown.enter="saveIfChanged()"
+                            @keydown.escape="cancelEditing()"
+                            rows="4"
+                        />
+                        @error('description')
+                            <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+                    <div x-show="!editing" @click="startEditing()" class="cursor-pointer">
+                        <p class="text-sm text-zinc-600 dark:text-zinc-400" x-text="originalValue || 'No description provided.'"></p>
+                    </div>
                 </div>
 
                 <!-- Event Details Grid -->
                 <div class="grid grid-cols-2 gap-4">
                     <!-- Start DateTime -->
-                    <div>
-                        @if($editMode)
-                            <flux:input wire:model="startDatetime" label="Start Date & Time" type="datetime-local" required />
-                        @else
+                    <div
+                         x-data="{
+                             editing: false,
+                             originalValue: @js($event->start_datetime->format('Y-m-d\TH:i')),
+                             currentValue: @js($event->start_datetime->format('Y-m-d\TH:i')),
+                             mouseLeaveTimer: null,
+                             startEditing() {
+                                 this.editing = true;
+                                 this.currentValue = this.originalValue;
+                                 $wire.startDatetime = this.originalValue;
+                                 $nextTick(() => $refs.input?.focus());
+                             },
+                             cancelEditing() {
+                                 this.editing = false;
+                                 this.currentValue = this.originalValue;
+                                 $wire.startDatetime = this.originalValue;
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                             },
+                             handleMouseLeave() {
+                                 if (!this.editing) return;
+                                 this.mouseLeaveTimer = setTimeout(() => {
+                                     this.saveIfChanged();
+                                 }, 300);
+                             },
+                             handleMouseEnter() {
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                             },
+                             saveIfChanged() {
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                                 if (this.currentValue !== this.originalValue) {
+                                     $wire.updateField('startDatetime', this.currentValue).then(() => {
+                                         this.originalValue = this.currentValue;
+                                     });
+                                 } else {
+                                     this.editing = false;
+                                 }
+                             }
+                         }"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()"
+                    >
+                        <div class="flex items-center gap-2 mb-2">
                             <flux:heading size="sm">Start</flux:heading>
+                            <button
+                                x-show="!editing"
+                                @click="startEditing()"
+                                class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                                type="button"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div x-show="editing" x-cloak>
+                            <flux:input
+                                x-ref="input"
+                                x-model="currentValue"
+                                x-on:input="$wire.startDatetime = currentValue"
+                                wire:model.live="startDatetime"
+                                @keydown.enter="saveIfChanged()"
+                                @keydown.escape="cancelEditing()"
+                                type="datetime-local"
+                                required
+                            />
+                            @error('startDatetime')
+                                <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div x-show="!editing">
                             <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
                                 @if($event->all_day)
                                     {{ $event->start_datetime->format('M j, Y') }} (All day)
@@ -188,15 +436,88 @@ new class extends Component
                                     {{ $event->start_datetime->format('M j, Y g:i A') }}
                                 @endif
                             </p>
-                        @endif
+                        </div>
                     </div>
 
                     <!-- End DateTime -->
-                    <div>
-                        @if($editMode)
-                            <flux:input wire:model="endDatetime" label="End Date & Time (optional)" type="datetime-local" />
-                        @else
+                    <div
+                         x-data="{
+                             editing: false,
+                             originalValue: @js($event->end_datetime?->format('Y-m-d\TH:i') ?? ''),
+                             currentValue: @js($event->end_datetime?->format('Y-m-d\TH:i') ?? ''),
+                             mouseLeaveTimer: null,
+                             startEditing() {
+                                 this.editing = true;
+                                 this.currentValue = this.originalValue;
+                                 $wire.endDatetime = this.originalValue;
+                                 $nextTick(() => $refs.input?.focus());
+                             },
+                             cancelEditing() {
+                                 this.editing = false;
+                                 this.currentValue = this.originalValue;
+                                 $wire.endDatetime = this.originalValue;
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                             },
+                             handleMouseLeave() {
+                                 if (!this.editing) return;
+                                 this.mouseLeaveTimer = setTimeout(() => {
+                                     this.saveIfChanged();
+                                 }, 300);
+                             },
+                             handleMouseEnter() {
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                             },
+                             saveIfChanged() {
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                                 if (this.currentValue !== this.originalValue) {
+                                     $wire.updateField('endDatetime', this.currentValue).then(() => {
+                                         this.originalValue = this.currentValue;
+                                     });
+                                 } else {
+                                     this.editing = false;
+                                 }
+                             }
+                         }"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()"
+                    >
+                        <div class="flex items-center gap-2 mb-2">
                             <flux:heading size="sm">End</flux:heading>
+                            <button
+                                x-show="!editing"
+                                @click="startEditing()"
+                                class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                                type="button"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div x-show="editing" x-cloak>
+                            <flux:input
+                                x-ref="input"
+                                x-model="currentValue"
+                                x-on:input="$wire.endDatetime = currentValue"
+                                wire:model.live="endDatetime"
+                                @keydown.enter="saveIfChanged()"
+                                @keydown.escape="cancelEditing()"
+                                type="datetime-local"
+                            />
+                            @error('endDatetime')
+                                <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div x-show="!editing">
                             <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
                                 @if($event->all_day)
                                     {{ $event->end_datetime->format('M j, Y') }} (All day)
@@ -204,66 +525,339 @@ new class extends Component
                                     {{ $event->end_datetime->format('M j, Y g:i A') }}
                                 @endif
                             </p>
-                        @endif
+                        </div>
                     </div>
 
                     <!-- All Day -->
-                    <div>
-                        @if($editMode)
-                            <flux:checkbox wire:model="allDay" label="All Day Event" />
-                        @else
+                    <div
+                         x-data="{
+                             editing: false,
+                             originalValue: @js($event->all_day),
+                             currentValue: @js($event->all_day),
+                             mouseLeaveTimer: null,
+                             startEditing() {
+                                 this.editing = true;
+                                 this.currentValue = this.originalValue;
+                                 $wire.allDay = this.originalValue;
+                             },
+                             cancelEditing() {
+                                 this.editing = false;
+                                 this.currentValue = this.originalValue;
+                                 $wire.allDay = this.originalValue;
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                             },
+                             handleMouseLeave() {
+                                 if (!this.editing) return;
+                                 this.mouseLeaveTimer = setTimeout(() => {
+                                     this.saveIfChanged();
+                                 }, 300);
+                             },
+                             handleMouseEnter() {
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                             },
+                             saveIfChanged() {
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                                 if (this.currentValue !== this.originalValue) {
+                                     $wire.updateField('allDay', this.currentValue).then(() => {
+                                         this.originalValue = this.currentValue;
+                                     });
+                                 } else {
+                                     this.editing = false;
+                                 }
+                             }
+                         }"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()"
+                    >
+                        <div class="flex items-center gap-2 mb-2">
                             <flux:heading size="sm">All Day</flux:heading>
-                            <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
-                                {{ $event->all_day ? 'Yes' : 'No' }}
-                            </p>
-                        @endif
+                            <button
+                                x-show="!editing"
+                                @click="startEditing()"
+                                class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                                type="button"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div x-show="editing" x-cloak>
+                            <flux:checkbox
+                                x-model="currentValue"
+                                x-on:change="$wire.allDay = currentValue"
+                                wire:model.live="allDay"
+                            />
+                            @error('allDay')
+                                <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div x-show="!editing">
+                            <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2" x-text="originalValue ? 'Yes' : 'No'"></p>
+                        </div>
                     </div>
 
                     <!-- Status -->
-                    <div>
-                        @if($editMode)
-                            <flux:select wire:model="status" label="Status" required>
-                                <option value="scheduled">Scheduled</option>
-                                <option value="tentative">Tentative</option>
-                                <option value="cancelled">Cancelled</option>
-                                <option value="completed">Completed</option>
-                            </flux:select>
-                        @else
+                    <div class="relative" @click.away="openDropdown = null"
+                         x-data="{
+                             openDropdown: null,
+                             mouseLeaveTimer: null,
+                             toggleDropdown() {
+                                 this.openDropdown = this.openDropdown === 'status' ? null : 'status';
+                             },
+                             isOpen() {
+                                 return this.openDropdown === 'status';
+                             },
+                             selectStatus(value) {
+                                 $wire.updateField('status', value).then(() => {
+                                     this.openDropdown = null;
+                                 });
+                             },
+                             handleMouseLeave() {
+                                 this.mouseLeaveTimer = setTimeout(() => {
+                                     this.openDropdown = null;
+                                 }, 300);
+                             },
+                             handleMouseEnter() {
+                                 if (this.mouseLeaveTimer) {
+                                     clearTimeout(this.mouseLeaveTimer);
+                                     this.mouseLeaveTimer = null;
+                                 }
+                             }
+                         }"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()"
+                    >
+                        <div class="flex items-center gap-2 mb-2">
                             <flux:heading size="sm">Status</flux:heading>
-                            <span class="inline-flex items-center px-3 py-1 text-sm font-medium rounded mt-2 {{ $event->status->badgeColor() }}">
-                                {{ ucfirst($event->status->value) }}
+                        </div>
+                        <button
+                            type="button"
+                            @click.stop="toggleDropdown()"
+                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors w-full"
+                        >
+                            <span class="text-sm font-medium">
+                                {{ match($event->status?->value ?? 'scheduled') {
+                                    'scheduled' => 'Scheduled',
+                                    'tentative' => 'Tentative',
+                                    'cancelled' => 'Cancelled',
+                                    'completed' => 'Completed',
+                                    default => 'Scheduled'
+                                } }}
                             </span>
-                        @endif
+                        </button>
+                        <div
+                            x-show="isOpen()"
+                            x-cloak
+                            x-transition
+                            class="absolute z-50 mt-1 w-full bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1"
+                        >
+                            <button
+                                @click="selectStatus('scheduled')"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ ($event->status?->value ?? 'scheduled') === 'scheduled' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                            >
+                                Scheduled
+                            </button>
+                            <button
+                                @click="selectStatus('tentative')"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ ($event->status?->value ?? 'scheduled') === 'tentative' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                            >
+                                Tentative
+                            </button>
+                            <button
+                                @click="selectStatus('cancelled')"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ ($event->status?->value ?? 'scheduled') === 'cancelled' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                            >
+                                Cancelled
+                            </button>
+                            <button
+                                @click="selectStatus('completed')"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ ($event->status?->value ?? 'scheduled') === 'completed' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                            >
+                                Completed
+                            </button>
+                        </div>
+                        @error('status')
+                            <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
+                        @enderror
                     </div>
                 </div>
 
                 <!-- Location -->
-                <div>
-                    @if($editMode)
-                        <flux:input wire:model="location" label="Location" />
-                    @else
+                <div
+                     x-data="{
+                         editing: false,
+                         originalValue: @js($event->location ?? ''),
+                         currentValue: @js($event->location ?? ''),
+                         mouseLeaveTimer: null,
+                         startEditing() {
+                             this.editing = true;
+                             this.currentValue = this.originalValue;
+                             $wire.location = this.originalValue;
+                             $nextTick(() => $refs.input?.focus());
+                         },
+                         cancelEditing() {
+                             this.editing = false;
+                             this.currentValue = this.originalValue;
+                             $wire.location = this.originalValue;
+                             if (this.mouseLeaveTimer) {
+                                 clearTimeout(this.mouseLeaveTimer);
+                                 this.mouseLeaveTimer = null;
+                             }
+                         },
+                         handleMouseLeave() {
+                             if (!this.editing) return;
+                             this.mouseLeaveTimer = setTimeout(() => {
+                                 this.saveIfChanged();
+                             }, 300);
+                         },
+                         handleMouseEnter() {
+                             if (this.mouseLeaveTimer) {
+                                 clearTimeout(this.mouseLeaveTimer);
+                                 this.mouseLeaveTimer = null;
+                             }
+                         },
+                         saveIfChanged() {
+                             if (this.mouseLeaveTimer) {
+                                 clearTimeout(this.mouseLeaveTimer);
+                                 this.mouseLeaveTimer = null;
+                             }
+                             if (this.currentValue !== this.originalValue) {
+                                 $wire.updateField('location', this.currentValue).then(() => {
+                                     this.originalValue = this.currentValue;
+                                 });
+                             } else {
+                                 this.editing = false;
+                             }
+                         }
+                     }"
+                     @mouseenter="handleMouseEnter()"
+                     @mouseleave="handleMouseLeave()"
+                >
+                    <div class="flex items-center gap-2 mb-2">
                         <flux:heading size="sm">Location</flux:heading>
-                        <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
-                            {{ $event->location ?: 'No location specified' }}
-                        </p>
-                    @endif
+                        <button
+                            x-show="!editing"
+                            @click="startEditing()"
+                            class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                            type="button"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div x-show="editing" x-cloak>
+                        <flux:input
+                            x-ref="input"
+                            x-model="currentValue"
+                            x-on:input="$wire.location = currentValue"
+                            wire:model.live="location"
+                            @keydown.enter="saveIfChanged()"
+                            @keydown.escape="cancelEditing()"
+                        />
+                        @error('location')
+                            <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+                    <div x-show="!editing">
+                        <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2" x-text="originalValue || 'No location specified'"></p>
+                    </div>
                 </div>
 
                 <!-- Color -->
-                <div>
-                    @if($editMode)
-                        <flux:input wire:model="color" label="Color" type="color" />
-                    @else
+                <div
+                     x-data="{
+                         editing: false,
+                         originalValue: @js($event->color ?? '#3b82f6'),
+                         currentValue: @js($event->color ?? '#3b82f6'),
+                         mouseLeaveTimer: null,
+                         startEditing() {
+                             this.editing = true;
+                             this.currentValue = this.originalValue;
+                             $wire.color = this.originalValue;
+                         },
+                         cancelEditing() {
+                             this.editing = false;
+                             this.currentValue = this.originalValue;
+                             $wire.color = this.originalValue;
+                             if (this.mouseLeaveTimer) {
+                                 clearTimeout(this.mouseLeaveTimer);
+                                 this.mouseLeaveTimer = null;
+                             }
+                         },
+                         handleMouseLeave() {
+                             if (!this.editing) return;
+                             this.mouseLeaveTimer = setTimeout(() => {
+                                 this.saveIfChanged();
+                             }, 300);
+                         },
+                         handleMouseEnter() {
+                             if (this.mouseLeaveTimer) {
+                                 clearTimeout(this.mouseLeaveTimer);
+                                 this.mouseLeaveTimer = null;
+                             }
+                         },
+                         saveIfChanged() {
+                             if (this.mouseLeaveTimer) {
+                                 clearTimeout(this.mouseLeaveTimer);
+                                 this.mouseLeaveTimer = null;
+                             }
+                             if (this.currentValue !== this.originalValue) {
+                                 $wire.updateField('color', this.currentValue).then(() => {
+                                     this.originalValue = this.currentValue;
+                                 });
+                             } else {
+                                 this.editing = false;
+                             }
+                         }
+                     }"
+                     @mouseenter="handleMouseEnter()"
+                     @mouseleave="handleMouseLeave()"
+                >
+                    <div class="flex items-center gap-2 mb-2">
                         <flux:heading size="sm">Color</flux:heading>
+                        <button
+                            x-show="!editing"
+                            @click="startEditing()"
+                            class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                            type="button"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div x-show="editing" x-cloak>
+                        <flux:input
+                            x-model="currentValue"
+                            x-on:change="$wire.color = currentValue"
+                            wire:model.live="color"
+                            type="color"
+                        />
+                        @error('color')
+                            <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+                    <div x-show="!editing">
                         <div class="flex items-center gap-2 mt-2">
-                            <span class="w-6 h-6 rounded" style="background-color: {{ $event->color }}"></span>
-                            <span class="text-sm text-zinc-600 dark:text-zinc-400">{{ $event->color }}</span>
+                            <span class="w-6 h-6 rounded" :style="`background-color: ${originalValue}`"></span>
+                            <span class="text-sm text-zinc-600 dark:text-zinc-400" x-text="originalValue"></span>
                         </div>
-                    @endif
+                    </div>
                 </div>
 
                 <!-- Tags -->
-                @if(!$editMode && $event->tags->isNotEmpty())
+                @if($event->tags->isNotEmpty())
                     <div>
                         <flux:heading size="sm">Tags</flux:heading>
                         <div class="flex flex-wrap gap-2 mt-2">
@@ -277,7 +871,7 @@ new class extends Component
                 @endif
 
                 <!-- Reminders -->
-                @if(!$editMode && $event->reminders->isNotEmpty())
+                @if($event->reminders->isNotEmpty())
                     <div>
                         <flux:heading size="sm">Reminders</flux:heading>
                         <div class="mt-2 space-y-2">
@@ -294,15 +888,39 @@ new class extends Component
                 @endif
 
                 <!-- Collaboration Placeholder -->
-                @if(!$editMode)
-                    <div class="border-t border-zinc-200 dark:border-zinc-700 pt-4">
-                        <flux:heading size="sm">Collaboration</flux:heading>
-                        <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">
-                            Collaboration features coming soon...
-                        </p>
-                    </div>
-                @endif
+                <div class="border-t border-zinc-200 dark:border-zinc-700 pt-4">
+                    <flux:heading size="sm">Collaboration</flux:heading>
+                    <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">
+                        Collaboration features coming soon...
+                    </p>
+                </div>
+
+                <!-- Delete Button -->
+                <div class="flex justify-end mt-6 mb-4">
+                    <flux:button
+                        variant="danger"
+                        @click="$wire.showDeleteConfirm = true"
+                    >
+                        Delete Event
+                    </flux:button>
+                </div>
             </div>
         @endif
+    </flux:modal>
+
+    <!-- Delete Confirmation Modal -->
+    <flux:modal wire:model="showDeleteConfirm" class="max-w-md">
+        <flux:heading size="lg" class="mb-4">Delete Event</flux:heading>
+        <p class="text-sm text-zinc-600 dark:text-zinc-400 mb-6">
+            Are you sure you want to delete "<strong>{{ $event?->title }}</strong>"? This action cannot be undone.
+        </p>
+        <div class="flex justify-end gap-2">
+            <flux:button variant="ghost" @click="$wire.showDeleteConfirm = false">
+                Cancel
+            </flux:button>
+            <flux:button variant="danger" wire:click="deleteEvent">
+                Delete
+            </flux:button>
+        </div>
     </flux:modal>
 </div>

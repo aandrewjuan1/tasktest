@@ -11,6 +11,12 @@
     @mouseenter="$el.style.borderLeftColor = 'rgb(147 197 253)'"
     @mouseleave="$el.style.borderLeftColor = originalColor"
 >
+    <div class="flex items-center gap-2 mb-3">
+        <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
+            Event
+        </span>
+    </div>
+
     <div class="flex items-start justify-between gap-3 mb-3">
         <h3 class="font-semibold text-zinc-900 dark:text-zinc-100 line-clamp-2 flex-1">
             {{ $event->title }}

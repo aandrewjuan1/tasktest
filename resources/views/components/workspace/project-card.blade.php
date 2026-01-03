@@ -7,6 +7,12 @@
     tabindex="0"
     aria-label="View project details: {{ $project->name }}"
 >
+    <div class="flex items-center gap-2 mb-3">
+        <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+            Project
+        </span>
+    </div>
+
     <div class="flex items-start justify-between gap-3 mb-3">
         <h3 class="font-semibold text-zinc-900 dark:text-zinc-100 line-clamp-2 flex-1">
             {{ $project->name }}

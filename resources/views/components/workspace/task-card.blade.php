@@ -7,17 +7,16 @@
     tabindex="0"
     aria-label="View task details: {{ $task->title }}"
 >
+    <div class="flex items-center gap-2 mb-3">
+        <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+            Task
+        </span>
+    </div>
+
     <div class="flex items-start justify-between gap-3 mb-3">
         <h3 class="font-semibold text-zinc-900 dark:text-zinc-100 line-clamp-2 flex-1">
             {{ $task->title }}
         </h3>
-
-        @if($task->priority)
-            <span
-                class="flex-shrink-0 w-3 h-3 rounded-full {{ $task->priority->dotColor() }}"
-                title="{{ ucfirst($task->priority->value) }} priority"
-            ></span>
-        @endif
     </div>
 
     @if($task->description)
@@ -36,6 +35,14 @@
                     'doing' => 'In Progress',
                     'done' => 'Done',
                 } }}
+            </span>
+        @endif
+
+        @if($task->priority)
+            <span
+                class="inline-flex items-center px-2 py-1 text-xs font-medium rounded {{ $task->priority->badgeColor() }}"
+            >
+                {{ ucfirst($task->priority->value) }} Priority
             </span>
         @endif
 
