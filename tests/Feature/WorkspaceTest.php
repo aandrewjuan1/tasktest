@@ -19,7 +19,7 @@ test('workspace page loads for authenticated user', function () {
         ->assertSeeLivewire('workspace.index')
         ->assertSeeLivewire('workspace.show-items')
         ->assertSeeLivewire('workspace.calendar-view')
-        ->assertSeeLivewire('workspace.create-item-modal');
+        ->assertSeeLivewire('workspace.create-item');
 });
 
 test('workspace page requires authentication', function () {
@@ -78,7 +78,7 @@ test('workspace does not display other users tasks', function () {
 test('can create task through modal', function () {
     actingAs($this->user);
 
-    Livewire::test('workspace.create-item-modal')
+    Livewire::test('workspace.create-item')
         ->set('activeTab', 'task')
         ->set('taskTitle', 'New Task')
         ->set('taskDescription', 'Task description')
@@ -92,7 +92,7 @@ test('can create task through modal', function () {
 test('task creation requires title', function () {
     actingAs($this->user);
 
-    Livewire::test('workspace.create-item-modal')
+    Livewire::test('workspace.create-item')
         ->set('activeTab', 'task')
         ->set('taskTitle', '')
         ->set('taskStatus', 'to_do')
@@ -103,7 +103,7 @@ test('task creation requires title', function () {
 test('can create event through modal', function () {
     actingAs($this->user);
 
-    Livewire::test('workspace.create-item-modal')
+    Livewire::test('workspace.create-item')
         ->set('activeTab', 'event')
         ->set('eventTitle', 'New Event')
         ->set('eventStartDatetime', now()->addDay()->format('Y-m-d H:i'))
@@ -117,7 +117,7 @@ test('can create event through modal', function () {
 test('event creation requires title and datetime', function () {
     actingAs($this->user);
 
-    Livewire::test('workspace.create-item-modal')
+    Livewire::test('workspace.create-item')
         ->set('activeTab', 'event')
         ->set('eventTitle', '')
         ->call('createEvent')
@@ -130,7 +130,7 @@ test('event end datetime must be after start datetime', function () {
     $start = now()->addDay();
     $end = now()->addHour();
 
-    Livewire::test('workspace.create-item-modal')
+    Livewire::test('workspace.create-item')
         ->set('activeTab', 'event')
         ->set('eventTitle', 'Test Event')
         ->set('eventStartDatetime', $start->format('Y-m-d H:i'))
@@ -142,7 +142,7 @@ test('event end datetime must be after start datetime', function () {
 test('can create project through modal', function () {
     actingAs($this->user);
 
-    Livewire::test('workspace.create-item-modal')
+    Livewire::test('workspace.create-item')
         ->set('activeTab', 'project')
         ->set('projectName', 'New Project')
         ->set('projectDescription', 'Project description')
@@ -155,7 +155,7 @@ test('can create project through modal', function () {
 test('project creation requires name', function () {
     actingAs($this->user);
 
-    Livewire::test('workspace.create-item-modal')
+    Livewire::test('workspace.create-item')
         ->set('activeTab', 'project')
         ->set('projectName', '')
         ->call('createProject')
@@ -327,7 +327,7 @@ test('list view updates after creating new task and does not disappear', functio
         ->assertSet('viewMode', 'list');
 
     // Create a new task via the modal
-    Livewire::test('workspace.create-item-modal')
+    Livewire::test('workspace.create-item')
         ->set('activeTab', 'task')
         ->set('taskTitle', 'New Task After Creation')
         ->set('taskStatus', 'to_do')
@@ -361,7 +361,7 @@ test('list view updates after creating new event and does not disappear', functi
         ->assertSet('viewMode', 'list');
 
     // Create a new event
-    Livewire::test('workspace.create-item-modal')
+    Livewire::test('workspace.create-item')
         ->set('activeTab', 'event')
         ->set('eventTitle', 'New Event After Creation')
         ->set('eventStartDatetime', now()->addDays(2)->format('Y-m-d\TH:i'))
@@ -392,7 +392,7 @@ test('list view updates after creating new project and does not disappear', func
         ->assertSet('viewMode', 'list');
 
     // Create a new project
-    Livewire::test('workspace.create-item-modal')
+    Livewire::test('workspace.create-item')
         ->set('activeTab', 'project')
         ->set('projectName', 'New Project After Creation')
         ->set('projectStartDate', now()->toDateString())

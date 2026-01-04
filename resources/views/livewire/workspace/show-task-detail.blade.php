@@ -30,11 +30,9 @@ new class extends Component
 
     public string $duration = '';
 
-    public string $startDate = '';
+    public string $startDatetime = '';
 
-    public string $startTime = '';
-
-    public string $endDate = '';
+    public string $endDatetime = '';
 
     public string $projectId = '';
 
@@ -73,9 +71,8 @@ new class extends Component
         $this->priority = $this->task->priority?->value ?? '';
         $this->complexity = $this->task->complexity?->value ?? '';
         $this->duration = $this->task->duration ? (string) $this->task->duration : '';
-        $this->startDate = $this->task->start_date?->format('Y-m-d') ?? '';
-        $this->startTime = $this->task->start_time ? substr($this->task->start_time, 0, 5) : '';
-        $this->endDate = $this->task->end_date?->format('Y-m-d') ?? '';
+        $this->startDatetime = $this->task->start_datetime?->format('Y-m-d\TH:i') ?? '';
+        $this->endDatetime = $this->task->end_datetime?->format('Y-m-d\TH:i') ?? '';
         $this->projectId = (string) ($this->task->project_id ?? '');
         $this->eventId = (string) ($this->task->event_id ?? '');
     }
@@ -95,9 +92,8 @@ new class extends Component
             'priority' => ['nullable', 'string', 'in:low,medium,high,urgent'],
             'complexity' => ['nullable', 'string', 'in:simple,moderate,complex'],
             'duration' => ['nullable', 'integer', 'min:1'],
-            'startDate' => ['nullable', 'date'],
-            'startTime' => ['nullable', 'date_format:H:i'],
-            'endDate' => ['nullable', 'date'],
+            'startDatetime' => ['nullable', 'date'],
+            'endDatetime' => ['nullable', 'date'],
             'projectId' => ['nullable', 'exists:projects,id'],
             default => [],
         };
@@ -133,14 +129,11 @@ new class extends Component
                     case 'duration':
                         $updateData['duration'] = $value ?: null;
                         break;
-                    case 'startDate':
-                        $updateData['start_date'] = $value ?: null;
+                    case 'startDatetime':
+                        $updateData['start_datetime'] = $value ? \Carbon\Carbon::parse($value) : null;
                         break;
-                    case 'startTime':
-                        $updateData['start_time'] = $value ? $value.':00' : null;
-                        break;
-                    case 'endDate':
-                        $updateData['end_date'] = $value ?: null;
+                    case 'endDatetime':
+                        $updateData['end_datetime'] = $value ? \Carbon\Carbon::parse($value) : null;
                         break;
                     case 'projectId':
                         $updateData['project_id'] = $value ?: null;
@@ -752,23 +745,23 @@ new class extends Component
                         </div>
                     </div>
 
-                    <!-- Start Date -->
+                    <!-- Start Datetime -->
                     <div
                          x-data="{
                              editing: false,
-                             originalValue: @js($task->start_date?->format('Y-m-d') ?? ''),
-                             currentValue: @js($task->start_date?->format('Y-m-d') ?? ''),
+                             originalValue: @js($task->start_datetime?->format('Y-m-d\TH:i') ?? ''),
+                             currentValue: @js($task->start_datetime?->format('Y-m-d\TH:i') ?? ''),
                              mouseLeaveTimer: null,
                              startEditing() {
                                  this.editing = true;
                                  this.currentValue = this.originalValue;
-                                 $wire.startDate = this.originalValue;
+                                 $wire.startDatetime = this.originalValue;
                                  $nextTick(() => $refs.input?.focus());
                              },
                              cancelEditing() {
                                  this.editing = false;
                                  this.currentValue = this.originalValue;
-                                 $wire.startDate = this.originalValue;
+                                 $wire.startDatetime = this.originalValue;
                                  if (this.mouseLeaveTimer) {
                                      clearTimeout(this.mouseLeaveTimer);
                                      this.mouseLeaveTimer = null;
@@ -792,7 +785,7 @@ new class extends Component
                                      this.mouseLeaveTimer = null;
                                  }
                                  if (this.currentValue !== this.originalValue) {
-                                     $wire.updateField('startDate', this.currentValue).then(() => {
+                                     $wire.updateField('startDatetime', this.currentValue).then(() => {
                                          this.originalValue = this.currentValue;
                                      });
                                  } else {
@@ -804,7 +797,7 @@ new class extends Component
                          @mouseleave="handleMouseLeave()"
                     >
                         <div class="flex items-center gap-2 mb-2">
-                            <flux:heading size="sm">Start Date</flux:heading>
+                            <flux:heading size="sm">Start Date & Time</flux:heading>
                             <button
                                 x-show="!editing"
                                 @click="startEditing()"
@@ -820,50 +813,47 @@ new class extends Component
                             <flux:input
                                 x-ref="input"
                                 x-model="currentValue"
-                                x-on:input="$wire.startDate = currentValue"
-                                wire:model.live="startDate"
+                                x-on:input="$wire.startDatetime = currentValue"
+                                wire:model.live="startDatetime"
                                 @keydown.enter="saveIfChanged()"
                                 @keydown.escape="cancelEditing()"
-                                type="date"
+                                type="datetime-local"
                             />
-                            @error('startDate')
+                            @error('startDatetime')
                                 <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
                             @enderror
                         </div>
                         <div x-show="!editing">
                             <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
-                                {{ $task->start_date?->format('M j, Y') ?? 'Not set' }}
-                                @if($task->start_time && $task->start_date)
+                                @if($task->start_datetime)
                                     @php
-                                        $dateString = $task->start_date instanceof \Carbon\Carbon
-                                            ? $task->start_date->format('Y-m-d')
-                                            : $task->start_date;
-                                        $startDateTime = Carbon::parse($dateString . ' ' . $task->start_time, 'UTC');
-                                        $manilaTime = $startDateTime->setTimezone('Asia/Manila');
+                                        $manilaTime = $task->start_datetime->setTimezone('Asia/Manila');
                                     @endphp
-                                    <span class="text-zinc-500 dark:text-zinc-400">at {{ $manilaTime->format('g:i A') }}</span>
+                                    {{ $manilaTime->format('M j, Y \a\t g:i A') }}
+                                @else
+                                    Not set
                                 @endif
                             </p>
                         </div>
                     </div>
 
-                    <!-- End Date -->
+                    <!-- End Datetime -->
                     <div
                          x-data="{
                              editing: false,
-                             originalValue: @js($task->end_date?->format('Y-m-d') ?? ''),
-                             currentValue: @js($task->end_date?->format('Y-m-d') ?? ''),
+                             originalValue: @js($task->end_datetime?->format('Y-m-d\TH:i') ?? ''),
+                             currentValue: @js($task->end_datetime?->format('Y-m-d\TH:i') ?? ''),
                              mouseLeaveTimer: null,
                              startEditing() {
                                  this.editing = true;
                                  this.currentValue = this.originalValue;
-                                 $wire.endDate = this.originalValue;
+                                 $wire.endDatetime = this.originalValue;
                                  $nextTick(() => $refs.input?.focus());
                              },
                              cancelEditing() {
                                  this.editing = false;
                                  this.currentValue = this.originalValue;
-                                 $wire.endDate = this.originalValue;
+                                 $wire.endDatetime = this.originalValue;
                                  if (this.mouseLeaveTimer) {
                                      clearTimeout(this.mouseLeaveTimer);
                                      this.mouseLeaveTimer = null;
@@ -887,7 +877,7 @@ new class extends Component
                                      this.mouseLeaveTimer = null;
                                  }
                                  if (this.currentValue !== this.originalValue) {
-                                     $wire.updateField('endDate', this.currentValue).then(() => {
+                                     $wire.updateField('endDatetime', this.currentValue).then(() => {
                                          this.originalValue = this.currentValue;
                                      });
                                  } else {
@@ -899,7 +889,7 @@ new class extends Component
                          @mouseleave="handleMouseLeave()"
                     >
                         <div class="flex items-center gap-2 mb-2">
-                            <flux:heading size="sm">Due Date</flux:heading>
+                            <flux:heading size="sm">Due Date & Time</flux:heading>
                             <button
                                 x-show="!editing"
                                 @click="startEditing()"
@@ -915,113 +905,23 @@ new class extends Component
                             <flux:input
                                 x-ref="input"
                                 x-model="currentValue"
-                                x-on:input="$wire.endDate = currentValue"
-                                wire:model.live="endDate"
+                                x-on:input="$wire.endDatetime = currentValue"
+                                wire:model.live="endDatetime"
                                 @keydown.enter="saveIfChanged()"
                                 @keydown.escape="cancelEditing()"
-                                type="date"
+                                type="datetime-local"
                             />
-                            @error('endDate')
+                            @error('endDatetime')
                                 <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
                             @enderror
                         </div>
                         <div x-show="!editing">
-                            <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2 {{ $task->end_date?->isPast() && $task->status->value !== 'done' ? 'text-red-600 dark:text-red-400 font-semibold' : '' }}">
-                                {{ $task->end_date?->format('M j, Y') ?? 'Not set' }}
-                            </p>
-                        </div>
-                    </div>
-
-                    <!-- Start Time -->
-                    <div
-                         x-data="{
-                             editing: false,
-                             originalValue: @js($task->start_time ? substr($task->start_time, 0, 5) : ''),
-                             currentValue: @js($task->start_time ? substr($task->start_time, 0, 5) : ''),
-                             mouseLeaveTimer: null,
-                             startEditing() {
-                                 this.editing = true;
-                                 this.currentValue = this.originalValue;
-                                 $wire.startTime = this.originalValue;
-                                 $nextTick(() => $refs.input?.focus());
-                             },
-                             cancelEditing() {
-                                 this.editing = false;
-                                 this.currentValue = this.originalValue;
-                                 $wire.startTime = this.originalValue;
-                                 if (this.mouseLeaveTimer) {
-                                     clearTimeout(this.mouseLeaveTimer);
-                                     this.mouseLeaveTimer = null;
-                                 }
-                             },
-                             handleMouseLeave() {
-                                 if (!this.editing) return;
-                                 this.mouseLeaveTimer = setTimeout(() => {
-                                     this.saveIfChanged();
-                                 }, 300);
-                             },
-                             handleMouseEnter() {
-                                 if (this.mouseLeaveTimer) {
-                                     clearTimeout(this.mouseLeaveTimer);
-                                     this.mouseLeaveTimer = null;
-                                 }
-                             },
-                             saveIfChanged() {
-                                 if (this.mouseLeaveTimer) {
-                                     clearTimeout(this.mouseLeaveTimer);
-                                     this.mouseLeaveTimer = null;
-                                 }
-                                 if (this.currentValue !== this.originalValue) {
-                                     $wire.updateField('startTime', this.currentValue).then(() => {
-                                         this.originalValue = this.currentValue;
-                                     });
-                                 } else {
-                                     this.editing = false;
-                                 }
-                             }
-                         }"
-                         @mouseenter="handleMouseEnter()"
-                         @mouseleave="handleMouseLeave()"
-                         x-show="$wire.startTime || editing"
-                    >
-                        <div class="flex items-center gap-2 mb-2">
-                            <flux:heading size="sm">Start Time</flux:heading>
-                            <button
-                                x-show="!editing"
-                                @click="startEditing()"
-                                class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
-                                type="button"
-                            >
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                </svg>
-                            </button>
-                        </div>
-                        <div x-show="editing" x-cloak>
-                            <flux:input
-                                x-ref="input"
-                                x-model="currentValue"
-                                x-on:input="$wire.startTime = currentValue"
-                                wire:model.live="startTime"
-                                @keydown.enter="saveIfChanged()"
-                                @keydown.escape="cancelEditing()"
-                                type="time"
-                            />
-                            @error('startTime')
-                                <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
-                            @enderror
-                        </div>
-                        <div x-show="!editing">
-                            <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
-                                @if($task->start_time && $task->start_date)
+                            <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2 {{ $task->end_datetime?->isPast() && $task->status->value !== 'done' ? 'text-red-600 dark:text-red-400 font-semibold' : '' }}">
+                                @if($task->end_datetime)
                                     @php
-                                        $dateString = $task->start_date instanceof \Carbon\Carbon
-                                            ? $task->start_date->format('Y-m-d')
-                                            : $task->start_date;
-                                        $startDateTime = Carbon::parse($dateString . ' ' . $task->start_time, 'UTC');
-                                        $manilaTime = $startDateTime->setTimezone('Asia/Manila');
+                                        $manilaTime = $task->end_datetime->setTimezone('Asia/Manila');
                                     @endphp
-                                    {{ $manilaTime->format('g:i A') }}
+                                    {{ $manilaTime->format('M j, Y \a\t g:i A') }}
                                 @else
                                     Not set
                                 @endif

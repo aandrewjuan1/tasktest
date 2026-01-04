@@ -20,8 +20,8 @@ class TaskFactory extends Factory
      */
     public function definition(): array
     {
-        $startDate = fake()->dateTimeBetween('now', '+1 month');
-        $endDate = fake()->dateTimeBetween($startDate, '+2 months');
+        $startDatetime = fake()->dateTimeBetween('now', '+1 month');
+        $endDatetime = fake()->dateTimeBetween($startDatetime, '+2 months');
         $status = fake()->randomElement(TaskStatus::cases());
 
         return [
@@ -32,9 +32,8 @@ class TaskFactory extends Factory
             'priority' => fake()->randomElement(TaskPriority::cases()),
             'complexity' => fake()->randomElement(TaskComplexity::cases()),
             'duration' => fake()->optional()->numberBetween(15, 480), // 15 minutes to 8 hours
-            'start_date' => $startDate,
-            'start_time' => fake()->optional()->time(),
-            'end_date' => $endDate,
+            'start_datetime' => $startDatetime,
+            'end_datetime' => $endDatetime,
             'project_id' => null,
             'event_id' => null,
             'completed_at' => $status === TaskStatus::Done ? now() : null,

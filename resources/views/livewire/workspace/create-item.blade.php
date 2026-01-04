@@ -26,9 +26,8 @@ new class extends Component
     public ?string $taskPriority = 'medium';
     public ?string $taskComplexity = 'moderate';
     public ?int $taskDuration = 60;
-    public ?string $taskStartDate = null;
-    public ?string $taskStartTime = null;
-    public ?string $taskEndDate = null;
+    public ?string $taskStartDatetime = null;
+    public ?string $taskEndDatetime = null;
     public ?int $taskProjectId = null;
     public array $taskTagIds = [];
 
@@ -64,9 +63,8 @@ new class extends Component
         $this->taskPriority = 'medium';
         $this->taskComplexity = 'moderate';
         $this->taskDuration = 60;
-        $this->taskStartDate = Carbon::today()->toDateString();
-        $this->taskStartTime = null;
-        $this->taskEndDate = null;
+        $this->taskStartDatetime = Carbon::now()->format('Y-m-d\TH:i');
+        $this->taskEndDatetime = null;
         $this->taskProjectId = null;
         $this->taskTagIds = [];
 
@@ -95,9 +93,8 @@ new class extends Component
                 'taskPriority' => ['nullable', 'string', 'in:low,medium,high,urgent'],
                 'taskComplexity' => ['nullable', 'string', 'in:simple,moderate,complex'],
                 'taskDuration' => ['nullable', 'integer', 'min:1'],
-                'taskStartDate' => ['nullable', 'date'],
-                'taskStartTime' => ['nullable', 'date_format:H:i'],
-                'taskEndDate' => ['nullable', 'date', 'after_or_equal:taskStartDate'],
+                'taskStartDatetime' => ['nullable', 'date'],
+                'taskEndDatetime' => ['nullable', 'date', 'after_or_equal:taskStartDatetime'],
                 'taskProjectId' => ['nullable', 'exists:projects,id'],
                 'taskTagIds' => ['nullable', 'array'],
                 'taskTagIds.*' => ['exists:tags,id'],
@@ -107,13 +104,15 @@ new class extends Component
                 'taskPriority' => 'priority',
                 'taskComplexity' => 'complexity',
                 'taskDuration' => 'duration',
-                'taskStartDate' => 'start date',
-                'taskStartTime' => 'start time',
-                'taskEndDate' => 'end date',
+                'taskStartDatetime' => 'start datetime',
+                'taskEndDatetime' => 'end datetime',
                 'taskProjectId' => 'project',
             ]);
 
-            DB::transaction(function () use ($validated) {
+            $startDatetime = $validated['taskStartDatetime'] ? Carbon::parse($validated['taskStartDatetime']) : null;
+            $endDatetime = $validated['taskEndDatetime'] ? Carbon::parse($validated['taskEndDatetime']) : null;
+
+            DB::transaction(function () use ($validated, $startDatetime, $endDatetime) {
                 $task = Task::create([
                     'user_id' => auth()->id(),
                     'title' => $validated['taskTitle'],
@@ -121,9 +120,8 @@ new class extends Component
                     'priority' => $validated['taskPriority'] ? TaskPriority::from($validated['taskPriority']) : null,
                     'complexity' => $validated['taskComplexity'] ? TaskComplexity::from($validated['taskComplexity']) : null,
                     'duration' => $validated['taskDuration'] ?? null,
-                    'start_date' => $validated['taskStartDate'] ?? null,
-                    'start_time' => $validated['taskStartTime'] ?? null,
-                    'end_date' => $validated['taskEndDate'] ?? null,
+                    'start_datetime' => $startDatetime,
+                    'end_datetime' => $endDatetime,
                     'project_id' => $validated['taskProjectId'] ?? null,
                 ]);
 
@@ -276,6 +274,8 @@ new class extends Component
 <div x-data="{
     activeTab: 'task',
     openDropdown: null,
+    isOpen: false,
+    mouseLeaveTimer: null,
     formData: {
         task: {
             title: '',
@@ -283,9 +283,8 @@ new class extends Component
             priority: 'medium',
             complexity: 'moderate',
             duration: 60,
-            startDate: '{{ Carbon::today()->toDateString() }}',
-            startTime: null,
-            endDate: null,
+            startDatetime: '{{ Carbon::now()->format('Y-m-d\TH:i') }}',
+            endDatetime: null,
             projectId: null,
             tagIds: []
         },
@@ -306,11 +305,13 @@ new class extends Component
     openModal() {
         this.activeTab = 'task';
         this.openDropdown = null;
-        $flux.modal('create-item').show();
+        this.isOpen = true;
+        document.body.style.overflow = 'hidden';
     },
     closeModal() {
-        $flux.modal('create-item').close();
+        this.isOpen = false;
         this.openDropdown = null;
+        document.body.style.overflow = '';
     },
     switchTab(tab) {
         this.activeTab = tab;
@@ -319,8 +320,37 @@ new class extends Component
     toggleDropdown(id) {
         this.openDropdown = this.openDropdown === id ? null : id;
     },
-    isOpen(id) {
+    isDropdownOpen(id) {
         return this.openDropdown === id;
+    },
+    handleMouseLeave() {
+        this.mouseLeaveTimer = setTimeout(() => {
+            this.openDropdown = null;
+        }, 300);
+    },
+    handleMouseEnter() {
+        if (this.mouseLeaveTimer) {
+            clearTimeout(this.mouseLeaveTimer);
+            this.mouseLeaveTimer = null;
+        }
+    },
+    get inputValue() {
+        if (this.activeTab === 'task') {
+            return this.formData.task.title;
+        } else if (this.activeTab === 'event') {
+            return this.formData.event.title;
+        } else {
+            return this.formData.project.name;
+        }
+    },
+    set inputValue(value) {
+        if (this.activeTab === 'task') {
+            this.formData.task.title = value;
+        } else if (this.activeTab === 'event') {
+            this.formData.event.title = value;
+        } else {
+            this.formData.project.name = value;
+        }
     },
     resetFormData() {
         this.formData = {
@@ -330,9 +360,8 @@ new class extends Component
                 priority: 'medium',
                 complexity: 'moderate',
                 duration: 60,
-                startDate: '{{ Carbon::today()->toDateString() }}',
-                startTime: null,
-                endDate: null,
+                startDatetime: '{{ Carbon::now()->format('Y-m-d\TH:i') }}',
+                endDatetime: null,
                 projectId: null,
                 tagIds: []
             },
@@ -360,9 +389,8 @@ new class extends Component
         $wire.taskPriority = this.formData.task.priority;
         $wire.taskComplexity = this.formData.task.complexity;
         $wire.taskDuration = this.formData.task.duration;
-        $wire.taskStartDate = this.formData.task.startDate;
-        $wire.taskStartTime = this.formData.task.startTime;
-        $wire.taskEndDate = this.formData.task.endDate;
+        $wire.taskStartDatetime = this.formData.task.startDatetime;
+        $wire.taskEndDatetime = this.formData.task.endDatetime;
         $wire.taskProjectId = this.formData.task.projectId;
         $wire.taskTagIds = this.formData.task.tagIds;
 
@@ -405,95 +433,85 @@ new class extends Component
      @open-create-modal.window="openModal()"
      @close-create-modal.window="closeModal()"
      @item-created.window="resetFormData(); closeModal();">
-    <flux:modal name="create-item" class="max-w-2xl">
-        <div class="space-y-6">
-            <!-- Tabs -->
-            <div class="flex gap-2 border-b border-zinc-200 dark:border-zinc-700">
-                <button
-                    @click="switchTab('task')"
-                    :class="activeTab === 'task' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'"
-                    class="px-4 py-2 font-medium text-sm transition-colors border-b-2"
-                >
-                    Task
-                </button>
-                <button
-                    @click="switchTab('event')"
-                    :class="activeTab === 'event' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'"
-                    class="px-4 py-2 font-medium text-sm transition-colors border-b-2"
-                >
-                    Event
-                </button>
-                <button
-                    @click="switchTab('project')"
-                    :class="activeTab === 'project' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'"
-                    class="px-4 py-2 font-medium text-sm transition-colors border-b-2"
-                >
-                    Project
-                </button>
+
+    <!-- Form Container -->
+    <div
+        x-show="isOpen"
+        x-transition:enter="transition-transform ease-out duration-300"
+        x-transition:enter-start="translate-y-full"
+        x-transition:enter-end="translate-y-0"
+        x-transition:leave="transition-transform ease-in duration-200"
+        x-transition:leave-start="translate-y-0"
+        x-transition:leave-end="translate-y-full"
+        @click.away="closeModal()"
+        class="fixed bottom-0 left-1/2 -translate-x-1/2 w-3/4 z-50 px-4 bg-white dark:bg-zinc-900 rounded-t-3xl shadow-2xl border-2 border-zinc-300 dark:border-zinc-600"
+        x-cloak
+    >
+        <div class="py-4 space-y-4" @click.stop>
+            <!-- Top Section: Title Input Field -->
+            <div class="space-y-3">
+                <!-- Tabs -->
+                <div class="flex gap-2">
+                    <button
+                        @click.stop="switchTab('task')"
+                        :class="activeTab === 'task' ? 'bg-blue-500 text-white' : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400'"
+                        class="px-3 py-1.5 rounded-full text-xs font-medium transition-colors"
+                    >
+                        Task
+                    </button>
+                    <button
+                        @click.stop="switchTab('event')"
+                        :class="activeTab === 'event' ? 'bg-blue-500 text-white' : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400'"
+                        class="px-3 py-1.5 rounded-full text-xs font-medium transition-colors"
+                    >
+                        Event
+                    </button>
+                    <button
+                        @click.stop="switchTab('project')"
+                        :class="activeTab === 'project' ? 'bg-blue-500 text-white' : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400'"
+                        class="px-3 py-1.5 rounded-full text-xs font-medium transition-colors"
+                    >
+                        Project
+                    </button>
+                </div>
+
+                <!-- Input Field and Submit Button -->
+                <div class="flex gap-2 items-center">
+                    <input
+                        type="text"
+                        x-model="inputValue"
+                        @keydown.enter.prevent="activeTab === 'task' ? submitTask() : (activeTab === 'event' ? submitEvent() : submitProject())"
+                        @click.stop
+                        :placeholder="activeTab === 'task' ? 'Enter task title...' : (activeTab === 'event' ? 'Enter event title...' : 'Enter project name...')"
+                        class="flex-1 px-6 py-4 rounded-full border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                    <button
+                        @click.stop="activeTab === 'task' ? submitTask() : (activeTab === 'event' ? submitEvent() : submitProject())"
+                        wire:loading.attr="disabled"
+                        class="px-6 py-4 rounded-full bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap"
+                    >
+                        <span wire:loading.remove>
+                            <span x-text="activeTab === 'task' ? 'Create Task' : (activeTab === 'event' ? 'Create Event' : 'Create Project')"></span>
+                        </span>
+                        <span wire:loading class="flex items-center gap-2">
+                            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>Creating...</span>
+                        </span>
+                    </button>
+                </div>
             </div>
 
-            <!-- Title Input -->
-            <div>
-                <div x-show="activeTab === 'task'">
-                    <flux:input x-model="formData.task.title" @keydown.enter.prevent="submitTask()" label="Title" placeholder="Enter task title" required />
-                </div>
-                <div x-show="activeTab === 'event'">
-                    <flux:input x-model="formData.event.title" @keydown.enter.prevent="submitEvent()" label="Title" placeholder="Enter event title" required />
-                </div>
-                <div x-show="activeTab === 'project'">
-                    <flux:input x-model="formData.project.name" @keydown.enter.prevent="submitProject()" label="Name" placeholder="Enter project name" required />
-                </div>
-            </div>
-
-            <!-- Property Buttons -->
-            <div class="flex flex-wrap gap-2">
+            <!-- Bottom Section: Property Buttons -->
+            <div class="flex flex-wrap gap-2" @click.stop>
                 <template x-if="activeTab === 'task'">
                     <div class="contents">
-                    <!-- Task Status -->
-                    <div class="relative" @click.away="openDropdown = null">
-                        <button
-                            type="button"
-                            @click.stop="toggleDropdown('task-status')"
-                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
-                        >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
-                            </svg>
-                            <span class="text-sm font-medium">Status</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.task.status === 'to_do' ? 'To Do' : (formData.task.status === 'doing' ? 'In Progress' : 'Done')"></span>
-                        </button>
-                        <div
-                            x-show="isOpen('task-status')"
-                            x-cloak
-                            x-transition
-                            class="absolute z-50 mt-1 w-48 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1"
-                        >
-                            <button
-                                @click="formData.task.status = 'to_do'; openDropdown = null"
-                                :class="formData.task.status === 'to_do' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                            >
-                                To Do
-                            </button>
-                            <button
-                                @click="formData.task.status = 'doing'; openDropdown = null"
-                                :class="formData.task.status === 'doing' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                            >
-                                In Progress
-                            </button>
-                            <button
-                                @click="formData.task.status = 'done'; openDropdown = null"
-                                :class="formData.task.status === 'done' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                            >
-                                Done
-                            </button>
-                        </div>
-                    </div>
-
                     <!-- Task Priority -->
-                    <div class="relative" @click.away="openDropdown = null">
+                    <div class="relative"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()">
                         <button
                             type="button"
                             @click.stop="toggleDropdown('task-priority')"
@@ -506,10 +524,10 @@ new class extends Component
                             <span class="text-xs text-zinc-500 dark:text-zinc-400 capitalize" x-text="formData.task.priority || 'Medium'"></span>
                         </button>
                         <div
-                            x-show="isOpen('task-priority')"
+                            x-show="isDropdownOpen('task-priority')"
                             x-cloak
                             x-transition
-                            class="absolute z-50 mt-1 w-48 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1"
+                            class="absolute bottom-full mb-1 z-50 w-48 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1"
                         >
                             <button
                                 @click="formData.task.priority = 'low'; openDropdown = null"
@@ -543,7 +561,9 @@ new class extends Component
                     </div>
 
                     <!-- Task Complexity -->
-                    <div class="relative" @click.away="openDropdown = null">
+                    <div class="relative"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()">
                         <button
                             type="button"
                             @click.stop="toggleDropdown('task-complexity')"
@@ -556,10 +576,10 @@ new class extends Component
                             <span class="text-xs text-zinc-500 dark:text-zinc-400 capitalize" x-text="formData.task.complexity || 'Moderate'"></span>
                         </button>
                         <div
-                            x-show="isOpen('task-complexity')"
+                            x-show="isDropdownOpen('task-complexity')"
                             x-cloak
                             x-transition
-                            class="absolute z-50 mt-1 w-48 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1"
+                            class="absolute bottom-full mb-1 z-50 w-48 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1"
                         >
                             <button
                                 @click="formData.task.complexity = 'simple'; openDropdown = null"
@@ -586,7 +606,9 @@ new class extends Component
                     </div>
 
                     <!-- Task Duration -->
-                    <div class="relative" @click.away="openDropdown = null">
+                    <div class="relative"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()">
                         <button
                             type="button"
                             @click.stop="toggleDropdown('task-duration')"
@@ -599,11 +621,10 @@ new class extends Component
                             <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.task.duration ? formData.task.duration + ' min' : 'Not set'"></span>
                         </button>
                         <div
-                            x-show="isOpen('task-duration')"
+                            x-show="isDropdownOpen('task-duration')"
                             x-cloak
                             x-transition
-                            class="absolute z-50 mt-1 w-48 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 max-h-60 overflow-y-auto"
-                            @click.away="openDropdown = null"
+                            class="absolute bottom-full mb-1 z-50 w-48 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 max-h-60 overflow-y-auto"
                         >
                             @foreach([15, 30, 45, 60, 90, 120, 180, 240, 300] as $minutes)
                                 <button
@@ -624,51 +645,76 @@ new class extends Component
                         </div>
                     </div>
 
-                    <!-- Task Dates -->
-                    <div class="relative" @click.away="openDropdown = null">
+                    <!-- Task Start Date & Time -->
+                    <div class="relative"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()">
                         <button
                             type="button"
-                            @click.stop="toggleDropdown('task-dates')"
+                            @click.stop="toggleDropdown('task-start-datetime')"
                             class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
                         >
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
-                            <span class="text-sm font-medium">Dates</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="(formData.task.startDate || formData.task.endDate) ? 'Set' : 'Not set'"></span>
+                            <span class="text-sm font-medium">Start Date & Time</span>
+                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.task.startDatetime || 'Not set'"></span>
                         </button>
                         <div
-                            x-show="isOpen('task-dates')"
+                            x-show="isDropdownOpen('task-start-datetime')"
                             x-cloak
                             x-transition
-                            class="absolute z-50 mt-1 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 p-4"
-                            @click.away="openDropdown = null"
+                            class="absolute bottom-full mb-1 z-50 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 p-4"
                         >
                             <div class="space-y-3">
-                                <div>
-                                    <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Start Date</label>
-                                    <flux:input x-model="formData.task.startDate" type="date" />
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Start Time</label>
-                                    <flux:input x-model="formData.task.startTime" type="time" />
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">End Date</label>
-                                    <flux:input x-model="formData.task.endDate" type="date" />
-                                </div>
+                                <flux:input x-model="formData.task.startDatetime" type="datetime-local" />
                                 <button
-                                    @click="formData.task.startDate = null; formData.task.startTime = null; formData.task.endDate = null"
+                                    @click="formData.task.startDatetime = null; openDropdown = null"
                                     class="w-full px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
                                 >
-                                    Clear all
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Task End Date & Time -->
+                    <div class="relative"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()">
+                        <button
+                            type="button"
+                            @click.stop="toggleDropdown('task-end-datetime')"
+                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span class="text-sm font-medium">End Date & Time</span>
+                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.task.endDatetime || 'Not set'"></span>
+                        </button>
+                        <div
+                            x-show="isDropdownOpen('task-end-datetime')"
+                            x-cloak
+                            x-transition
+                            class="absolute bottom-full mb-1 z-50 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 p-4"
+                        >
+                            <div class="space-y-3">
+                                <flux:input x-model="formData.task.endDatetime" type="datetime-local" />
+                                <button
+                                    @click="formData.task.endDatetime = null; openDropdown = null"
+                                    class="w-full px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
+                                >
+                                    Clear
                                 </button>
                             </div>
                         </div>
                     </div>
 
                     <!-- Task Project -->
-                    <div class="relative" @click.away="openDropdown = null">
+                    <div class="relative"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()">
                         <button
                             type="button"
                             @click.stop="toggleDropdown('task-project')"
@@ -680,12 +726,11 @@ new class extends Component
                             <span class="text-sm font-medium">Project</span>
                             <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.task.projectId ? 'Selected' : 'None'"></span>
                         </button>
-                        <template x-if="isOpen('task-project')">
+                        <template x-if="isDropdownOpen('task-project')">
                             <div
                                 x-cloak
                                 x-transition
-                                class="absolute z-50 mt-1 w-48 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 max-h-60 overflow-y-auto"
-                                @click.away="openDropdown = null"
+                                class="absolute bottom-full mb-1 z-50 w-48 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 max-h-60 overflow-y-auto"
                             >
                                 <button
                                     @click="formData.task.projectId = null; openDropdown = null"
@@ -709,7 +754,9 @@ new class extends Component
                     </div>
 
                     <!-- Task Tags -->
-                    <div class="relative" @click.away="openDropdown = null">
+                    <div class="relative"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()">
                         <button
                             type="button"
                             @click.stop="toggleDropdown('task-tags')"
@@ -721,12 +768,11 @@ new class extends Component
                             <span class="text-sm font-medium">Tags</span>
                             <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.task.tagIds.length > 0 ? formData.task.tagIds.length + ' selected' : 'None'"></span>
                         </button>
-                        <template x-if="isOpen('task-tags')">
+                        <template x-if="isDropdownOpen('task-tags')">
                             <div
                                 x-cloak
                                 x-transition
-                                class="absolute z-50 mt-1 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 max-h-60 overflow-y-auto"
-                                @click.away="openDropdown = null"
+                                class="absolute bottom-full mb-1 z-50 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 max-h-60 overflow-y-auto"
                             >
                                 @foreach($this->availableTags as $tag)
                                     <label wire:key="task-tag-{{ $tag->id }}" class="flex items-center px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer">
@@ -750,7 +796,9 @@ new class extends Component
                 <template x-if="activeTab === 'event'">
                     <div class="contents">
                     <!-- Event Status -->
-                    <div class="relative" @click.away="openDropdown = null">
+                    <div class="relative"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()">
                         <button
                             type="button"
                             @click.stop="toggleDropdown('event-status')"
@@ -763,10 +811,10 @@ new class extends Component
                             <span class="text-xs text-zinc-500 dark:text-zinc-400 capitalize" x-text="formData.event.status || 'Scheduled'"></span>
                         </button>
                         <div
-                            x-show="isOpen('event-status')"
+                            x-show="isDropdownOpen('event-status')"
                             x-cloak
                             x-transition
-                            class="absolute z-50 mt-1 w-48 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1"
+                            class="absolute bottom-full mb-1 z-50 w-48 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1"
                         >
                             <button
                                 @click="formData.event.status = 'scheduled'; openDropdown = null"
@@ -799,47 +847,76 @@ new class extends Component
                         </div>
                     </div>
 
-                    <!-- Event Dates -->
-                    <div class="relative" @click.away="openDropdown = null">
+                    <!-- Event Start Date & Time -->
+                    <div class="relative"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()">
                         <button
                             type="button"
-                            @click.stop="toggleDropdown('event-dates')"
+                            @click.stop="toggleDropdown('event-start-datetime')"
                             class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
                         >
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
-                            <span class="text-sm font-medium">Dates</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="(formData.event.startDatetime || formData.event.endDatetime) ? 'Set' : 'Not set'"></span>
+                            <span class="text-sm font-medium">Start Date & Time</span>
+                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.event.startDatetime || 'Not set'"></span>
                         </button>
                         <div
-                            x-show="isOpen('event-dates')"
+                            x-show="isDropdownOpen('event-start-datetime')"
                             x-cloak
                             x-transition
-                            class="absolute z-50 mt-1 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 p-4"
-                            @click.away="openDropdown = null"
+                            class="absolute bottom-full mb-1 z-50 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 p-4"
                         >
                             <div class="space-y-3">
-                                <div>
-                                    <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Start Date & Time</label>
-                                    <flux:input x-model="formData.event.startDatetime" type="datetime-local" />
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">End Date & Time</label>
-                                    <flux:input x-model="formData.event.endDatetime" type="datetime-local" />
-                                </div>
+                                <flux:input x-model="formData.event.startDatetime" type="datetime-local" />
                                 <button
-                                    @click="formData.event.startDatetime = null; formData.event.endDatetime = null"
+                                    @click="formData.event.startDatetime = null; openDropdown = null"
                                     class="w-full px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
                                 >
-                                    Clear all
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Event End Date & Time -->
+                    <div class="relative"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()">
+                        <button
+                            type="button"
+                            @click.stop="toggleDropdown('event-end-datetime')"
+                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span class="text-sm font-medium">End Date & Time</span>
+                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.event.endDatetime || 'Not set'"></span>
+                        </button>
+                        <div
+                            x-show="isDropdownOpen('event-end-datetime')"
+                            x-cloak
+                            x-transition
+                            class="absolute bottom-full mb-1 z-50 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 p-4"
+                        >
+                            <div class="space-y-3">
+                                <flux:input x-model="formData.event.endDatetime" type="datetime-local" />
+                                <button
+                                    @click="formData.event.endDatetime = null; openDropdown = null"
+                                    class="w-full px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
+                                >
+                                    Clear
                                 </button>
                             </div>
                         </div>
                     </div>
 
                     <!-- Event Tags -->
-                    <div class="relative" @click.away="openDropdown = null">
+                    <div class="relative"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()">
                         <button
                             type="button"
                             @click.stop="toggleDropdown('event-tags')"
@@ -851,12 +928,11 @@ new class extends Component
                             <span class="text-sm font-medium">Tags</span>
                             <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.event.tagIds.length > 0 ? formData.event.tagIds.length + ' selected' : 'None'"></span>
                         </button>
-                        <template x-if="isOpen('event-tags')">
+                        <template x-if="isDropdownOpen('event-tags')">
                             <div
                                 x-cloak
                                 x-transition
-                                class="absolute z-50 mt-1 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 max-h-60 overflow-y-auto"
-                                @click.away="openDropdown = null"
+                                class="absolute bottom-full mb-1 z-50 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 max-h-60 overflow-y-auto"
                             >
                                 @foreach($this->availableTags as $tag)
                                     <label wire:key="event-tag-{{ $tag->id }}" class="flex items-center px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer">
@@ -879,47 +955,76 @@ new class extends Component
                 </template>
                 <template x-if="activeTab === 'project'">
                     <div class="contents">
-                        <!-- Project Dates -->
-                    <div class="relative" @click.away="openDropdown = null">
+                        <!-- Project Start Date -->
+                    <div class="relative"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()">
                         <button
                             type="button"
-                            @click.stop="toggleDropdown('project-dates')"
+                            @click.stop="toggleDropdown('project-start-date')"
                             class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
                         >
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
-                            <span class="text-sm font-medium">Dates</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="(formData.project.startDate || formData.project.endDate) ? 'Set' : 'Not set'"></span>
+                            <span class="text-sm font-medium">Start Date</span>
+                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.project.startDate || 'Not set'"></span>
                         </button>
                         <div
-                            x-show="isOpen('project-dates')"
+                            x-show="isDropdownOpen('project-start-date')"
                             x-cloak
                             x-transition
-                            class="absolute z-50 mt-1 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 p-4"
-                            @click.away="openDropdown = null"
+                            class="absolute bottom-full mb-1 z-50 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 p-4"
                         >
                             <div class="space-y-3">
-                                <div>
-                                    <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Start Date</label>
-                                    <flux:input x-model="formData.project.startDate" type="date" />
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">End Date</label>
-                                    <flux:input x-model="formData.project.endDate" type="date" />
-                                </div>
+                                <flux:input x-model="formData.project.startDate" type="date" />
                                 <button
-                                    @click="formData.project.startDate = null; formData.project.endDate = null"
+                                    @click="formData.project.startDate = null; openDropdown = null"
                                     class="w-full px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
                                 >
-                                    Clear all
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                        <!-- Project End Date -->
+                    <div class="relative"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()">
+                        <button
+                            type="button"
+                            @click.stop="toggleDropdown('project-end-date')"
+                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span class="text-sm font-medium">End Date</span>
+                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.project.endDate || 'Not set'"></span>
+                        </button>
+                        <div
+                            x-show="isDropdownOpen('project-end-date')"
+                            x-cloak
+                            x-transition
+                            class="absolute bottom-full mb-1 z-50 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 p-4"
+                        >
+                            <div class="space-y-3">
+                                <flux:input x-model="formData.project.endDate" type="date" />
+                                <button
+                                    @click="formData.project.endDate = null; openDropdown = null"
+                                    class="w-full px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
+                                >
+                                    Clear
                                 </button>
                             </div>
                         </div>
                     </div>
 
                         <!-- Project Tags -->
-                    <div class="relative" @click.away="openDropdown = null">
+                    <div class="relative"
+                         @mouseenter="handleMouseEnter()"
+                         @mouseleave="handleMouseLeave()">
                         <button
                             type="button"
                             @click.stop="toggleDropdown('project-tags')"
@@ -931,12 +1036,11 @@ new class extends Component
                             <span class="text-sm font-medium">Tags</span>
                             <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.project.tagIds.length > 0 ? formData.project.tagIds.length + ' selected' : 'None'"></span>
                         </button>
-                        <template x-if="isOpen('project-tags')">
+                        <template x-if="isDropdownOpen('project-tags')">
                             <div
                                 x-cloak
                                 x-transition
-                                class="absolute z-50 mt-1 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 max-h-60 overflow-y-auto"
-                                @click.away="openDropdown = null"
+                                class="absolute bottom-full mb-1 z-50 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 max-h-60 overflow-y-auto"
                             >
                                 @foreach($this->availableTags as $tag)
                                     <label wire:key="project-tag-{{ $tag->id }}" class="flex items-center px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer">
@@ -958,61 +1062,6 @@ new class extends Component
                     </div>
                 </template>
             </div>
-
-            <!-- Actions -->
-            <div class="flex justify-end gap-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
-                <flux:button variant="ghost" @click="$flux.modal('create-item').close(); resetFormData(); $wire.call('resetForm');">
-                    Cancel
-                </flux:button>
-                <flux:button
-                    x-show="activeTab === 'task'"
-                    variant="primary"
-                    @click="submitTask()"
-                    wire:loading.attr="disabled"
-                    wire:target="createTask"
-                >
-                    <span wire:loading.remove wire:target="createTask">Create Task</span>
-                    <span wire:loading wire:target="createTask" class="flex items-center gap-2">
-                        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Creating...
-                    </span>
-                </flux:button>
-                <flux:button
-                    x-show="activeTab === 'event'"
-                    variant="primary"
-                    @click="submitEvent()"
-                    wire:loading.attr="disabled"
-                    wire:target="createEvent"
-                >
-                    <span wire:loading.remove wire:target="createEvent">Create Event</span>
-                    <span wire:loading wire:target="createEvent" class="flex items-center gap-2">
-                        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Creating...
-                    </span>
-                </flux:button>
-                <flux:button
-                    x-show="activeTab === 'project'"
-                    variant="primary"
-                    @click="submitProject()"
-                    wire:loading.attr="disabled"
-                    wire:target="createProject"
-                >
-                    <span wire:loading.remove wire:target="createProject">Create Project</span>
-                    <span wire:loading wire:target="createProject" class="flex items-center gap-2">
-                        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Creating...
-                    </span>
-                </flux:button>
-            </div>
         </div>
-    </flux:modal>
+    </div>
 </div>

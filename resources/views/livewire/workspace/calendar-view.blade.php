@@ -132,19 +132,24 @@ new class extends Component
         $tasks = Task::query()
             ->accessibleBy(auth()->user())
             ->with(['project', 'tags', 'event'])
+            ->whereNotNull('start_datetime')
             ->where(function ($query) use ($start, $end) {
-                $query->whereBetween('start_date', [$start->toDateString(), $end->toDateString()])
-                    ->orWhereBetween('end_date', [$start->toDateString(), $end->toDateString()]);
+                $query->whereBetween('start_datetime', [$start, $end])
+                    ->orWhereBetween('end_datetime', [$start, $end])
+                    ->orWhere(function ($q) use ($start, $end) {
+                        $q->where('start_datetime', '<=', $start)
+                            ->where('end_datetime', '>=', $end);
+                    });
             })
             ->get();
 
         $tasksByDate = [];
         foreach ($tasks as $task) {
-            if (! $task->start_date) {
+            if (! $task->start_datetime) {
                 continue;
             }
 
-            $dateKey = $task->start_date->format('Y-m-d');
+            $dateKey = $task->start_datetime->format('Y-m-d');
             if (! isset($tasksByDate[$dateKey])) {
                 $tasksByDate[$dateKey] = [];
             }

@@ -140,24 +140,19 @@ new class extends Component
 
             if ($itemType === 'task') {
                 if ($newStart) {
-                    $startDateTime = Carbon::parse($newStart);
-                    $model->start_date = $startDateTime->toDateString();
-                    $model->start_time = $startDateTime->format('H:i:s');
+                    $model->start_datetime = Carbon::parse($newStart);
                 } else {
-                    $model->start_date = null;
-                    $model->start_time = null;
+                    $model->start_datetime = null;
                 }
 
                 if ($newEnd) {
-                    $model->end_date = Carbon::parse($newEnd)->toDateString();
+                    $model->end_datetime = Carbon::parse($newEnd);
                     // Calculate duration from start and end times
-                    if ($model->start_date && $model->start_time) {
-                        $startDateTime = Carbon::parse($model->start_date.' '.$model->start_time);
-                        $endDateTime = Carbon::parse($newEnd);
-                        $model->duration = $startDateTime->diffInMinutes($endDateTime);
+                    if ($model->start_datetime) {
+                        $model->duration = $model->start_datetime->diffInMinutes($model->end_datetime);
                     }
                 } else {
-                    $model->end_date = null;
+                    $model->end_datetime = null;
                 }
             } elseif ($itemType === 'event') {
                 if ($newStart) {
@@ -376,19 +371,19 @@ new class extends Component
         return $this->items->filter(function ($item) use ($targetDate) {
             if ($item->item_type === 'task') {
                 // If task has no dates, don't show in date-filtered view
-                if (! $item->start_date && ! $item->end_date) {
+                if (! $item->start_datetime && ! $item->end_datetime) {
                     return false;
                 }
 
-                $startDate = $item->start_date instanceof Carbon
-                    ? $item->start_date->format('Y-m-d')
-                    : Carbon::parse($item->start_date)->format('Y-m-d');
+                $startDate = $item->start_datetime instanceof Carbon
+                    ? $item->start_datetime->format('Y-m-d')
+                    : Carbon::parse($item->start_datetime)->format('Y-m-d');
 
                 $endDate = null;
-                if ($item->end_date) {
-                    $endDate = $item->end_date instanceof Carbon
-                        ? $item->end_date->format('Y-m-d')
-                        : Carbon::parse($item->end_date)->format('Y-m-d');
+                if ($item->end_datetime) {
+                    $endDate = $item->end_datetime instanceof Carbon
+                        ? $item->end_datetime->format('Y-m-d')
+                        : Carbon::parse($item->end_datetime)->format('Y-m-d');
                 }
 
                 // Include task if it starts, ends, or spans the target date
@@ -597,6 +592,6 @@ new class extends Component
         </div>
     @endif
 
-    <!-- Create Item Modal -->
-    <livewire:workspace.create-item-modal />
+    <!-- Create Item -->
+    <livewire:workspace.create-item />
 </div>

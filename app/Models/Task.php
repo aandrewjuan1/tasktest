@@ -27,9 +27,8 @@ class Task extends Model
         'priority',
         'complexity',
         'duration',
-        'start_date',
-        'start_time',
-        'end_date',
+        'start_datetime',
+        'end_datetime',
         'project_id',
         'event_id',
         'completed_at',
@@ -41,8 +40,8 @@ class Task extends Model
             'status' => TaskStatus::class,
             'priority' => TaskPriority::class,
             'complexity' => TaskComplexity::class,
-            'start_date' => 'date',
-            'end_date' => 'date',
+            'start_datetime' => 'datetime',
+            'end_datetime' => 'datetime',
             'completed_at' => 'datetime',
             'duration' => 'integer',
         ];
@@ -64,8 +63,8 @@ class Task extends Model
             if (is_null($task->duration)) {
                 $task->duration = 60;
             }
-            if (is_null($task->start_date)) {
-                $task->start_date = \Illuminate\Support\Carbon::today()->toDateString();
+            if (is_null($task->start_datetime)) {
+                $task->start_datetime = now();
             }
         });
     }
