@@ -464,9 +464,9 @@ new class extends Component
                         <div x-show="!editing">
                             <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
                                 @if($event->all_day)
-                                    {{ $event->start_datetime->format('M j, Y') }} (All day)
+                                    {{ $event->start_datetime->setTimezone('Asia/Manila')->format('M j, Y') }} (All day)
                                 @else
-                                    {{ $event->start_datetime->format('M j, Y g:i A') }}
+                                    {{ $event->start_datetime->setTimezone('Asia/Manila')->format('M j, Y g:i A') }}
                                 @endif
                             </p>
                         </div>
@@ -553,9 +553,9 @@ new class extends Component
                         <div x-show="!editing">
                             <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
                                 @if($event->all_day)
-                                    {{ $event->end_datetime->format('M j, Y') }} (All day)
+                                    {{ $event->end_datetime->setTimezone('Asia/Manila')->format('M j, Y') }} (All day)
                                 @else
-                                    {{ $event->end_datetime->format('M j, Y g:i A') }}
+                                    {{ $event->end_datetime->setTimezone('Asia/Manila')->format('M j, Y g:i A') }}
                                 @endif
                             </p>
                         </div>

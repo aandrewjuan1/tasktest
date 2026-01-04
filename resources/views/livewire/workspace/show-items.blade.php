@@ -562,7 +562,7 @@ new class extends Component
 
     <!-- List View -->
     @if($viewMode === 'list')
-        <div wire:key="list-view-container-{{ $currentDate->format('Y-m-d') }}">
+        <div wire:key="list-view-container-{{ $currentDate->format('Y-m-d') }}" wire:transition="fade">
             <livewire:workspace.list-view
                 :items="$this->filteredItems"
                 :current-date="$currentDate"
@@ -573,7 +573,7 @@ new class extends Component
 
     <!-- Kanban View -->
     @if($viewMode === 'kanban')
-        <div wire:key="kanban-view-container-{{ $currentDate->format('Y-m-d') }}">
+        <div wire:key="kanban-view-container-{{ $currentDate->format('Y-m-d') }}" wire:transition="fade">
             <livewire:workspace.kanban-view
                 :items="$this->filteredItems"
                 :items-by-status="$this->itemsByStatus"

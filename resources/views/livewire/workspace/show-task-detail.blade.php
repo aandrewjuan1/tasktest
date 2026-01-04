@@ -2,6 +2,7 @@
 
 use App\Models\Project;
 use App\Models\Task;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
@@ -727,7 +728,27 @@ new class extends Component
                             @enderror
                         </div>
                         <div x-show="!editing">
-                            <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2" x-text="originalValue ? originalValue + ' minutes' : 'Not set'"></p>
+                            <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
+                                @if($task->duration)
+                                    @php
+                                        $duration = (int) $task->duration;
+                                        if ($duration >= 60) {
+                                            $hours = floor($duration / 60);
+                                            $minutes = $duration % 60;
+                                            if ($minutes === 0) {
+                                                $display = $hours . ($hours === 1 ? ' hour' : ' hours');
+                                            } else {
+                                                $display = $hours . ($hours === 1 ? ' hour' : ' hours') . ' ' . $minutes . ($minutes === 1 ? ' minute' : ' minutes');
+                                            }
+                                        } else {
+                                            $display = $duration . ($duration === 1 ? ' minute' : ' minutes');
+                                        }
+                                    @endphp
+                                    {{ $display }}
+                                @else
+                                    Not set
+                                @endif
+                            </p>
                         </div>
                     </div>
 
@@ -812,8 +833,15 @@ new class extends Component
                         <div x-show="!editing">
                             <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
                                 {{ $task->start_date?->format('M j, Y') ?? 'Not set' }}
-                                @if($task->start_time)
-                                    <span class="text-zinc-500 dark:text-zinc-400">at {{ substr($task->start_time, 0, 5) }}</span>
+                                @if($task->start_time && $task->start_date)
+                                    @php
+                                        $dateString = $task->start_date instanceof \Carbon\Carbon
+                                            ? $task->start_date->format('Y-m-d')
+                                            : $task->start_date;
+                                        $startDateTime = Carbon::parse($dateString . ' ' . $task->start_time, 'UTC');
+                                        $manilaTime = $startDateTime->setTimezone('Asia/Manila');
+                                    @endphp
+                                    <span class="text-zinc-500 dark:text-zinc-400">at {{ $manilaTime->format('g:i A') }}</span>
                                 @endif
                             </p>
                         </div>
@@ -984,7 +1012,20 @@ new class extends Component
                             @enderror
                         </div>
                         <div x-show="!editing">
-                            <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2" x-text="originalValue || ''"></p>
+                            <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
+                                @if($task->start_time && $task->start_date)
+                                    @php
+                                        $dateString = $task->start_date instanceof \Carbon\Carbon
+                                            ? $task->start_date->format('Y-m-d')
+                                            : $task->start_date;
+                                        $startDateTime = Carbon::parse($dateString . ' ' . $task->start_time, 'UTC');
+                                        $manilaTime = $startDateTime->setTimezone('Asia/Manila');
+                                    @endphp
+                                    {{ $manilaTime->format('g:i A') }}
+                                @else
+                                    Not set
+                                @endif
+                            </p>
                         </div>
                     </div>
                 </div>
