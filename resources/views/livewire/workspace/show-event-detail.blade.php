@@ -178,62 +178,13 @@ new class extends Component
                              editing: false,
                              originalValue: @js($event->title),
                              currentValue: @js($event->title),
-                             debounceTimer: null,
-                             mouseLeaveTimer: null,
                              startEditing() {
                                  this.editing = true;
                                  this.currentValue = this.originalValue;
                                  $wire.title = this.originalValue;
                                  $nextTick(() => $refs.input?.focus());
                              },
-                             cancelEditing() {
-                                 this.editing = false;
-                                 this.currentValue = this.originalValue;
-                                 $wire.title = this.originalValue;
-                                 if (this.debounceTimer) {
-                                     clearTimeout(this.debounceTimer);
-                                     this.debounceTimer = null;
-                                 }
-                                 if (this.mouseLeaveTimer) {
-                                     clearTimeout(this.mouseLeaveTimer);
-                                     this.mouseLeaveTimer = null;
-                                 }
-                             },
-                             handleInput() {
-                                 $wire.title = this.currentValue;
-                                 if (this.debounceTimer) {
-                                     clearTimeout(this.debounceTimer);
-                                 }
-                                 this.debounceTimer = setTimeout(() => {
-                                     if (this.currentValue !== this.originalValue) {
-                                         $wire.updateField('title', this.currentValue).then(() => {
-                                             this.originalValue = this.currentValue;
-                                             this.editing = false;
-                                         });
-                                     }
-                                 }, 500);
-                             },
-                             handleMouseLeave() {
-                                 if (!this.editing) return;
-                                 this.mouseLeaveTimer = setTimeout(() => {
-                                     this.saveIfChanged();
-                                 }, 300);
-                             },
-                             handleMouseEnter() {
-                                 if (this.mouseLeaveTimer) {
-                                     clearTimeout(this.mouseLeaveTimer);
-                                     this.mouseLeaveTimer = null;
-                                 }
-                             },
-                             saveIfChanged() {
-                                 if (this.debounceTimer) {
-                                     clearTimeout(this.debounceTimer);
-                                     this.debounceTimer = null;
-                                 }
-                                 if (this.mouseLeaveTimer) {
-                                     clearTimeout(this.mouseLeaveTimer);
-                                     this.mouseLeaveTimer = null;
-                                 }
+                             save() {
                                  if (this.currentValue !== this.originalValue) {
                                      $wire.updateField('title', this.currentValue).then(() => {
                                          this.originalValue = this.currentValue;
@@ -242,24 +193,54 @@ new class extends Component
                                  } else {
                                      this.editing = false;
                                  }
+                             },
+                             cancel() {
+                                 this.currentValue = this.originalValue;
+                                 $wire.title = this.originalValue;
+                                 this.editing = false;
                              }
                          }"
-                         @mouseenter="handleMouseEnter()"
-                         @mouseleave="handleMouseLeave()"
                     >
-                        <div x-show="!editing" @click="startEditing()" class="cursor-pointer">
-                            <flux:heading size="lg" x-text="originalValue"></flux:heading>
+                        <div x-show="!editing" class="flex items-center gap-2">
+                            <flux:heading size="lg" x-text="originalValue" class="cursor-pointer" @click="startEditing()"></flux:heading>
+                            <button
+                                @click="startEditing()"
+                                class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                                type="button"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            </button>
                         </div>
-                        <div x-show="editing" x-cloak>
-                            <flux:input
-                                x-ref="input"
-                                x-model="currentValue"
-                                x-on:input="handleInput()"
-                                @keydown.enter="saveIfChanged()"
-                                @keydown.escape="cancelEditing()"
-                                label="Title"
-                                required
-                            />
+                        <div x-show="editing" x-cloak @click.away="cancel()" class="space-y-2">
+                            <div class="flex items-start gap-2">
+                                <div class="flex-1">
+                                    <flux:input
+                                        x-ref="input"
+                                        x-model="currentValue"
+                                        x-on:input="$wire.title = currentValue"
+                                        @keydown.enter.prevent="save()"
+                                        @keydown.escape="cancel()"
+                                        label="Title"
+                                        required
+                                    />
+                                </div>
+                                <div class="flex items-center gap-2 pt-6">
+                                    <button
+                                        @click="save()"
+                                        class="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg transition-colors"
+                                    >
+                                        Done
+                                    </button>
+                                    <button
+                                        @click="cancel()"
+                                        class="px-3 py-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
                             @error('title')
                                 <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
                             @enderror
@@ -273,62 +254,13 @@ new class extends Component
                          editing: false,
                          originalValue: @js($event->description ?? ''),
                          currentValue: @js($event->description ?? ''),
-                         debounceTimer: null,
-                         mouseLeaveTimer: null,
                          startEditing() {
                              this.editing = true;
                              this.currentValue = this.originalValue;
                              $wire.description = this.originalValue;
                              $nextTick(() => $refs.input?.focus());
                          },
-                         cancelEditing() {
-                             this.editing = false;
-                             this.currentValue = this.originalValue;
-                             $wire.description = this.originalValue;
-                             if (this.debounceTimer) {
-                                 clearTimeout(this.debounceTimer);
-                                 this.debounceTimer = null;
-                             }
-                             if (this.mouseLeaveTimer) {
-                                 clearTimeout(this.mouseLeaveTimer);
-                                 this.mouseLeaveTimer = null;
-                             }
-                         },
-                         handleInput() {
-                             $wire.description = this.currentValue;
-                             if (this.debounceTimer) {
-                                 clearTimeout(this.debounceTimer);
-                             }
-                             this.debounceTimer = setTimeout(() => {
-                                 if (this.currentValue !== this.originalValue) {
-                                     $wire.updateField('description', this.currentValue).then(() => {
-                                         this.originalValue = this.currentValue;
-                                         this.editing = false;
-                                     });
-                                 }
-                             }, 500);
-                         },
-                         handleMouseLeave() {
-                             if (!this.editing) return;
-                             this.mouseLeaveTimer = setTimeout(() => {
-                                 this.saveIfChanged();
-                             }, 300);
-                         },
-                         handleMouseEnter() {
-                             if (this.mouseLeaveTimer) {
-                                 clearTimeout(this.mouseLeaveTimer);
-                                 this.mouseLeaveTimer = null;
-                             }
-                         },
-                         saveIfChanged() {
-                             if (this.debounceTimer) {
-                                 clearTimeout(this.debounceTimer);
-                                 this.debounceTimer = null;
-                             }
-                             if (this.mouseLeaveTimer) {
-                                 clearTimeout(this.mouseLeaveTimer);
-                                 this.mouseLeaveTimer = null;
-                             }
+                         save() {
                              if (this.currentValue !== this.originalValue) {
                                  $wire.updateField('description', this.currentValue).then(() => {
                                      this.originalValue = this.currentValue;
@@ -337,23 +269,53 @@ new class extends Component
                              } else {
                                  this.editing = false;
                              }
+                         },
+                         cancel() {
+                             this.currentValue = this.originalValue;
+                             $wire.description = this.originalValue;
+                             this.editing = false;
                          }
                      }"
-                     @mouseenter="handleMouseEnter()"
-                     @mouseleave="handleMouseLeave()"
                 >
                     <div class="mb-2">
-                        <flux:heading size="sm">Description</flux:heading>
+                        <div class="flex items-center gap-2">
+                            <flux:heading size="sm">Description</flux:heading>
+                            <button
+                                x-show="!editing"
+                                @click="startEditing()"
+                                class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                                type="button"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            </button>
+                        </div>
                     </div>
-                    <div x-show="editing" x-cloak>
+                    <div x-show="editing" x-cloak @click.away="cancel()" class="space-y-2">
                         <flux:textarea
                             x-ref="input"
                             x-model="currentValue"
-                            x-on:input="handleInput()"
-                            @keydown.enter="saveIfChanged()"
-                            @keydown.escape="cancelEditing()"
+                            x-on:input="$wire.description = currentValue"
+                            @keydown.ctrl.enter.prevent="save()"
+                            @keydown.meta.enter.prevent="save()"
+                            @keydown.escape="cancel()"
                             rows="4"
                         />
+                        <div class="flex items-center gap-2">
+                            <button
+                                @click="save()"
+                                class="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg transition-colors"
+                            >
+                                Done
+                            </button>
+                            <button
+                                @click="cancel()"
+                                class="px-3 py-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        </div>
                         @error('description')
                             <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
                         @enderror
