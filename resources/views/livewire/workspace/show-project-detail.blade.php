@@ -22,14 +22,18 @@ new class extends Component {
     #[On('view-project-detail')]
     public function openModal(int $id): void
     {
+        // Load project first before setting isOpen to prevent DOM flicker
         $this->project = Project::with(['tags', 'tasks', 'reminders'])
             ->findOrFail($id);
 
         $this->authorize('view', $this->project);
 
+        // Load data before opening modal to ensure stable DOM structure
+        $this->loadProjectData();
+
+        // Set modal state after data is loaded
         $this->isOpen = true;
         $this->showDeleteConfirm = false;
-        $this->loadProjectData();
     }
 
     public function closeModal(): void
@@ -172,10 +176,10 @@ new class extends Component {
     }
 }; ?>
 
-<div>
+<div wire:key="project-detail-modal">
     <flux:modal wire:model="isOpen" class="min-w-[700px]" variant="flyout" closeable="false">
-        @if($project)
-            <div class="space-y-6">
+        <div class="space-y-6" wire:key="project-content-{{ $project?->id ?? 'empty' }}">
+            @if($project)
                 <!-- Header -->
                 <div>
                     <div class="flex-1"
@@ -636,8 +640,8 @@ new class extends Component {
                         Delete Project
                     </flux:button>
                 </div>
-            </div>
-        @endif
+            @endif
+        </div>
     </flux:modal>
 
     <!-- Delete Confirmation Modal -->

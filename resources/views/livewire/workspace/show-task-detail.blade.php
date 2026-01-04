@@ -41,14 +41,18 @@ new class extends Component
     #[On('view-task-detail')]
     public function openModal(int $id): void
     {
+        // Load task first before setting isOpen to prevent DOM flicker
         $this->task = Task::with(['project', 'event', 'tags', 'reminders', 'pomodoroSessions'])
             ->findOrFail($id);
 
         $this->authorize('view', $this->task);
 
+        // Load data before opening modal to ensure stable DOM structure
+        $this->loadTaskData();
+
+        // Set modal state after data is loaded
         $this->isOpen = true;
         $this->showDeleteConfirm = false;
-        $this->loadTaskData();
     }
 
     public function closeModal(): void
@@ -200,10 +204,10 @@ new class extends Component
     }
 }; ?>
 
-<div>
+<div wire:key="task-detail-modal">
     <flux:modal wire:model="isOpen" class="min-w-[700px]" variant="flyout" closeable="false">
-        @if($task)
-            <div class="space-y-6">
+        <div class="space-y-6" wire:key="task-content-{{ $task?->id ?? 'empty' }}">
+            @if($task)
                 <!-- Header -->
                 <div>
                     <div class="flex-1"
@@ -1059,8 +1063,8 @@ new class extends Component
                         Delete Task
                     </flux:button>
                 </div>
-            </div>
-        @endif
+            @endif
+        </div>
     </flux:modal>
 
     <!-- Delete Confirmation Modal -->

@@ -29,19 +29,19 @@ class extends Component {
     <div class="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-6 overflow-hidden">
         <!-- Left Column: Tasks, Events, Projects (75%) -->
         <div class="lg:col-span-3 overflow-y-auto">
-            <livewire:workspace.show-items />
+            <livewire:workspace.show-items wire:key="workspace-show-items" />
         </div>
 
         <!-- Right Column: Calendar (25%) -->
         <div class="lg:col-span-1 overflow-y-auto">
-            <livewire:workspace.calendar-view />
+            <livewire:workspace.calendar-view wire:key="workspace-calendar-view" />
         </div>
     </div>
 
     <!-- Detail View Modals -->
-    <livewire:workspace.show-task-detail />
-    <livewire:workspace.show-event-detail />
-    <livewire:workspace.show-project-detail />
+    <livewire:workspace.show-task-detail wire:key="workspace-task-detail" />
+    <livewire:workspace.show-event-detail wire:key="workspace-event-detail" />
+    <livewire:workspace.show-project-detail wire:key="workspace-project-detail" />
 
     <!-- Calendar Event Popover -->
     <livewire:workspace.calendar-event-popover />

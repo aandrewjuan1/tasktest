@@ -19,26 +19,48 @@ return new class extends Migration
         });
 
         // Migrate existing data: combine start_date + start_time → start_datetime
-        DB::statement("
-            UPDATE tasks
-            SET start_datetime = CASE
-                WHEN start_date IS NOT NULL AND start_time IS NOT NULL THEN
-                    CONCAT(start_date, ' ', start_time)
-                WHEN start_date IS NOT NULL THEN
-                    CONCAT(start_date, ' 00:00:00')
-                ELSE NULL
-            END
-        ");
+        // Use database-agnostic concatenation
+        if (DB::getDriverName() === 'sqlite') {
+            DB::statement("
+                UPDATE tasks
+                SET start_datetime = CASE
+                    WHEN start_date IS NOT NULL AND start_time IS NOT NULL THEN
+                        start_date || ' ' || start_time
+                    WHEN start_date IS NOT NULL THEN
+                        start_date || ' 00:00:00'
+                    ELSE NULL
+                END
+            ");
 
-        // Migrate existing data: end_date → end_datetime
-        DB::statement("
-            UPDATE tasks
-            SET end_datetime = CASE
-                WHEN end_date IS NOT NULL THEN
-                    CONCAT(end_date, ' 00:00:00')
-                ELSE NULL
-            END
-        ");
+            DB::statement("
+                UPDATE tasks
+                SET end_datetime = CASE
+                    WHEN end_date IS NOT NULL THEN
+                        end_date || ' 00:00:00'
+                    ELSE NULL
+                END
+            ");
+        } else {
+            DB::statement("
+                UPDATE tasks
+                SET start_datetime = CASE
+                    WHEN start_date IS NOT NULL AND start_time IS NOT NULL THEN
+                        CONCAT(start_date, ' ', start_time)
+                    WHEN start_date IS NOT NULL THEN
+                        CONCAT(start_date, ' 00:00:00')
+                    ELSE NULL
+                END
+            ");
+
+            DB::statement("
+                UPDATE tasks
+                SET end_datetime = CASE
+                    WHEN end_date IS NOT NULL THEN
+                        CONCAT(end_date, ' 00:00:00')
+                    ELSE NULL
+                END
+            ");
+        }
 
         // Drop old columns
         Schema::table('tasks', function (Blueprint $table) {

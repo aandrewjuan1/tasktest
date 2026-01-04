@@ -28,14 +28,18 @@ new class extends Component
     #[On('view-event-detail')]
     public function openModal(int $id): void
     {
+        // Load event first before setting isOpen to prevent DOM flicker
         $this->event = Event::with(['tags', 'reminders'])
             ->findOrFail($id);
 
         $this->authorize('view', $this->event);
 
+        // Load data before opening modal to ensure stable DOM structure
+        $this->loadEventData();
+
+        // Set modal state after data is loaded
         $this->isOpen = true;
         $this->showDeleteConfirm = false;
-        $this->loadEventData();
     }
 
     public function closeModal(): void
@@ -163,10 +167,10 @@ new class extends Component
     }
 }; ?>
 
-<div>
+<div wire:key="event-detail-modal">
     <flux:modal wire:model="isOpen" class="min-w-[700px]" variant="flyout" closeable="false">
-        @if($event)
-            <div class="space-y-6">
+        <div class="space-y-6" wire:key="event-content-{{ $event?->id ?? 'empty' }}">
+            @if($event)
                 <!-- Header -->
                 <div>
                     <div class="flex-1"
@@ -666,8 +670,8 @@ new class extends Component
                         Delete Event
                     </flux:button>
                 </div>
-            </div>
-        @endif
+            @endif
+        </div>
     </flux:modal>
 
     <!-- Delete Confirmation Modal -->

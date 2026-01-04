@@ -119,11 +119,18 @@ new class extends Component
         // Clear computed property cache to force recalculation with fresh data
         // Unsetting 'items' will automatically invalidate dependent computed properties
         // (filteredItems, itemsByStatus) since they depend on $this->items
-        unset($this->items);
+        // Use a more defensive approach to prevent component unmounting
+        if (isset($this->items)) {
+            unset($this->items);
+        }
 
         // Also clear availableTags and availableProjects in case new tags/projects were created
-        unset($this->availableTags);
-        unset($this->availableProjects);
+        if (isset($this->availableTags)) {
+            unset($this->availableTags);
+        }
+        if (isset($this->availableProjects)) {
+            unset($this->availableProjects);
+        }
     }
 
     public function updateItemDateTime(int $itemId, string $itemType, string $newStart, ?string $newEnd = null): void
@@ -451,6 +458,7 @@ new class extends Component
 }; ?>
 
 <div
+    wire:key="show-items-component"
     class="space-y-4 px-4"
     wire:loading.class="opacity-50"
     wire:target="switchView,goToTodayDate,previousDay,nextDay,updateCurrentDate"
