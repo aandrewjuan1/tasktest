@@ -23,12 +23,6 @@ new class extends Component
 
     public string $endDatetime = '';
 
-    public bool $allDay = false;
-
-    public string $location = '';
-
-    public string $color = '#3b82f6';
-
     public string $status = 'scheduled';
 
     #[On('view-event-detail')]
@@ -62,9 +56,6 @@ new class extends Component
         $this->description = $this->event->description ?? '';
         $this->startDatetime = $this->event->start_datetime->format('Y-m-d\TH:i');
         $this->endDatetime = $this->event->end_datetime?->format('Y-m-d\TH:i') ?? '';
-        $this->allDay = $this->event->all_day;
-        $this->location = $this->event->location ?? '';
-        $this->color = $this->event->color ?? '#3b82f6';
         $this->status = $this->event->status?->value ?? 'scheduled';
     }
 
@@ -81,9 +72,6 @@ new class extends Component
             'description' => ['nullable', 'string'],
             'startDatetime' => ['required', 'date'],
             'endDatetime' => ['nullable', 'date'],
-            'allDay' => ['boolean'],
-            'location' => ['nullable', 'string', 'max:255'],
-            'color' => ['nullable', 'string', 'max:7'],
             'status' => ['nullable', 'string', 'in:scheduled,cancelled,completed,tentative'],
             default => [],
         };
@@ -117,15 +105,6 @@ new class extends Component
                         break;
                     case 'endDatetime':
                         $updateData['end_datetime'] = $value ? Carbon::parse($value) : null;
-                        break;
-                    case 'allDay':
-                        $updateData['all_day'] = (bool) $value;
-                        break;
-                    case 'location':
-                        $updateData['location'] = $value ?: null;
-                        break;
-                    case 'color':
-                        $updateData['color'] = $value;
                         break;
                     case 'status':
                         $updateData['status'] = $value ?: 'scheduled';
@@ -463,11 +442,7 @@ new class extends Component
                         </div>
                         <div x-show="!editing">
                             <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
-                                @if($event->all_day)
-                                    {{ $event->start_datetime->setTimezone('Asia/Manila')->format('M j, Y') }} (All day)
-                                @else
-                                    {{ $event->start_datetime->setTimezone('Asia/Manila')->format('M j, Y g:i A') }}
-                                @endif
+                                {{ $event->start_datetime->setTimezone('Asia/Manila')->format('M j, Y g:i A') }}
                             </p>
                         </div>
                     </div>
@@ -552,90 +527,8 @@ new class extends Component
                         </div>
                         <div x-show="!editing">
                             <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
-                                @if($event->all_day)
-                                    {{ $event->end_datetime->setTimezone('Asia/Manila')->format('M j, Y') }} (All day)
-                                @else
-                                    {{ $event->end_datetime->setTimezone('Asia/Manila')->format('M j, Y g:i A') }}
-                                @endif
+                                {{ $event->end_datetime->setTimezone('Asia/Manila')->format('M j, Y g:i A') }}
                             </p>
-                        </div>
-                    </div>
-
-                    <!-- All Day -->
-                    <div
-                         x-data="{
-                             editing: false,
-                             originalValue: @js($event->all_day),
-                             currentValue: @js($event->all_day),
-                             mouseLeaveTimer: null,
-                             startEditing() {
-                                 this.editing = true;
-                                 this.currentValue = this.originalValue;
-                                 $wire.allDay = this.originalValue;
-                             },
-                             cancelEditing() {
-                                 this.editing = false;
-                                 this.currentValue = this.originalValue;
-                                 $wire.allDay = this.originalValue;
-                                 if (this.mouseLeaveTimer) {
-                                     clearTimeout(this.mouseLeaveTimer);
-                                     this.mouseLeaveTimer = null;
-                                 }
-                             },
-                             handleMouseLeave() {
-                                 if (!this.editing) return;
-                                 this.mouseLeaveTimer = setTimeout(() => {
-                                     this.saveIfChanged();
-                                 }, 300);
-                             },
-                             handleMouseEnter() {
-                                 if (this.mouseLeaveTimer) {
-                                     clearTimeout(this.mouseLeaveTimer);
-                                     this.mouseLeaveTimer = null;
-                                 }
-                             },
-                             saveIfChanged() {
-                                 if (this.mouseLeaveTimer) {
-                                     clearTimeout(this.mouseLeaveTimer);
-                                     this.mouseLeaveTimer = null;
-                                 }
-                                 if (this.currentValue !== this.originalValue) {
-                                     $wire.updateField('allDay', this.currentValue).then(() => {
-                                         this.originalValue = this.currentValue;
-                                     });
-                                 } else {
-                                     this.editing = false;
-                                 }
-                             }
-                         }"
-                         @mouseenter="handleMouseEnter()"
-                         @mouseleave="handleMouseLeave()"
-                    >
-                        <div class="flex items-center gap-2 mb-2">
-                            <flux:heading size="sm">All Day</flux:heading>
-                            <button
-                                x-show="!editing"
-                                @click="startEditing()"
-                                class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
-                                type="button"
-                            >
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                </svg>
-                            </button>
-                        </div>
-                        <div x-show="editing" x-cloak>
-                            <flux:checkbox
-                                x-model="currentValue"
-                                x-on:change="$wire.allDay = currentValue"
-                                wire:model.live="allDay"
-                            />
-                            @error('allDay')
-                                <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
-                            @enderror
-                        </div>
-                        <div x-show="!editing">
-                            <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2" x-text="originalValue ? 'Yes' : 'No'"></p>
                         </div>
                     </div>
 
@@ -722,170 +615,6 @@ new class extends Component
                         @error('status')
                             <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
                         @enderror
-                    </div>
-                </div>
-
-                <!-- Location -->
-                <div
-                     x-data="{
-                         editing: false,
-                         originalValue: @js($event->location ?? ''),
-                         currentValue: @js($event->location ?? ''),
-                         mouseLeaveTimer: null,
-                         startEditing() {
-                             this.editing = true;
-                             this.currentValue = this.originalValue;
-                             $wire.location = this.originalValue;
-                             $nextTick(() => $refs.input?.focus());
-                         },
-                         cancelEditing() {
-                             this.editing = false;
-                             this.currentValue = this.originalValue;
-                             $wire.location = this.originalValue;
-                             if (this.mouseLeaveTimer) {
-                                 clearTimeout(this.mouseLeaveTimer);
-                                 this.mouseLeaveTimer = null;
-                             }
-                         },
-                         handleMouseLeave() {
-                             if (!this.editing) return;
-                             this.mouseLeaveTimer = setTimeout(() => {
-                                 this.saveIfChanged();
-                             }, 300);
-                         },
-                         handleMouseEnter() {
-                             if (this.mouseLeaveTimer) {
-                                 clearTimeout(this.mouseLeaveTimer);
-                                 this.mouseLeaveTimer = null;
-                             }
-                         },
-                         saveIfChanged() {
-                             if (this.mouseLeaveTimer) {
-                                 clearTimeout(this.mouseLeaveTimer);
-                                 this.mouseLeaveTimer = null;
-                             }
-                             if (this.currentValue !== this.originalValue) {
-                                 $wire.updateField('location', this.currentValue).then(() => {
-                                     this.originalValue = this.currentValue;
-                                 });
-                             } else {
-                                 this.editing = false;
-                             }
-                         }
-                     }"
-                     @mouseenter="handleMouseEnter()"
-                     @mouseleave="handleMouseLeave()"
-                >
-                    <div class="flex items-center gap-2 mb-2">
-                        <flux:heading size="sm">Location</flux:heading>
-                        <button
-                            x-show="!editing"
-                            @click="startEditing()"
-                            class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
-                            type="button"
-                        >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                        </button>
-                    </div>
-                    <div x-show="editing" x-cloak>
-                        <flux:input
-                            x-ref="input"
-                            x-model="currentValue"
-                            x-on:input="$wire.location = currentValue"
-                            wire:model.live="location"
-                            @keydown.enter="saveIfChanged()"
-                            @keydown.escape="cancelEditing()"
-                        />
-                        @error('location')
-                            <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
-                        @enderror
-                    </div>
-                    <div x-show="!editing">
-                        <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2" x-text="originalValue || 'No location specified'"></p>
-                    </div>
-                </div>
-
-                <!-- Color -->
-                <div
-                     x-data="{
-                         editing: false,
-                         originalValue: @js($event->color ?? '#3b82f6'),
-                         currentValue: @js($event->color ?? '#3b82f6'),
-                         mouseLeaveTimer: null,
-                         startEditing() {
-                             this.editing = true;
-                             this.currentValue = this.originalValue;
-                             $wire.color = this.originalValue;
-                         },
-                         cancelEditing() {
-                             this.editing = false;
-                             this.currentValue = this.originalValue;
-                             $wire.color = this.originalValue;
-                             if (this.mouseLeaveTimer) {
-                                 clearTimeout(this.mouseLeaveTimer);
-                                 this.mouseLeaveTimer = null;
-                             }
-                         },
-                         handleMouseLeave() {
-                             if (!this.editing) return;
-                             this.mouseLeaveTimer = setTimeout(() => {
-                                 this.saveIfChanged();
-                             }, 300);
-                         },
-                         handleMouseEnter() {
-                             if (this.mouseLeaveTimer) {
-                                 clearTimeout(this.mouseLeaveTimer);
-                                 this.mouseLeaveTimer = null;
-                             }
-                         },
-                         saveIfChanged() {
-                             if (this.mouseLeaveTimer) {
-                                 clearTimeout(this.mouseLeaveTimer);
-                                 this.mouseLeaveTimer = null;
-                             }
-                             if (this.currentValue !== this.originalValue) {
-                                 $wire.updateField('color', this.currentValue).then(() => {
-                                     this.originalValue = this.currentValue;
-                                 });
-                             } else {
-                                 this.editing = false;
-                             }
-                         }
-                     }"
-                     @mouseenter="handleMouseEnter()"
-                     @mouseleave="handleMouseLeave()"
-                >
-                    <div class="flex items-center gap-2 mb-2">
-                        <flux:heading size="sm">Color</flux:heading>
-                        <button
-                            x-show="!editing"
-                            @click="startEditing()"
-                            class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
-                            type="button"
-                        >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                        </button>
-                    </div>
-                    <div x-show="editing" x-cloak>
-                        <flux:input
-                            x-model="currentValue"
-                            x-on:change="$wire.color = currentValue"
-                            wire:model.live="color"
-                            type="color"
-                        />
-                        @error('color')
-                            <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
-                        @enderror
-                    </div>
-                    <div x-show="!editing">
-                        <div class="flex items-center gap-2 mt-2">
-                            <span class="w-6 h-6 rounded" :style="`background-color: ${originalValue}`"></span>
-                            <span class="text-sm text-zinc-600 dark:text-zinc-400" x-text="originalValue"></span>
-                        </div>
                     </div>
                 </div>
 

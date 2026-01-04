@@ -84,6 +84,5 @@ test('event end_datetime is auto-calculated if not provided', function () {
 
     expect($event->end_datetime->format('Y-m-d H:i'))
         ->toBe($start->copy()->addHour()->format('Y-m-d H:i'));
-    expect($event->timezone)->toBe(config('app.timezone'));
     expect($event->status->value)->toBe('scheduled');
 });

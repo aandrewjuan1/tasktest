@@ -37,8 +37,6 @@ new class extends Component
     public ?string $eventStatus = 'scheduled';
     public ?string $eventStartDatetime = null;
     public ?string $eventEndDatetime = null;
-    public ?string $eventLocation = null;
-    public ?string $eventColor = null;
     public array $eventTagIds = [];
 
     // Project fields
@@ -76,8 +74,6 @@ new class extends Component
         $this->eventStatus = 'scheduled';
         $this->eventStartDatetime = Carbon::now()->format('Y-m-d\TH:i');
         $this->eventEndDatetime = null;
-        $this->eventLocation = null;
-        $this->eventColor = null;
         $this->eventTagIds = [];
 
         $this->projectName = '';
@@ -162,8 +158,6 @@ new class extends Component
                 'eventStatus' => ['nullable', 'string', 'in:scheduled,cancelled,completed,tentative'],
                 'eventStartDatetime' => ['nullable', 'date'],
                 'eventEndDatetime' => ['nullable', 'date', 'after:eventStartDatetime'],
-                'eventLocation' => ['nullable', 'string', 'max:255'],
-                'eventColor' => ['nullable', 'string', 'max:7'],
                 'eventTagIds' => ['nullable', 'array'],
                 'eventTagIds.*' => ['exists:tags,id'],
             ], [], [
@@ -171,8 +165,6 @@ new class extends Component
                 'eventStatus' => 'status',
                 'eventStartDatetime' => 'start datetime',
                 'eventEndDatetime' => 'end datetime',
-                'eventLocation' => 'location',
-                'eventColor' => 'color',
             ]);
 
             $startDatetime = $validated['eventStartDatetime'] ? Carbon::parse($validated['eventStartDatetime']) : null;
@@ -185,9 +177,6 @@ new class extends Component
                     'status' => $validated['eventStatus'] ? EventStatus::from($validated['eventStatus']) : null,
                     'start_datetime' => $startDatetime,
                     'end_datetime' => $endDatetime,
-                    'location' => $validated['eventLocation'] ?? null,
-                    'color' => $validated['eventColor'] ?? null,
-                    'timezone' => config('app.timezone'),
                 ]);
 
                 if (!empty($validated['eventTagIds'])) {
@@ -305,8 +294,6 @@ new class extends Component
             status: 'scheduled',
             startDatetime: '{{ Carbon::now()->format('Y-m-d\TH:i') }}',
             endDatetime: null,
-            location: null,
-            color: null,
             tagIds: []
         },
         project: {
@@ -383,8 +370,6 @@ new class extends Component
         $wire.eventStatus = this.formData.event.status;
         $wire.eventStartDatetime = this.formData.event.startDatetime;
         $wire.eventEndDatetime = this.formData.event.endDatetime;
-        $wire.eventLocation = this.formData.event.location;
-        $wire.eventColor = this.formData.event.color;
         $wire.eventTagIds = this.formData.event.tagIds;
 
         $wire.projectName = this.formData.project.name;
@@ -850,70 +835,6 @@ new class extends Component
                                     Clear all
                                 </button>
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- Event Location -->
-                    <div class="relative" @click.away="openDropdown = null">
-                        <button
-                            type="button"
-                            @click.stop="toggleDropdown('event-location')"
-                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
-                        >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                            <span class="text-sm font-medium">Location</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.event.location ? (formData.event.location.length > 15 ? formData.event.location.substring(0, 15) + '...' : formData.event.location) : 'Not set'"></span>
-                        </button>
-                        <div
-                            x-show="isOpen('event-location')"
-                            x-cloak
-                            x-transition
-                            class="absolute z-50 mt-1 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 p-4"
-                            @click.away="openDropdown = null"
-                        >
-                            <flux:input x-model="formData.event.location" placeholder="Enter location" />
-                        </div>
-                    </div>
-
-                    <!-- Event Color -->
-                    <div class="relative" @click.away="openDropdown = null">
-                        <button
-                            type="button"
-                            @click.stop="toggleDropdown('event-color')"
-                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
-                        >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-                            </svg>
-                            <span class="text-sm font-medium">Color</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.event.color ? 'Set' : 'Not set'"></span>
-                        </button>
-                        <div
-                            x-show="isOpen('event-color')"
-                            x-cloak
-                            x-transition
-                            class="absolute z-50 mt-1 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 p-4"
-                            @click.away="openDropdown = null"
-                        >
-                            <div class="grid grid-cols-6 gap-2">
-                                @foreach(['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1', '#14b8a6', '#64748b'] as $color)
-                                    <button
-                                        @click="formData.event.color = '{{ $color }}'; openDropdown = null"
-                                        :class="formData.event.color === '{{ $color }}' ? 'border-zinc-900 dark:border-zinc-100 ring-2 ring-offset-2' : 'border-zinc-300 dark:border-zinc-600'"
-                                        class="w-8 h-8 rounded border-2"
-                                        style="background-color: {{ $color }}"
-                                    ></button>
-                                @endforeach
-                            </div>
-                            <button
-                                @click="formData.event.color = null; openDropdown = null"
-                                class="mt-2 w-full px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
-                            >
-                                Clear
-                            </button>
                         </div>
                     </div>
 

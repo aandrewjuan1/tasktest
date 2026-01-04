@@ -119,30 +119,26 @@ new class extends Component
                 $dateKey = Carbon::parse($item->start_datetime)->format('Y-m-d');
 
                 if (isset($itemsByDay[$dateKey])) {
-                    if ($item->all_day) {
-                        $itemsByDay[$dateKey]['all_day']->push($item);
-                    } else {
-                        // Calculate position and height
-                        $startTime = Carbon::parse($item->start_datetime);
-                        $endTime = Carbon::parse($item->end_datetime);
+                    // Calculate position and height
+                    $startTime = Carbon::parse($item->start_datetime);
+                    $endTime = Carbon::parse($item->end_datetime);
 
-                        $startMinutes = ($startTime->hour * 60) + $startTime->minute;
-                        $endMinutes = ($endTime->hour * 60) + $endTime->minute;
+                    $startMinutes = ($startTime->hour * 60) + $startTime->minute;
+                    $endMinutes = ($endTime->hour * 60) + $endTime->minute;
 
-                        $gridStartMinutes = $this->startHour * 60;
-                        $gridEndMinutes = $this->endHour * 60;
+                    $gridStartMinutes = $this->startHour * 60;
+                    $gridEndMinutes = $this->endHour * 60;
 
-                        if ($startMinutes < $gridEndMinutes && $endMinutes > $gridStartMinutes) {
-                            $topMinutes = max($startMinutes - $gridStartMinutes, 0);
-                            $durationMinutes = min($endMinutes, $gridEndMinutes) - max($startMinutes, $gridStartMinutes);
+                    if ($startMinutes < $gridEndMinutes && $endMinutes > $gridStartMinutes) {
+                        $topMinutes = max($startMinutes - $gridStartMinutes, 0);
+                        $durationMinutes = min($endMinutes, $gridEndMinutes) - max($startMinutes, $gridStartMinutes);
 
-                            // Clone the item to avoid mutating the reactive prop
-                            $itemCopy = clone $item;
-                            $itemCopy->grid_top = ($topMinutes / 60) * $this->hourHeight;
-                            $itemCopy->grid_height = ($durationMinutes / 60) * $this->hourHeight;
+                        // Clone the item to avoid mutating the reactive prop
+                        $itemCopy = clone $item;
+                        $itemCopy->grid_top = ($topMinutes / 60) * $this->hourHeight;
+                        $itemCopy->grid_height = ($durationMinutes / 60) * $this->hourHeight;
 
-                            $itemsByDay[$dateKey]['timed']->push($itemCopy);
-                        }
+                        $itemsByDay[$dateKey]['timed']->push($itemCopy);
                     }
                 }
             } elseif ($item->item_type === 'project') {

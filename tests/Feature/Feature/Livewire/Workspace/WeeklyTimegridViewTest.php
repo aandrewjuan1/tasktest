@@ -70,7 +70,6 @@ test('weekly view displays events in current week', function () {
         'title' => 'Test Event',
         'start_datetime' => now()->startOfWeek()->addDays(2)->setHour(10),
         'end_datetime' => now()->startOfWeek()->addDays(2)->setHour(11),
-        'all_day' => false,
     ]);
 
     $component = Volt::test('workspace.show-items')
@@ -84,13 +83,12 @@ test('weekly view displays events in current week', function () {
     expect($weeklyItems[$dateKey]['timed']->first()->title)->toBe('Test Event');
 });
 
-test('weekly view displays all-day events in all-day section', function () {
+test('weekly view displays events in timed section', function () {
     $event = Event::factory()->create([
         'user_id' => $this->user->id,
         'title' => 'All Day Event',
         'start_datetime' => now()->startOfWeek()->addDays(1)->startOfDay(),
         'end_datetime' => now()->startOfWeek()->addDays(1)->endOfDay(),
-        'all_day' => true,
     ]);
 
     $component = Volt::test('workspace.show-items')
@@ -100,8 +98,8 @@ test('weekly view displays all-day events in all-day section', function () {
     $weeklyItems = $component->get('weeklyItems');
     $dateKey = $event->start_datetime->format('Y-m-d');
 
-    expect($weeklyItems[$dateKey]['all_day'])->toHaveCount(1);
-    expect($weeklyItems[$dateKey]['all_day']->first()->title)->toBe('All Day Event');
+    expect($weeklyItems[$dateKey]['timed'])->toHaveCount(1);
+    expect($weeklyItems[$dateKey]['timed']->first()->title)->toBe('All Day Event');
 });
 
 test('weekly view displays tasks in all-day section', function () {

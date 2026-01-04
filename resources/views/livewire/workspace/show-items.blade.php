@@ -111,6 +111,9 @@ new class extends Component
 
     #[On('item-updated')]
     #[On('item-created')]
+    #[On('task-deleted')]
+    #[On('event-deleted')]
+    #[On('project-deleted')]
     public function refreshItems(): void
     {
         // Clear computed property cache to force recalculation with fresh data

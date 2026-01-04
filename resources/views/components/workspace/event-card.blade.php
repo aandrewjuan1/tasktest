@@ -2,14 +2,10 @@
 
 <div
     class="bg-white dark:bg-zinc-800 rounded-lg border-l-4 border-zinc-200 dark:border-zinc-700 p-4 cursor-pointer hover:shadow-lg transition-all"
-    style="border-left-color: {{ $event->color ?? '#6b7280' }}"
     wire:click="$dispatch('view-event-detail', { id: {{ $event->id }} })"
     role="button"
     tabindex="0"
     aria-label="View event details: {{ $event->title }}"
-    x-data="{ originalColor: '{{ $event->color ?? '#6b7280' }}' }"
-    @mouseenter="$el.style.borderLeftColor = 'rgb(147 197 253)'"
-    @mouseleave="$el.style.borderLeftColor = originalColor"
 >
     <div class="flex items-center gap-2 mb-3">
         <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
@@ -46,16 +42,12 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span>
-                    @if($event->all_day)
-                        {{ $event->start_datetime->format('M j, Y') }} (All day)
-                    @else
-                        {{ $event->start_datetime->format('M j, Y g:i A') }}
-                    @endif
+                    {{ $event->start_datetime->format('M j, Y g:i A') }}
                 </span>
             </div>
         @endif
 
-        @if($event->end_datetime && !$event->all_day)
+        @if($event->end_datetime)
             <div class="flex items-center gap-2">
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -64,16 +56,6 @@
             </div>
         @elseif(!$event->end_datetime && $event->start_datetime)
             <span class="text-zinc-400 dark:text-zinc-500 text-xs">No end time</span>
-        @endif
-
-        @if($event->location)
-            <div class="flex items-center gap-2">
-                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <span class="truncate">{{ $event->location }}</span>
-            </div>
         @endif
     </div>
 

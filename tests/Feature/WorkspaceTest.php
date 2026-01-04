@@ -444,6 +444,107 @@ test('can delete task from detail modal', function () {
     expect(Task::find($task->id))->toBeNull();
 });
 
+test('show-items component remains visible and refreshes after task deletion', function () {
+    $task1 = Task::factory()->create([
+        'user_id' => $this->user->id,
+        'title' => 'Task to Delete',
+        'start_date' => now()->toDateString(),
+    ]);
+
+    $task2 = Task::factory()->create([
+        'user_id' => $this->user->id,
+        'title' => 'Remaining Task',
+        'start_date' => now()->toDateString(),
+    ]);
+
+    actingAs($this->user);
+
+    $component = Livewire::test('workspace.show-items')
+        ->assertSet('viewMode', 'list');
+
+    // Verify component is visible by checking for view switcher
+    $component->assertSee('List View');
+
+    // Delete the task via the detail modal
+    Livewire::test('workspace.show-task-detail')
+        ->dispatch('view-task-detail', id: $task1->id)
+        ->call('deleteTask')
+        ->assertDispatched('task-deleted');
+
+    // Verify show-items component refreshes and remains visible
+    $component->dispatch('task-deleted')
+        ->assertSee('List View') // Component is still visible
+        ->assertSet('viewMode', 'list');
+});
+
+test('show-items component remains visible and refreshes after event deletion', function () {
+    $event1 = Event::factory()->create([
+        'user_id' => $this->user->id,
+        'title' => 'Event to Delete',
+        'start_datetime' => now()->addDay(),
+        'end_datetime' => now()->addDay()->addHour(),
+    ]);
+
+    $event2 = Event::factory()->create([
+        'user_id' => $this->user->id,
+        'title' => 'Remaining Event',
+        'start_datetime' => now()->addDays(2),
+        'end_datetime' => now()->addDays(2)->addHour(),
+    ]);
+
+    actingAs($this->user);
+
+    $component = Livewire::test('workspace.show-items')
+        ->assertSet('viewMode', 'list');
+
+    // Verify component is visible by checking for view switcher
+    $component->assertSee('List View');
+
+    // Delete the event via the detail modal
+    Livewire::test('workspace.show-event-detail')
+        ->dispatch('view-event-detail', id: $event1->id)
+        ->call('deleteEvent')
+        ->assertDispatched('event-deleted');
+
+    // Verify show-items component refreshes and remains visible
+    $component->dispatch('event-deleted')
+        ->assertSee('List View') // Component is still visible
+        ->assertSet('viewMode', 'list');
+});
+
+test('show-items component remains visible and refreshes after project deletion', function () {
+    $project1 = Project::factory()->create([
+        'user_id' => $this->user->id,
+        'name' => 'Project to Delete',
+        'start_date' => now()->toDateString(),
+    ]);
+
+    $project2 = Project::factory()->create([
+        'user_id' => $this->user->id,
+        'name' => 'Remaining Project',
+        'start_date' => now()->toDateString(),
+    ]);
+
+    actingAs($this->user);
+
+    $component = Livewire::test('workspace.show-items')
+        ->assertSet('viewMode', 'list');
+
+    // Verify component is visible by checking for view switcher
+    $component->assertSee('List View');
+
+    // Delete the project via the detail modal
+    Livewire::test('workspace.show-project-detail')
+        ->dispatch('view-project-detail', id: $project1->id)
+        ->call('deleteProject')
+        ->assertDispatched('project-deleted');
+
+    // Verify show-items component refreshes and remains visible
+    $component->dispatch('project-deleted')
+        ->assertSee('List View') // Component is still visible
+        ->assertSet('viewMode', 'list');
+});
+
 test('can open and view event detail modal', function () {
     $event = Event::factory()->create([
         'user_id' => $this->user->id,

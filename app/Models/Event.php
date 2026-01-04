@@ -23,10 +23,6 @@ class Event extends Model
         'description',
         'start_datetime',
         'end_datetime',
-        'all_day',
-        'timezone',
-        'location',
-        'color',
         'status',
     ];
 
@@ -36,7 +32,6 @@ class Event extends Model
             'status' => EventStatus::class,
             'start_datetime' => 'datetime',
             'end_datetime' => 'datetime',
-            'all_day' => 'boolean',
         ];
     }
 
@@ -56,11 +51,6 @@ class Event extends Model
             // Auto-calculate end_datetime if not provided
             if (is_null($event->end_datetime) && $event->start_datetime) {
                 $event->end_datetime = $event->start_datetime->copy()->addHour();
-            }
-
-            // Set timezone from config if not provided
-            if (is_null($event->timezone)) {
-                $event->timezone = config('app.timezone');
             }
         });
     }
