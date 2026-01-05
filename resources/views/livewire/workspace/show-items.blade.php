@@ -4,7 +4,6 @@ use App\Enums\EventStatus;
 use App\Enums\TaskStatus;
 use App\Models\Event;
 use App\Models\Project;
-use App\Models\Tag;
 use App\Models\Task;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -28,6 +27,20 @@ new class extends Component
     // Date navigation for list and kanban views
     public ?Carbon $currentDate = null;
 
+    // Filter properties
+    #[Url]
+    public ?string $filterType = null;
+    #[Url]
+    public ?string $filterPriority = null;
+    #[Url]
+    public ?string $filterStatus = null;
+
+    // Sort properties
+    #[Url]
+    public ?string $sortBy = null;
+    #[Url]
+    public string $sortDirection = 'asc';
+
     public function mount(): void
     {
         $this->weekStartDate = now()->startOfWeek();
@@ -38,12 +51,15 @@ new class extends Component
     public function switchView(string $mode): void
     {
         $this->viewMode = $mode;
+        // Reset filters and sorts when switching views
+        $this->clearAll();
     }
 
     public function goToTodayDate(): void
     {
         if (in_array($this->viewMode, ['list', 'kanban'])) {
             $this->currentDate = now();
+            $this->dispatch('date-focused', date: $this->currentDate->format('Y-m-d'));
         }
     }
 
@@ -51,6 +67,7 @@ new class extends Component
     {
         if (in_array($this->viewMode, ['list', 'kanban']) && $this->currentDate) {
             $this->currentDate = $this->currentDate->copy()->subDay();
+            $this->dispatch('date-focused', date: $this->currentDate->format('Y-m-d'));
         }
     }
 
@@ -58,6 +75,7 @@ new class extends Component
     {
         if (in_array($this->viewMode, ['list', 'kanban']) && $this->currentDate) {
             $this->currentDate = $this->currentDate->copy()->addDay();
+            $this->dispatch('date-focused', date: $this->currentDate->format('Y-m-d'));
         }
     }
 
@@ -117,20 +135,112 @@ new class extends Component
     public function refreshItems(): void
     {
         // Clear computed property cache to force recalculation with fresh data
-        // Unsetting 'items' will automatically invalidate dependent computed properties
-        // (filteredItems, itemsByStatus) since they depend on $this->items
-        // Use a more defensive approach to prevent component unmounting
-        if (isset($this->items)) {
-            unset($this->items);
-        }
+        // Use unset() to invalidate computed properties without causing component unmounting
+        // This will trigger Livewire to recompute the properties on next access
+        unset($this->filteredTasks);
+        unset($this->filteredEvents);
+        unset($this->filteredProjects);
+        unset($this->filteredItems);
+        unset($this->itemsByStatus);
+    }
 
-        // Also clear availableTags and availableProjects in case new tags/projects were created
-        if (isset($this->availableTags)) {
-            unset($this->availableTags);
+    #[On('reset-filters-sorts')]
+    public function resetFiltersAndSorts(): void
+    {
+        $this->clearAll();
+    }
+
+    #[On('set-filter-type')]
+    public function handleSetFilterType(...$params): void
+    {
+        $type = $params[0] ?? null;
+        $this->setFilterType($type);
+    }
+
+    #[On('set-filter-priority')]
+    public function handleSetFilterPriority(...$params): void
+    {
+        $priority = $params[0] ?? null;
+        $this->setFilterPriority($priority);
+    }
+
+    #[On('set-filter-status')]
+    public function handleSetFilterStatus(...$params): void
+    {
+        $status = $params[0] ?? null;
+        $this->setFilterStatus($status);
+    }
+
+    #[On('set-sort-by')]
+    public function handleSetSortBy(...$params): void
+    {
+        $sortBy = $params[0] ?? null;
+        $this->setSortBy($sortBy);
+    }
+
+    #[On('clear-all-filters-sorts')]
+    public function handleClearAll(): void
+    {
+        $this->clearAll();
+    }
+
+    public function setFilterType(?string $type): void
+    {
+        $this->filterType = $type;
+        unset($this->filteredTasks, $this->filteredEvents, $this->filteredProjects, $this->filteredItems, $this->itemsByStatus);
+    }
+
+    public function setFilterPriority(?string $priority): void
+    {
+        $this->filterPriority = $priority;
+        unset($this->filteredTasks, $this->filteredEvents, $this->filteredProjects, $this->filteredItems, $this->itemsByStatus);
+    }
+
+    public function setFilterStatus(?string $status): void
+    {
+        $this->filterStatus = $status;
+        unset($this->filteredTasks, $this->filteredEvents, $this->filteredProjects, $this->filteredItems, $this->itemsByStatus);
+    }
+
+    public function setSortBy(?string $sortBy): void
+    {
+        if ($this->sortBy === $sortBy) {
+            // Toggle direction if same sort field
+            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortBy = $sortBy;
+            $this->sortDirection = 'asc';
         }
-        if (isset($this->availableProjects)) {
-            unset($this->availableProjects);
-        }
+        unset($this->filteredTasks, $this->filteredEvents, $this->filteredProjects, $this->filteredItems, $this->itemsByStatus);
+    }
+
+    public function clearFilters(): void
+    {
+        $this->filterType = null;
+        $this->filterPriority = null;
+        $this->filterStatus = null;
+        unset($this->filteredTasks, $this->filteredEvents, $this->filteredProjects, $this->filteredItems, $this->itemsByStatus);
+    }
+
+    public function clearSorting(): void
+    {
+        $this->sortBy = null;
+        $this->sortDirection = 'asc';
+        unset($this->filteredTasks, $this->filteredEvents, $this->filteredProjects, $this->filteredItems, $this->itemsByStatus);
+    }
+
+    public function clearAll(): void
+    {
+        $this->clearFilters();
+        $this->clearSorting();
+    }
+
+    #[Computed]
+    public function hasActiveFilters(): bool
+    {
+        return ($this->filterType && $this->filterType !== 'all')
+            || ($this->filterPriority && $this->filterPriority !== 'all')
+            || ($this->filterStatus && $this->filterStatus !== 'all');
     }
 
     public function updateItemDateTime(int $itemId, string $itemType, string $newStart, ?string $newEnd = null): void
@@ -294,158 +404,206 @@ new class extends Component
     }
 
     #[Computed]
-    public function items(): Collection
-    {
-        $user = auth()->user();
-        $items = collect();
-
-        // Always fetch all tasks
-        $tasks = Task::query()
-            ->accessibleBy($user)
-            ->with(['project', 'tags', 'event'])
-            ->get()
-            ->map(function ($task) {
-                $task->item_type = 'task';
-                $task->sort_date = $task->end_date ?? $task->created_at;
-
-                return $task;
-            });
-
-        // Always fetch all events
-        $events = Event::query()
-            ->accessibleBy($user)
-            ->with(['tags'])
-            ->get()
-            ->map(function ($event) {
-                $event->item_type = 'event';
-                $event->sort_date = $event->start_datetime;
-
-                return $event;
-            });
-
-        // Always fetch all projects
-        $projects = Project::query()
-            ->accessibleBy($user)
-            ->with(['tags', 'tasks'])
-            ->get()
-            ->map(function ($project) {
-                $project->item_type = 'project';
-                $project->sort_date = $project->created_at;
-
-                return $project;
-            });
-
-        return $items->merge($tasks)->merge($events)->merge($projects);
-    }
-
-    #[Computed]
-    public function availableTags(): Collection
+    public function filteredTasks(): Collection
     {
         $user = auth()->user();
 
-        return Tag::whereHas('tasks', function ($query) use ($user) {
-            $query->accessibleBy($user);
-        })
-            ->orWhereHas('events', function ($query) use ($user) {
-                $query->accessibleBy($user);
-            })
-            ->orWhereHas('projects', function ($query) use ($user) {
-                $query->accessibleBy($user);
-            })
-            ->orderBy('name')
-            ->get();
+        $query = Task::query()
+            ->accessibleBy($user)
+            ->with(['project', 'tags', 'event']);
+
+        // Apply filters
+        if ($this->filterType === 'task' || !$this->filterType || $this->filterType === 'all') {
+            // Only apply filters if we're showing tasks or all items
+            if ($this->filterPriority) {
+                $query->filterByPriority($this->filterPriority);
+            }
+            if ($this->filterStatus) {
+                $query->filterByStatus($this->filterStatus);
+            }
+        } else {
+            // If filtering by type and it's not 'task', return empty collection
+            return collect();
+        }
+
+        // Apply date filter for list/kanban views
+        if (in_array($this->viewMode, ['list', 'kanban']) && $this->currentDate) {
+            $query->dateFilter($this->currentDate);
+        }
+
+        // Apply sorting
+        $query->orderByField($this->sortBy, $this->sortDirection);
+
+        return $query->get()->map(function ($task) {
+            $task->item_type = 'task';
+            $task->sort_date = $task->end_datetime ?? $task->created_at;
+
+            return $task;
+        });
     }
 
     #[Computed]
-    public function availableProjects(): Collection
+    public function filteredEvents(): Collection
     {
-        return Project::accessibleBy(auth()->user())
-            ->orderBy('name')
-            ->get();
+        $user = auth()->user();
+
+        $query = Event::query()
+            ->accessibleBy($user)
+            ->with(['tags', 'tasks']);
+
+        // Apply filters
+        if ($this->filterType === 'event' || !$this->filterType || $this->filterType === 'all') {
+            // Only apply filters if we're showing events or all items
+            if ($this->filterPriority) {
+                $query->filterByPriority($this->filterPriority);
+            }
+            if ($this->filterStatus) {
+                $query->filterByStatus($this->filterStatus);
+            }
+        } else {
+            // If filtering by type and it's not 'event', return empty collection
+            return collect();
+        }
+
+        // Apply date filter for list/kanban views
+        if (in_array($this->viewMode, ['list', 'kanban']) && $this->currentDate) {
+            $query->dateFilter($this->currentDate);
+        }
+
+        // Apply sorting
+        $query->orderByField($this->sortBy, $this->sortDirection);
+
+        return $query->get()->map(function ($event) {
+            $event->item_type = 'event';
+            $event->sort_date = $event->start_datetime;
+
+            return $event;
+        });
+    }
+
+    #[Computed]
+    public function filteredProjects(): Collection
+    {
+        $user = auth()->user();
+
+        $query = Project::query()
+            ->accessibleBy($user)
+            ->with(['tags', 'tasks']);
+
+        // Apply filters
+        if ($this->filterType === 'project' || !$this->filterType || $this->filterType === 'all') {
+            // Only apply filters if we're showing projects or all items
+            if ($this->filterPriority) {
+                $query->filterByPriority($this->filterPriority);
+            }
+            if ($this->filterStatus) {
+                $query->filterByStatus($this->filterStatus);
+            }
+        } else {
+            // If filtering by type and it's not 'project', return empty collection
+            return collect();
+        }
+
+        // Apply date filter for list/kanban views
+        if (in_array($this->viewMode, ['list', 'kanban']) && $this->currentDate) {
+            $query->dateFilter($this->currentDate);
+        }
+
+        // Apply sorting
+        $query->orderByField($this->sortBy, $this->sortDirection);
+
+        return $query->get()->map(function ($project) {
+            $project->item_type = 'project';
+            $project->sort_date = $project->created_at;
+
+            return $project;
+        });
     }
 
     #[Computed]
     public function filteredItems(): Collection
     {
-        // For weekly view, return all items (weekly view handles its own filtering)
+        // For weekly view, apply filters and sorting but not date filtering (weekly view handles its own date filtering)
         if ($this->viewMode === 'weekly') {
-            return $this->items;
-        }
+            $user = auth()->user();
 
-        // For list/kanban views, filter items by currentDate
-        if (! in_array($this->viewMode, ['list', 'kanban']) || ! $this->currentDate) {
-            return $this->items;
-        }
+            // Get filtered tasks (without date filter)
+            $taskQuery = Task::query()
+                ->accessibleBy($user)
+                ->with(['project', 'tags', 'event']);
 
-        $targetDate = $this->currentDate->format('Y-m-d');
-
-        return $this->items->filter(function ($item) use ($targetDate) {
-            if ($item->item_type === 'task') {
-                // If task has no dates, don't show in date-filtered view
-                if (! $item->start_datetime && ! $item->end_datetime) {
-                    return false;
+            if ($this->filterType === 'task' || !$this->filterType || $this->filterType === 'all') {
+                if ($this->filterPriority) {
+                    $taskQuery->filterByPriority($this->filterPriority);
                 }
-
-                $startDate = $item->start_datetime instanceof Carbon
-                    ? $item->start_datetime->format('Y-m-d')
-                    : Carbon::parse($item->start_datetime)->format('Y-m-d');
-
-                $endDate = null;
-                if ($item->end_datetime) {
-                    $endDate = $item->end_datetime instanceof Carbon
-                        ? $item->end_datetime->format('Y-m-d')
-                        : Carbon::parse($item->end_datetime)->format('Y-m-d');
+                if ($this->filterStatus) {
+                    $taskQuery->filterByStatus($this->filterStatus);
                 }
-
-                // Include task if it starts, ends, or spans the target date
-                return ($startDate === $targetDate) ||
-                       ($endDate === $targetDate) ||
-                       ($endDate && $startDate <= $targetDate && $endDate >= $targetDate);
-            } elseif ($item->item_type === 'event') {
-                if (! $item->start_datetime) {
-                    return false;
-                }
-
-                $startDate = $item->start_datetime instanceof Carbon
-                    ? $item->start_datetime->format('Y-m-d')
-                    : Carbon::parse($item->start_datetime)->format('Y-m-d');
-
-                $endDate = null;
-                if ($item->end_datetime) {
-                    $endDate = $item->end_datetime instanceof Carbon
-                        ? $item->end_datetime->format('Y-m-d')
-                        : Carbon::parse($item->end_datetime)->format('Y-m-d');
-                }
-
-                // Include event if it starts, ends, or spans the target date
-                return ($startDate === $targetDate) ||
-                       ($endDate === $targetDate) ||
-                       ($endDate && $startDate <= $targetDate && $endDate >= $targetDate);
-            } elseif ($item->item_type === 'project') {
-                // If project has no dates, don't show in date-filtered view
-                if (! $item->start_date && ! $item->end_date) {
-                    return false;
-                }
-
-                $startDate = $item->start_date instanceof Carbon
-                    ? $item->start_date->format('Y-m-d')
-                    : Carbon::parse($item->start_date)->format('Y-m-d');
-
-                $endDate = null;
-                if ($item->end_date) {
-                    $endDate = $item->end_date instanceof Carbon
-                        ? $item->end_date->format('Y-m-d')
-                        : Carbon::parse($item->end_date)->format('Y-m-d');
-                }
-
-                // Include project if it starts, ends, or spans the target date
-                return ($startDate === $targetDate) ||
-                       ($endDate === $targetDate) ||
-                       ($endDate && $startDate <= $targetDate && $endDate >= $targetDate);
+            } else {
+                $taskQuery->whereRaw('1 = 0'); // Return empty result
             }
 
-            return false;
-        });
+            $taskQuery->orderByField($this->sortBy, $this->sortDirection);
+            $tasks = $taskQuery->get()->map(function ($task) {
+                $task->item_type = 'task';
+                $task->sort_date = $task->end_datetime ?? $task->created_at;
+                return $task;
+            });
+
+            // Get filtered events (without date filter)
+            $eventQuery = Event::query()
+                ->accessibleBy($user)
+                ->with(['tags', 'tasks']);
+
+            if ($this->filterType === 'event' || !$this->filterType || $this->filterType === 'all') {
+                if ($this->filterPriority) {
+                    $eventQuery->filterByPriority($this->filterPriority);
+                }
+                if ($this->filterStatus) {
+                    $eventQuery->filterByStatus($this->filterStatus);
+                }
+            } else {
+                $eventQuery->whereRaw('1 = 0'); // Return empty result
+            }
+
+            $eventQuery->orderByField($this->sortBy, $this->sortDirection);
+            $events = $eventQuery->get()->map(function ($event) {
+                $event->item_type = 'event';
+                $event->sort_date = $event->start_datetime;
+                return $event;
+            });
+
+            // Get filtered projects (without date filter)
+            $projectQuery = Project::query()
+                ->accessibleBy($user)
+                ->with(['tags', 'tasks']);
+
+            if ($this->filterType === 'project' || !$this->filterType || $this->filterType === 'all') {
+                if ($this->filterPriority) {
+                    $projectQuery->filterByPriority($this->filterPriority);
+                }
+                if ($this->filterStatus) {
+                    $projectQuery->filterByStatus($this->filterStatus);
+                }
+            } else {
+                $projectQuery->whereRaw('1 = 0'); // Return empty result
+            }
+
+            $projectQuery->orderByField($this->sortBy, $this->sortDirection);
+            $projects = $projectQuery->get()->map(function ($project) {
+                $project->item_type = 'project';
+                $project->sort_date = $project->created_at;
+                return $project;
+            });
+
+            return collect()->merge($tasks)->merge($events)->merge($projects);
+        }
+
+        // For list/kanban views, merge filtered collections
+        return collect()
+            ->merge($this->filteredTasks)
+            ->merge($this->filteredEvents)
+            ->merge($this->filteredProjects);
     }
 
     #[Computed]
@@ -469,77 +627,6 @@ new class extends Component
     x-data="{}"
     x-cloak
 >
-    <!-- View Switcher -->
-    <div class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
-        <div class="flex gap-2" role="group" aria-label="View mode selection">
-            <flux:tooltip content="List View">
-                <button
-                    wire:click="switchView('list')"
-                    wire:loading.attr="disabled"
-                    wire:target="switchView"
-                    aria-label="Switch to list view"
-                    aria-pressed="{{ $viewMode === 'list' ? 'true' : 'false' }}"
-                    class="px-3 py-2 rounded transition-colors {{ $viewMode === 'list' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600' }} disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    <span wire:loading.remove wire:target="switchView">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
-                    </span>
-                    <span wire:loading wire:target="switchView">
-                        <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                    </span>
-                </button>
-            </flux:tooltip>
-            <flux:tooltip content="Kanban View">
-                <button
-                    wire:click="switchView('kanban')"
-                    wire:loading.attr="disabled"
-                    wire:target="switchView"
-                    aria-label="Switch to kanban view"
-                    aria-pressed="{{ $viewMode === 'kanban' ? 'true' : 'false' }}"
-                    class="px-3 py-2 rounded transition-colors {{ $viewMode === 'kanban' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600' }} disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    <span wire:loading.remove wire:target="switchView">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-                        </svg>
-                    </span>
-                    <span wire:loading wire:target="switchView">
-                        <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                    </span>
-                </button>
-            </flux:tooltip>
-            <flux:tooltip content="Weekly Timegrid View">
-                <button
-                    wire:click="switchView('weekly')"
-                    wire:loading.attr="disabled"
-                    wire:target="switchView"
-                    aria-label="Switch to weekly timegrid view"
-                    aria-pressed="{{ $viewMode === 'weekly' ? 'true' : 'false' }}"
-                    class="px-3 py-2 rounded transition-colors {{ $viewMode === 'weekly' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600' }} disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    <span wire:loading.remove wire:target="switchView">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                    </span>
-                    <span wire:loading wire:target="switchView">
-                        <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                    </span>
-                </button>
-            </flux:tooltip>
-        </div>
-    </div>
 
     <!-- Loading Overlay for View Switching -->
     <div
@@ -575,23 +662,37 @@ new class extends Component
 
     <!-- List View -->
     @if($viewMode === 'list')
-        <div wire:key="list-view-container-{{ $currentDate->format('Y-m-d') }}" wire:transition="fade">
+        <div wire:key="list-view-container" wire:transition="fade">
             <livewire:workspace.list-view
                 :items="$this->filteredItems"
                 :current-date="$currentDate"
-                wire:key="list-view-{{ $currentDate->format('Y-m-d') }}"
+                :filter-type="$filterType"
+                :filter-priority="$filterPriority"
+                :filter-status="$filterStatus"
+                :sort-by="$sortBy"
+                :sort-direction="$sortDirection"
+                :has-active-filters="$this->hasActiveFilters"
+                :view-mode="$viewMode"
+                wire:key="list-view-{{ $viewMode }}"
             />
         </div>
     @endif
 
     <!-- Kanban View -->
     @if($viewMode === 'kanban')
-        <div wire:key="kanban-view-container-{{ $currentDate->format('Y-m-d') }}" wire:transition="fade">
+        <div wire:key="kanban-view-container" wire:transition="fade">
             <livewire:workspace.kanban-view
                 :items="$this->filteredItems"
                 :items-by-status="$this->itemsByStatus"
                 :current-date="$currentDate"
-                wire:key="kanban-view-{{ $currentDate->format('Y-m-d') }}"
+                :filter-type="$filterType"
+                :filter-priority="$filterPriority"
+                :filter-status="$filterStatus"
+                :sort-by="$sortBy"
+                :sort-direction="$sortDirection"
+                :has-active-filters="$this->hasActiveFilters"
+                :view-mode="$viewMode"
+                wire:key="kanban-view-{{ $viewMode }}"
             />
         </div>
     @endif
@@ -600,8 +701,15 @@ new class extends Component
     @if($viewMode === 'weekly')
         <div wire:key="weekly-view-container-{{ $weekStartDate->format('Y-m-d') }}" wire:transition="fade">
             <livewire:workspace.weekly-view
-                :items="$this->items"
+                :items="$this->filteredItems"
                 :week-start-date="$weekStartDate"
+                :view-mode="$viewMode"
+                :filter-type="$filterType"
+                :filter-priority="$filterPriority"
+                :filter-status="$filterStatus"
+                :sort-by="$sortBy"
+                :sort-direction="$sortDirection"
+                :has-active-filters="$this->hasActiveFilters"
                 wire:key="weekly-view-{{ $weekStartDate->format('Y-m-d') }}"
             />
         </div>

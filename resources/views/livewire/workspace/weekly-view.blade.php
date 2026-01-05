@@ -14,6 +14,27 @@ new class extends Component
     #[Reactive]
     public ?Carbon $weekStartDate = null;
 
+    #[Reactive]
+    public string $viewMode = 'weekly';
+
+    #[Reactive]
+    public ?string $filterType = null;
+
+    #[Reactive]
+    public ?string $filterPriority = null;
+
+    #[Reactive]
+    public ?string $filterStatus = null;
+
+    #[Reactive]
+    public ?string $sortBy = null;
+
+    #[Reactive]
+    public string $sortDirection = 'asc';
+
+    #[Reactive]
+    public bool $hasActiveFilters = false;
+
     public int $startHour = 6;
 
     public int $endHour = 23;
@@ -22,10 +43,26 @@ new class extends Component
 
     public int $slotIncrement = 15;
 
-    public function mount(Collection $items, ?Carbon $weekStartDate = null): void
-    {
+    public function mount(
+        Collection $items,
+        ?Carbon $weekStartDate = null,
+        string $viewMode = 'weekly',
+        ?string $filterType = null,
+        ?string $filterPriority = null,
+        ?string $filterStatus = null,
+        ?string $sortBy = null,
+        string $sortDirection = 'asc',
+        bool $hasActiveFilters = false
+    ): void {
         $this->items = $items;
         $this->weekStartDate = $weekStartDate ?? now()->startOfWeek();
+        $this->viewMode = $viewMode;
+        $this->filterType = $filterType;
+        $this->filterPriority = $filterPriority;
+        $this->filterStatus = $filterStatus;
+        $this->sortBy = $sortBy;
+        $this->sortDirection = $sortDirection;
+        $this->hasActiveFilters = $hasActiveFilters;
     }
 
     public function previousWeek(): void
@@ -152,55 +189,82 @@ new class extends Component
 
         return $itemsByDay;
     }
+
+    #[Computed]
+    public function filterDescription(): string
+    {
+        $parts = [];
+
+        if ($this->filterType && $this->filterType !== 'all') {
+            $typeLabel = match($this->filterType) {
+                'task' => 'tasks',
+                'event' => 'events',
+                'project' => 'projects',
+                default => $this->filterType,
+            };
+            $parts[] = "Showing {$typeLabel} only";
+        }
+
+        if ($this->filterPriority && $this->filterPriority !== 'all') {
+            $priorityLabel = ucfirst($this->filterPriority);
+            $parts[] = "Priority: {$priorityLabel}";
+        }
+
+        if ($this->filterStatus && $this->filterStatus !== 'all') {
+            $statusLabel = match($this->filterStatus) {
+                'to_do' => 'To Do',
+                'doing' => 'In Progress',
+                'done' => 'Done',
+                'scheduled' => 'Scheduled',
+                'completed' => 'Completed',
+                'cancelled' => 'Cancelled',
+                'tentative' => 'Tentative',
+                default => ucfirst($this->filterStatus),
+            };
+            $parts[] = "Status: {$statusLabel}";
+        }
+
+        return implode(' • ', $parts);
+    }
+
+    #[Computed]
+    public function sortDescription(): ?string
+    {
+        if (!$this->sortBy) {
+            return null;
+        }
+
+        $sortLabel = match($this->sortBy) {
+            'priority' => 'Priority',
+            'created_at' => 'Date Created',
+            'start_datetime' => 'Start Date',
+            'end_datetime' => 'End Date',
+            'title' => 'Title/Name',
+            'status' => 'Status',
+            default => ucfirst(str_replace('_', ' ', $this->sortBy)),
+        };
+
+        $direction = $this->sortDirection === 'asc' ? '↑' : '↓';
+
+        return "Sorted by: {$sortLabel} {$direction}";
+    }
 }; ?>
 
 <div class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
-    <!-- Week Navigation -->
-    <div class="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-700">
-        <div class="flex items-center gap-2">
-            <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-                {{ $weekStartDate->format('M d') }} - {{ $weekStartDate->copy()->addDays(6)->format('M d, Y') }}
-            </h3>
-        </div>
-        <div class="flex items-center gap-2" role="group" aria-label="Week navigation">
-            <flux:button
-                variant="ghost"
-                size="sm"
-                wire:click="goToToday"
-                wire:loading.attr="disabled"
-                wire:target="goToToday,previousWeek,nextWeek"
-                aria-label="Go to current week"
-            >
-                <span wire:loading.remove wire:target="goToToday,previousWeek,nextWeek">Today</span>
-                <span wire:loading wire:target="goToToday,previousWeek,nextWeek">
-                    <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                </span>
-            </flux:button>
-            <flux:button
-                variant="ghost"
-                size="sm"
-                icon="chevron-left"
-                wire:click="previousWeek"
-                wire:loading.attr="disabled"
-                wire:target="goToToday,previousWeek,nextWeek"
-                aria-label="Previous week"
-            >
-            </flux:button>
-            <flux:button
-                variant="ghost"
-                size="sm"
-                icon="chevron-right"
-                wire:click="nextWeek"
-                wire:loading.attr="disabled"
-                wire:target="goToToday,previousWeek,nextWeek"
-                aria-label="Next week"
-            >
-            </flux:button>
-        </div>
-    </div>
+    <!-- View Navigation -->
+    <x-workspace.view-navigation
+        :view-mode="$viewMode"
+        :week-start-date="$weekStartDate"
+        :filter-type="$filterType"
+        :filter-priority="$filterPriority"
+        :filter-status="$filterStatus"
+        :sort-by="$sortBy"
+        :sort-direction="$sortDirection"
+        :has-active-filters="$hasActiveFilters"
+        :filter-description="$this->filterDescription"
+        :sort-description="$this->sortDescription"
+        no-wrapper
+    />
 
     <!-- Weekly Calendar Grid -->
     <div class="overflow-x-auto">

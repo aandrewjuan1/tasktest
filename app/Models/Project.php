@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\CollaborationPermission;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -36,7 +38,7 @@ class Project extends Model
         static::creating(function (Project $project) {
             // Set default start_date to current date if not provided
             if (is_null($project->start_date)) {
-                $project->start_date = \Illuminate\Support\Carbon::today()->toDateString();
+                $project->start_date = \Illuminate\Support\Carbon::today();
             }
         });
     }
@@ -142,5 +144,77 @@ class Project extends Model
             $q->where('user_id', $user->id)
                 ->orWhereHas('collaborations', fn ($q) => $q->where('user_id', $user->id));
         });
+    }
+
+    public function scopeFilterByPriority($query, ?string $priority): Builder
+    {
+        // Projects don't have priority, so this is a no-op for interface consistency
+        return $query;
+    }
+
+    public function scopeFilterByStatus($query, ?string $status): Builder
+    {
+        // Projects don't have status, so this is a no-op for interface consistency
+        return $query;
+    }
+
+    public function scopeDateFilter($query, ?Carbon $date): Builder
+    {
+        if (!$date) {
+            return $query;
+        }
+
+        $targetDate = $date->format('Y-m-d');
+
+        return $query->where(function ($q) use ($targetDate) {
+            $q->where(function ($dateQ) use ($targetDate) {
+                $dateQ->whereNotNull('start_date')
+                    ->where(function ($subQ) use ($targetDate) {
+                        $subQ->whereDate('start_date', $targetDate)
+                            ->orWhereDate('end_date', $targetDate)
+                            ->orWhere(function ($spanQ) use ($targetDate) {
+                                $spanQ->whereDate('start_date', '<=', $targetDate)
+                                    ->whereDate('end_date', '>=', $targetDate);
+                            });
+                    });
+            });
+        });
+    }
+
+    public function scopeSortByCreatedAt($query, string $direction = 'desc'): Builder
+    {
+        return $query->orderBy('created_at', $direction);
+    }
+
+    public function scopeSortByStartDate($query, string $direction = 'asc'): Builder
+    {
+        return $query->orderBy('start_date', $direction);
+    }
+
+    public function scopeSortByEndDate($query, string $direction = 'asc'): Builder
+    {
+        return $query->orderBy('end_date', $direction);
+    }
+
+    public function scopeSortByName($query, string $direction = 'asc'): Builder
+    {
+        return $query->orderBy('name', $direction);
+    }
+
+    public function scopeOrderByField($query, ?string $field, string $direction = 'asc'): Builder
+    {
+        if (!$field) {
+            return $query->orderBy('created_at', 'desc');
+        }
+
+        return match ($field) {
+            'created_at' => $query->orderBy('created_at', $direction),
+            'start_datetime' => $query->orderBy('start_date', $direction), // Map to start_date for projects
+            'end_datetime' => $query->orderBy('end_date', $direction), // Map to end_date for projects
+            'title' => $query->orderBy('name', $direction), // Map to name for projects
+            'status' => $query->orderBy('created_at', 'desc'), // Projects don't have status
+            'priority' => $query->orderBy('created_at', 'desc'), // Projects don't have priority
+            default => $query->orderBy('created_at', 'desc'),
+        };
     }
 }

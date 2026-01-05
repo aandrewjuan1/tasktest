@@ -51,6 +51,12 @@ new class extends Component
         $parsedDate = Carbon::parse($date);
         if (! $this->focusedDate || $this->focusedDate->format('Y-m-d') !== $parsedDate->format('Y-m-d')) {
             $this->focusedDate = $parsedDate;
+
+            // Update month/year if the focused date is outside the current month view
+            if ($parsedDate->month !== $this->month || $parsedDate->year !== $this->year) {
+                $this->year = $parsedDate->year;
+                $this->month = $parsedDate->month;
+            }
         }
     }
 
@@ -69,16 +75,27 @@ new class extends Component
     #[Computed]
     public function calendarDays(): array
     {
-        $start = $this->currentDate->copy()->startOfMonth()->startOfWeek();
-        $end = $this->currentDate->copy()->endOfMonth()->endOfWeek();
+        $start = $this->currentDate->copy()->startOfMonth();
+        $end = $this->currentDate->copy()->endOfMonth();
 
         $days = [];
-        $current = $start->copy();
 
+        // Add empty cells for days before the first day of the month
+        $firstDayOfWeek = $start->dayOfWeek; // 0 = Sunday, 6 = Saturday
+        for ($i = 0; $i < $firstDayOfWeek; $i++) {
+            $days[] = [
+                'date' => null,
+                'isCurrentMonth' => false,
+                'isToday' => false,
+            ];
+        }
+
+        // Add all days of the current month
+        $current = $start->copy();
         while ($current <= $end) {
             $days[] = [
                 'date' => $current->copy(),
-                'isCurrentMonth' => $current->month === $this->month,
+                'isCurrentMonth' => true,
                 'isToday' => $current->isToday(),
             ];
             $current->addDay();
@@ -159,17 +176,20 @@ new class extends Component
         return $tasksByDate;
     }
 
-    public function getItemCountForDate(Carbon $date): int
+    public function getItemCountForDate(?Carbon $date): int
     {
+        if (! $date) {
+            return 0;
+        }
         $dateKey = $date->format('Y-m-d');
-        $eventCount = count($this->events[$dateKey] ?? []);
-        $taskCount = count($this->tasks[$dateKey] ?? []);
-
-        return $eventCount + $taskCount;
+        return count($this->events[$dateKey] ?? []);
     }
 
-    public function getUrgencyLevelForDate(Carbon $date): string
+    public function getUrgencyLevelForDate(?Carbon $date): string
     {
+        if (! $date) {
+            return 'low';
+        }
         $dateKey = $date->format('Y-m-d');
         $dayTasks = $this->tasks[$dateKey] ?? [];
 
@@ -195,7 +215,7 @@ new class extends Component
     }
 }; ?>
 
-<div class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 h-full flex flex-col" x-cloak>
+<div class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 flex flex-col sticky top-6" x-cloak>
     <!-- Calendar Header -->
     <div class="flex items-center justify-between mb-4">
         <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
@@ -213,7 +233,7 @@ new class extends Component
     </div>
 
     <!-- Calendar Grid -->
-    <div class="flex-1 overflow-auto">
+    <div>
         <!-- Day Headers -->
         <div class="grid grid-cols-7 gap-1 mb-2">
             @foreach(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as $day)
@@ -226,45 +246,50 @@ new class extends Component
         <!-- Calendar Days -->
         <div class="grid grid-cols-7 gap-1">
             @foreach($this->calendarDays as $day)
-                @php
-                    $itemCount = $this->getItemCountForDate($day['date']);
-                    $urgencyLevel = $this->getUrgencyLevelForDate($day['date']);
-                    $dayDateString = $day['date']->format('Y-m-d');
-                    $isFocused = $this->focusedDate && $this->focusedDate->format('Y-m-d') === $dayDateString;
+                @if($day['date'] === null)
+                    {{-- Empty cell for days before the first day of the month --}}
+                    <div class="min-h-[80px] rounded-lg p-1 border border-transparent"></div>
+                @else
+                    @php
+                        $itemCount = $this->getItemCountForDate($day['date']);
+                        $urgencyLevel = $this->getUrgencyLevelForDate($day['date']);
+                        $dayDateString = $day['date']->format('Y-m-d');
+                        $isFocused = $this->focusedDate && $this->focusedDate->format('Y-m-d') === $dayDateString;
 
-                    $badgeClasses = match($urgencyLevel) {
-                        'urgent' => 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
-                        'high' => 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300',
-                        'medium' => 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300',
-                        default => 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
-                    };
+                        $badgeClasses = match($urgencyLevel) {
+                            'urgent' => 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
+                            'high' => 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300',
+                            'medium' => 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300',
+                            default => 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
+                        };
 
-                    $borderClasses = '';
-                    if ($day['isToday']) {
-                        $borderClasses = 'border-2 border-green-500';
-                    } elseif ($isFocused) {
-                        $borderClasses = 'border-2 border-blue-500';
-                    }
-                @endphp
-                <div
-                    class="min-h-[80px] rounded-lg p-1 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors {{ $day['isCurrentMonth'] ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50' }} {{ $borderClasses ?: 'border border-zinc-200 dark:border-zinc-700' }}"
-                    @click="
-                        $wire.$set('focusedDate', '{{ $dayDateString }}');
-                        $dispatch('date-focused', { date: '{{ $dayDateString }}' });
-                    "
-                >
-                    <div class="text-xs {{ $day['isCurrentMonth'] ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 dark:text-zinc-600' }} {{ ($day['isToday'] || $isFocused) ? 'font-bold ' : '' }}{{ $day['isToday'] ? 'text-green-600 dark:text-green-400' : ($isFocused ? 'text-blue-600 dark:text-blue-400' : '') }} mb-1">
-                        {{ $day['date']->day }}
-                    </div>
-
-                    @if($itemCount > 0)
-                        <div class="flex items-center justify-center mt-1">
-                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold {{ $badgeClasses }}">
-                                {{ $itemCount }}
-                            </span>
+                        $borderClasses = '';
+                        if ($day['isToday']) {
+                            $borderClasses = 'border-2 border-green-500';
+                        } elseif ($isFocused) {
+                            $borderClasses = 'border-2 border-blue-500';
+                        }
+                    @endphp
+                    <div
+                        class="min-h-[80px] rounded-lg p-1 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors bg-white dark:bg-zinc-900 {{ $borderClasses ?: 'border border-zinc-200 dark:border-zinc-700' }}"
+                        @click="
+                            $wire.$set('focusedDate', '{{ $dayDateString }}');
+                            $dispatch('date-focused', { date: '{{ $dayDateString }}' });
+                        "
+                    >
+                        <div class="text-xs text-zinc-900 dark:text-zinc-100 {{ ($day['isToday'] || $isFocused) ? 'font-bold ' : '' }}{{ $day['isToday'] ? 'text-green-600 dark:text-green-400' : ($isFocused ? 'text-blue-600 dark:text-blue-400' : '') }} mb-1">
+                            {{ $day['date']->day }}
                         </div>
-                    @endif
-                </div>
+
+                        @if($itemCount > 0)
+                            <div class="flex items-center justify-center mt-1">
+                                <span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold {{ $badgeClasses }}">
+                                    {{ $itemCount }}
+                                </span>
+                            </div>
+                        @endif
+                    </div>
+                @endif
             @endforeach
         </div>
     </div>

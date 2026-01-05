@@ -9,7 +9,7 @@ new
 class extends Component {
 }; ?>
 
-<div class="h-screen flex flex-col overflow-hidden">
+<div class="min-h-screen flex flex-col">
     <!-- Toast Notifications -->
     <x-toast />
 
@@ -26,14 +26,14 @@ class extends Component {
     @endif
 
     <!-- Main Layout: 75/25 Split -->
-    <div class="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-6 overflow-hidden">
+    <div class="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-6 p-6">
         <!-- Left Column: Tasks, Events, Projects (75%) -->
-        <div class="lg:col-span-3 overflow-y-auto">
+        <div class="lg:col-span-3">
             <livewire:workspace.show-items wire:key="workspace-show-items" />
         </div>
 
         <!-- Right Column: Calendar (25%) -->
-        <div class="lg:col-span-1 overflow-y-auto">
+        <div class="lg:col-span-1">
             <livewire:workspace.calendar-view wire:key="workspace-calendar-view" />
         </div>
     </div>

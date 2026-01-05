@@ -6,6 +6,8 @@ use App\Enums\CollaborationPermission;
 use App\Enums\TaskComplexity;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -185,5 +187,114 @@ class Task extends Model
             $q->where('user_id', $user->id)
                 ->orWhereHas('collaborations', fn ($q) => $q->where('user_id', $user->id));
         });
+    }
+
+    public function scopeFilterByPriority($query, ?string $priority): Builder
+    {
+        if ($priority && $priority !== 'all') {
+            $query->where('priority', $priority);
+        }
+
+        return $query;
+    }
+
+    public function scopeFilterByStatus($query, ?string $status): Builder
+    {
+        if ($status && $status !== 'all') {
+            $query->where('status', $status);
+        }
+
+        return $query;
+    }
+
+    public function scopeFilterByComplexity($query, ?string $complexity): Builder
+    {
+        if ($complexity && $complexity !== 'all') {
+            $query->where('complexity', $complexity);
+        }
+
+        return $query;
+    }
+
+    public function scopeDateFilter($query, ?Carbon $date): Builder
+    {
+        if (!$date) {
+            return $query;
+        }
+
+        $targetDate = $date->format('Y-m-d');
+
+        return $query->where(function ($q) use ($targetDate) {
+            $q->where(function ($dateQ) use ($targetDate) {
+                $dateQ->whereNotNull('start_datetime')
+                    ->where(function ($subQ) use ($targetDate) {
+                        $subQ->whereDate('start_datetime', $targetDate)
+                            ->orWhereDate('end_datetime', $targetDate)
+                            ->orWhere(function ($spanQ) use ($targetDate) {
+                                $spanQ->whereDate('start_datetime', '<=', $targetDate)
+                                    ->whereDate('end_datetime', '>=', $targetDate);
+                            });
+                    });
+            });
+        });
+    }
+
+    public function scopeSortByPriority($query, string $direction = 'desc'): Builder
+    {
+        return $query->orderByRaw("CASE
+            WHEN priority = 'urgent' THEN 4
+            WHEN priority = 'high' THEN 3
+            WHEN priority = 'medium' THEN 2
+            WHEN priority = 'low' THEN 1
+            ELSE 0
+        END {$direction}");
+    }
+
+    public function scopeSortByCreatedAt($query, string $direction = 'desc'): Builder
+    {
+        return $query->orderBy('created_at', $direction);
+    }
+
+    public function scopeSortByStartDatetime($query, string $direction = 'asc'): Builder
+    {
+        return $query->orderBy('start_datetime', $direction);
+    }
+
+    public function scopeSortByEndDatetime($query, string $direction = 'asc'): Builder
+    {
+        return $query->orderBy('end_datetime', $direction);
+    }
+
+    public function scopeSortByTitle($query, string $direction = 'asc'): Builder
+    {
+        return $query->orderBy('title', $direction);
+    }
+
+    public function scopeSortByStatus($query, string $direction = 'asc'): Builder
+    {
+        return $query->orderBy('status', $direction);
+    }
+
+    public function scopeOrderByField($query, ?string $field, string $direction = 'asc'): Builder
+    {
+        if (!$field) {
+            return $query->orderBy('created_at', 'desc');
+        }
+
+        return match ($field) {
+            'priority' => $query->orderByRaw("CASE
+                WHEN priority = 'urgent' THEN 4
+                WHEN priority = 'high' THEN 3
+                WHEN priority = 'medium' THEN 2
+                WHEN priority = 'low' THEN 1
+                ELSE 0
+            END {$direction}"),
+            'created_at' => $query->orderBy('created_at', $direction),
+            'start_datetime' => $query->orderBy('start_datetime', $direction),
+            'end_datetime' => $query->orderBy('end_datetime', $direction),
+            'title' => $query->orderBy('title', $direction),
+            'status' => $query->orderBy('status', $direction),
+            default => $query->orderBy('created_at', 'desc'),
+        };
     }
 }
