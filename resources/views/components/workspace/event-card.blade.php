@@ -13,10 +13,46 @@
         </span>
     </div>
 
-    <div class="flex items-start justify-between gap-3 mb-3">
+    <div class="flex items-start justify-between gap-3 mb-3 relative">
         <h3 class="font-semibold text-zinc-900 dark:text-zinc-100 line-clamp-2 flex-1">
             {{ $event->title }}
         </h3>
+        @if($event->status)
+            <div class="flex items-center gap-1 flex-shrink-0" @click.stop>
+                @php
+                    $currentStatus = $event->status->value;
+                    $availableStatuses = match($currentStatus) {
+                        'scheduled' => [
+                            ['status' => 'completed', 'icon' => 'check', 'tooltip' => 'Mark as Completed'],
+                            ['status' => 'cancelled', 'icon' => 'archive-box-x-mark', 'tooltip' => 'Mark as Cancelled'],
+                        ],
+                        'completed' => [
+                            ['status' => 'scheduled', 'icon' => 'clock', 'tooltip' => 'Mark as Scheduled'],
+                            ['status' => 'cancelled', 'icon' => 'archive-box-x-mark', 'tooltip' => 'Mark as Cancelled'],
+                        ],
+                        'cancelled' => [
+                            ['status' => 'scheduled', 'icon' => 'clock', 'tooltip' => 'Mark as Scheduled'],
+                            ['status' => 'completed', 'icon' => 'check', 'tooltip' => 'Mark as Completed'],
+                        ],
+                        'tentative' => [
+                            ['status' => 'scheduled', 'icon' => 'clock', 'tooltip' => 'Mark as Scheduled'],
+                            ['status' => 'completed', 'icon' => 'check', 'tooltip' => 'Mark as Completed'],
+                        ],
+                        default => [],
+                    };
+                @endphp
+                @foreach($availableStatuses as $statusOption)
+                    <flux:button
+                        variant="ghost"
+                        size="xs"
+                        icon="{{ $statusOption['icon'] }}"
+                        tooltip="{{ $statusOption['tooltip'] }}"
+                        @click="$dispatch('update-item-status', { itemId: {{ $event->id }}, itemType: 'event', newStatus: '{{ $statusOption['status'] }}' })"
+                        class="!p-1"
+                    />
+                @endforeach
+            </div>
+        @endif
     </div>
 
     @if($event->description)

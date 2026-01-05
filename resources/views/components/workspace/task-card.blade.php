@@ -13,10 +13,42 @@
         </span>
     </div>
 
-    <div class="flex items-start justify-between gap-3 mb-3">
+    <div class="flex items-start justify-between gap-3 mb-3 relative">
         <h3 class="font-semibold text-zinc-900 dark:text-zinc-100 line-clamp-2 flex-1">
             {{ $task->title }}
         </h3>
+        @if($task->status)
+            <div class="flex items-center gap-1 flex-shrink-0" @click.stop>
+                @php
+                    $currentStatus = $task->status->value;
+                    $availableStatuses = match($currentStatus) {
+                        'to_do' => [
+                            ['status' => 'doing', 'icon' => 'play', 'tooltip' => 'Mark as In Progress'],
+                            ['status' => 'done', 'icon' => 'check', 'tooltip' => 'Mark as Done'],
+                        ],
+                        'doing' => [
+                            ['status' => 'to_do', 'icon' => 'arrow-down-circle', 'tooltip' => 'Mark as To Do'],
+                            ['status' => 'done', 'icon' => 'check', 'tooltip' => 'Mark as Done'],
+                        ],
+                        'done' => [
+                            ['status' => 'to_do', 'icon' => 'arrow-down-circle', 'tooltip' => 'Mark as To Do'],
+                            ['status' => 'doing', 'icon' => 'play', 'tooltip' => 'Mark as In Progress'],
+                        ],
+                        default => [],
+                    };
+                @endphp
+                @foreach($availableStatuses as $statusOption)
+                    <flux:button
+                        variant="ghost"
+                        size="xs"
+                        icon="{{ $statusOption['icon'] }}"
+                        tooltip="{{ $statusOption['tooltip'] }}"
+                        @click="$dispatch('update-item-status', { itemId: {{ $task->id }}, itemType: 'task', newStatus: '{{ $statusOption['status'] }}' })"
+                        class="!p-1"
+                    />
+                @endforeach
+            </div>
+        @endif
     </div>
 
     @if($task->description)
