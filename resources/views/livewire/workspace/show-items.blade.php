@@ -134,14 +134,8 @@ new class extends Component
     #[On('project-deleted')]
     public function refreshItems(): void
     {
-        // Clear computed property cache to force recalculation with fresh data
-        // Use unset() to invalidate computed properties without causing component unmounting
-        // This will trigger Livewire to recompute the properties on next access
-        unset($this->filteredTasks);
-        unset($this->filteredEvents);
-        unset($this->filteredProjects);
-        unset($this->filteredItems);
-        unset($this->itemsByStatus);
+        // Livewire automatically recomputes computed properties when dependencies change
+        // No need to manually unset - it will be recalculated on next access
     }
 
     #[On('reset-filters-sorts')]
@@ -187,19 +181,19 @@ new class extends Component
     public function setFilterType(?string $type): void
     {
         $this->filterType = $type;
-        unset($this->filteredTasks, $this->filteredEvents, $this->filteredProjects, $this->filteredItems, $this->itemsByStatus);
+        // Livewire will automatically recompute computed properties
     }
 
     public function setFilterPriority(?string $priority): void
     {
         $this->filterPriority = $priority;
-        unset($this->filteredTasks, $this->filteredEvents, $this->filteredProjects, $this->filteredItems, $this->itemsByStatus);
+        // Livewire will automatically recompute computed properties
     }
 
     public function setFilterStatus(?string $status): void
     {
         $this->filterStatus = $status;
-        unset($this->filteredTasks, $this->filteredEvents, $this->filteredProjects, $this->filteredItems, $this->itemsByStatus);
+        // Livewire will automatically recompute computed properties
     }
 
     public function setSortBy(?string $sortBy): void
@@ -211,7 +205,7 @@ new class extends Component
             $this->sortBy = $sortBy;
             $this->sortDirection = 'asc';
         }
-        unset($this->filteredTasks, $this->filteredEvents, $this->filteredProjects, $this->filteredItems, $this->itemsByStatus);
+        // Livewire will automatically recompute computed properties
     }
 
     public function clearFilters(): void
@@ -219,14 +213,14 @@ new class extends Component
         $this->filterType = null;
         $this->filterPriority = null;
         $this->filterStatus = null;
-        unset($this->filteredTasks, $this->filteredEvents, $this->filteredProjects, $this->filteredItems, $this->itemsByStatus);
+        // Livewire will automatically recompute computed properties
     }
 
     public function clearSorting(): void
     {
         $this->sortBy = null;
         $this->sortDirection = 'asc';
-        unset($this->filteredTasks, $this->filteredEvents, $this->filteredProjects, $this->filteredItems, $this->itemsByStatus);
+        // Livewire will automatically recompute computed properties
     }
 
     public function clearAll(): void
@@ -662,7 +656,7 @@ new class extends Component
 
     <!-- List View -->
     @if($viewMode === 'list')
-        <div wire:key="list-view-container" wire:transition="fade">
+        <div wire:key="list-view-container">
             <livewire:workspace.list-view
                 :items="$this->filteredItems"
                 :current-date="$currentDate"
@@ -680,7 +674,7 @@ new class extends Component
 
     <!-- Kanban View -->
     @if($viewMode === 'kanban')
-        <div wire:key="kanban-view-container" wire:transition="fade">
+        <div wire:key="kanban-view-container">
             <livewire:workspace.kanban-view
                 :items="$this->filteredItems"
                 :items-by-status="$this->itemsByStatus"
@@ -699,7 +693,7 @@ new class extends Component
 
     <!-- Weekly Timegrid View -->
     @if($viewMode === 'weekly')
-        <div wire:key="weekly-view-container-{{ $weekStartDate->format('Y-m-d') }}" wire:transition="fade">
+        <div wire:key="weekly-view-container-{{ $weekStartDate->format('Y-m-d') }}">
             <livewire:workspace.weekly-view
                 :items="$this->filteredItems"
                 :week-start-date="$weekStartDate"
