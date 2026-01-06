@@ -133,28 +133,12 @@ new class extends Component
     class="space-y-4"
     x-data="{
         deleted: [],
-        moving: [],
     }"
     x-on:optimistic-item-deleted.window="
         deleted.push({
             id: $event.detail.itemId,
             type: $event.detail.itemType,
         })
-    "
-    x-on:update-item-status.window="
-        if ($event.detail?.itemId) {
-            moving.push({
-                id: $event.detail.itemId,
-                type: $event.detail.itemType || null,
-            });
-        }
-    "
-    x-on:item-updated.window="
-        if ($event.detail?.id) {
-            moving = moving.filter(m => m.id !== $event.detail.id);
-        } else {
-            moving = [];
-        }
     "
 >
     <!-- View Navigation -->
@@ -186,11 +170,7 @@ new class extends Component
             @forelse($this->sortedItems as $item)
                 <div
                     wire:key="list-item-{{ $item->item_type }}-{{ $item->id }}"
-                    x-show="
-                        !deleted.some(d => d.id === {{ $item->id }} && d.type === '{{ $item->item_type }}') &&
-                        !moving.some(m => m.id === {{ $item->id }})
-                    "
-                    x-transition.opacity
+                    x-show="!deleted.some(d => d.id === {{ $item->id }} && d.type === '{{ $item->item_type }}')"
                 >
                     @if($item->item_type === 'task')
                         <x-workspace.task-card :task="$item" />

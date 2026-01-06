@@ -127,15 +127,14 @@ new class extends Component
         $this->updateItemDuration($itemId, $itemType, $newDurationMinutes);
     }
 
-    #[On('item-updated')]
-    #[On('item-created')]
+    #[On('task-updated')]
     #[On('task-deleted')]
-    #[On('event-deleted')]
-    #[On('project-deleted')]
-    public function refreshItems(): void
+    #[On('item-created')]
+    public function refreshItemsFromTaskDetail(): void
     {
-        // Livewire automatically recomputes computed properties when dependencies change
-        // No need to manually unset - it will be recalculated on next access
+        // Trigger a re-render so the list reflects changes made in other components
+        // like the task detail modal or the create-item component.
+        // No additional logic is needed; computed queries will be re-run.
     }
 
     #[On('reset-filters-sorts')]
