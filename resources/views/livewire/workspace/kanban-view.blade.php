@@ -129,7 +129,31 @@ new class extends Component
 
 }; ?>
 
-<div>
+<div
+    x-data="{
+        optimisticCreated: [],
+        deleted: [],
+    }"
+    x-on:optimistic-item-created.window="
+        optimisticCreated.push({
+            id: $event.detail.id,
+            type: $event.detail.type,
+            label: $event.detail.label,
+        })
+    "
+    x-on:optimistic-item-create-failed.window="
+        optimisticCreated = optimisticCreated.filter(item => item.id !== $event.detail.id)
+    "
+    x-on:item-created.window="
+        optimisticCreated = []
+    "
+    x-on:optimistic-item-deleted.window="
+        deleted.push({
+            id: $event.detail.itemId,
+            type: $event.detail.itemType,
+        })
+    "
+>
     <!-- View Navigation -->
     <x-workspace.view-navigation
         :view-mode="$viewMode"
@@ -219,6 +243,22 @@ new class extends Component
             </h3>
 
             <div class="space-y-3" aria-live="polite">
+                <!-- Optimistic created placeholders (show in To Do column only) -->
+                @if($status === 'to_do')
+                    <template x-for="item in optimisticCreated" :key="item.id">
+                        <div class="bg-white dark:bg-zinc-800 rounded-lg border border-dashed border-zinc-200 dark:border-zinc-700 p-4 animate-pulse">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
+                                    <span x-text="item.type === 'task' ? 'Task' : (item.type === 'event' ? 'Event' : 'Project')"></span>
+                                    <span class="ml-1">(creating…)</span>
+                                </span>
+                            </div>
+                            <div class="h-4 bg-zinc-100 dark:bg-zinc-700 rounded w-2/3 mb-2"></div>
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400" x-text="item.label"></p>
+                        </div>
+                    </template>
+                @endif
+
                 @foreach(collect($this->itemsByStatus[$status] ?? []) as $item)
                     <div
                         wire:key="item-{{ $item->item_type }}-{{ $item->id }}"
@@ -235,6 +275,8 @@ new class extends Component
                         @dragend="
                             $el.classList.remove('opacity-50', 'ring-2', 'ring-blue-500');
                         "
+                        x-show="!deleted.some(d => d.id == {{ $item->id }} && d.type === '{{ $item->item_type }}')"
+                        x-transition.opacity
                         class="cursor-move relative transition-all"
                     >
                         @if($item->item_type === 'task')

@@ -144,6 +144,7 @@ new class extends Component {
 
             $this->closeModal();
             $this->dispatch('project-deleted');
+            $this->dispatch('notify', message: 'Project deleted successfully', type: 'success');
             session()->flash('message', 'Project deleted successfully!');
         } catch (\Exception $e) {
             \Log::error('Failed to delete project', [
@@ -195,10 +196,22 @@ new class extends Component {
                              },
                              save() {
                                  if (this.currentValue !== this.originalValue) {
-                                     $wire.updateField('name', this.currentValue).then(() => {
-                                         this.originalValue = this.currentValue;
-                                         this.editing = false;
-                                     });
+                                     $wire.updateField('name', this.currentValue)
+                                         .then(() => {
+                                             this.originalValue = this.currentValue;
+                                             this.editing = false;
+                                         })
+                                         .catch(() => {
+                                             this.currentValue = this.originalValue;
+                                             $wire.name = this.originalValue;
+                                             this.editing = false;
+                                             window.dispatchEvent(new CustomEvent('notify', {
+                                                 detail: {
+                                                     message: 'Failed to update name. Please try again.',
+                                                     type: 'error',
+                                                 },
+                                             }));
+                                         });
                                  } else {
                                      this.editing = false;
                                  }
@@ -271,10 +284,22 @@ new class extends Component {
                          },
                          save() {
                              if (this.currentValue !== this.originalValue) {
-                                 $wire.updateField('description', this.currentValue).then(() => {
-                                     this.originalValue = this.currentValue;
-                                     this.editing = false;
-                                 });
+                                 $wire.updateField('description', this.currentValue)
+                                     .then(() => {
+                                         this.originalValue = this.currentValue;
+                                         this.editing = false;
+                                     })
+                                     .catch(() => {
+                                         this.currentValue = this.originalValue;
+                                         $wire.description = this.originalValue;
+                                         this.editing = false;
+                                         window.dispatchEvent(new CustomEvent('notify', {
+                                             detail: {
+                                                 message: 'Failed to update description. Please try again.',
+                                                 type: 'error',
+                                             },
+                                         }));
+                                     });
                              } else {
                                  this.editing = false;
                              }
@@ -376,9 +401,21 @@ new class extends Component {
                                      this.mouseLeaveTimer = null;
                                  }
                                  if (this.currentValue !== this.originalValue) {
-                                     $wire.updateField('startDate', this.currentValue).then(() => {
-                                         this.originalValue = this.currentValue;
-                                     });
+                                     $wire.updateField('startDate', this.currentValue)
+                                         .then(() => {
+                                             this.originalValue = this.currentValue;
+                                         })
+                                         .catch(() => {
+                                             this.currentValue = this.originalValue;
+                                             $wire.startDate = this.originalValue;
+                                             this.editing = false;
+                                             window.dispatchEvent(new CustomEvent('notify', {
+                                                 detail: {
+                                                     message: 'Failed to update start date. Please try again.',
+                                                     type: 'error',
+                                                 },
+                                             }));
+                                         });
                                  } else {
                                      this.editing = false;
                                  }
@@ -461,9 +498,21 @@ new class extends Component {
                                      this.mouseLeaveTimer = null;
                                  }
                                  if (this.currentValue !== this.originalValue) {
-                                     $wire.updateField('endDate', this.currentValue).then(() => {
-                                         this.originalValue = this.currentValue;
-                                     });
+                                     $wire.updateField('endDate', this.currentValue)
+                                         .then(() => {
+                                             this.originalValue = this.currentValue;
+                                         })
+                                         .catch(() => {
+                                             this.currentValue = this.originalValue;
+                                             $wire.endDate = this.originalValue;
+                                             this.editing = false;
+                                             window.dispatchEvent(new CustomEvent('notify', {
+                                                 detail: {
+                                                     message: 'Failed to update end date. Please try again.',
+                                                     type: 'error',
+                                                 },
+                                             }));
+                                         });
                                  } else {
                                      this.editing = false;
                                  }
@@ -594,7 +643,7 @@ new class extends Component {
                 </div>
 
                 <!-- Delete Button -->
-                <div class="flex justify-end mt-6 mb-4">
+                <div class="flex justify-end mt-6 mb-4" x-data="{}">
                     <flux:button
                         variant="danger"
                         @click="$wire.showDeleteConfirm = true"
@@ -616,7 +665,17 @@ new class extends Component {
             <flux:button variant="ghost" @click="$wire.showDeleteConfirm = false">
                 Cancel
             </flux:button>
-            <flux:button variant="danger" wire:click="deleteProject">
+            <flux:button
+                variant="danger"
+                x-data="{}"
+                @click="
+                    $dispatch('optimistic-item-deleted', {
+                        itemId: '{{ $project?->id }}',
+                        itemType: 'project',
+                    });
+                    $wire.deleteProject();
+                "
+            >
                 Delete
             </flux:button>
         </div>

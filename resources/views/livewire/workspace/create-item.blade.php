@@ -384,16 +384,66 @@ new class extends Component
         $wire.projectTagIds = this.formData.project.tagIds;
     },
     submitTask() {
+        const tempId = Date.now() + Math.random();
+
+        // Optimistically show a lightweight placeholder in the list view
+        window.dispatchEvent(new CustomEvent('optimistic-item-created', {
+            detail: {
+                id: tempId,
+                type: 'task',
+                label: this.formData.task.title || 'New task',
+            },
+        }));
+
         this.syncToLivewire();
-        $wire.createTask();
+        this.closeModal();
+
+        $wire.createTask().catch(() => {
+            // Clear the optimistic placeholder on failure; validation errors surface via Livewire
+            window.dispatchEvent(new CustomEvent('optimistic-item-create-failed', {
+                detail: { id: tempId },
+            }));
+        });
     },
     submitEvent() {
+        const tempId = Date.now() + Math.random();
+
+        window.dispatchEvent(new CustomEvent('optimistic-item-created', {
+            detail: {
+                id: tempId,
+                type: 'event',
+                label: this.formData.event.title || 'New event',
+            },
+        }));
+
         this.syncToLivewire();
-        $wire.createEvent();
+        this.closeModal();
+
+        $wire.createEvent().catch(() => {
+            window.dispatchEvent(new CustomEvent('optimistic-item-create-failed', {
+                detail: { id: tempId },
+            }));
+        });
     },
     submitProject() {
+        const tempId = Date.now() + Math.random();
+
+        window.dispatchEvent(new CustomEvent('optimistic-item-created', {
+            detail: {
+                id: tempId,
+                type: 'project',
+                label: this.formData.project.name || 'New project',
+            },
+        }));
+
         this.syncToLivewire();
-        $wire.createProject();
+        this.closeModal();
+
+        $wire.createProject().catch(() => {
+            window.dispatchEvent(new CustomEvent('optimistic-item-create-failed', {
+                detail: { id: tempId },
+            }));
+        });
     },
     toggleTag(tagId, type) {
         const tagIds = this.formData[type].tagIds;
@@ -410,7 +460,7 @@ new class extends Component
 }"
      @open-create-modal.window="openModal()"
      @close-create-modal.window="closeModal()"
-     @item-created.window="resetFormData(); closeModal();">
+     @item-created.window="resetFormData()">
 
     <!-- Form Container -->
     <div
@@ -465,19 +515,9 @@ new class extends Component
                     />
                     <button
                         @click.stop="activeTab === 'task' ? submitTask() : (activeTab === 'event' ? submitEvent() : submitProject())"
-                        wire:loading.attr="disabled"
-                        class="px-6 py-4 rounded-full bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap"
+                        class="px-6 py-4 rounded-full bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-medium transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
                     >
-                        <span wire:loading.remove>
-                            <span x-text="activeTab === 'task' ? 'Create Task' : (activeTab === 'event' ? 'Create Event' : 'Create Project')"></span>
-                        </span>
-                        <span wire:loading class="flex items-center gap-2">
-                            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <span>Creating...</span>
-                        </span>
+                        <span x-text="activeTab === 'task' ? 'Create Task' : (activeTab === 'event' ? 'Create Event' : 'Create Project')"></span>
                     </button>
                 </div>
             </div>

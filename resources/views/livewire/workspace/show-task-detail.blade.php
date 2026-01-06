@@ -182,6 +182,7 @@ new class extends Component
 
             $this->closeModal();
             $this->dispatch('task-deleted');
+            $this->dispatch('notify', message: 'Task deleted successfully', type: 'success');
             session()->flash('message', 'Task deleted successfully!');
         } catch (\Exception $e) {
             \Log::error('Failed to delete task', [
@@ -223,10 +224,22 @@ new class extends Component
                              },
                              save() {
                                  if (this.currentValue !== this.originalValue) {
-                                     $wire.updateField('title', this.currentValue).then(() => {
-                                         this.originalValue = this.currentValue;
-                                         this.editing = false;
-                                     });
+                                     $wire.updateField('title', this.currentValue)
+                                         .then(() => {
+                                             this.originalValue = this.currentValue;
+                                             this.editing = false;
+                                         })
+                                         .catch(() => {
+                                             this.currentValue = this.originalValue;
+                                             $wire.title = this.originalValue;
+                                             this.editing = false;
+                                             window.dispatchEvent(new CustomEvent('notify', {
+                                                 detail: {
+                                                     message: 'Failed to update title. Please try again.',
+                                                     type: 'error',
+                                                 },
+                                             }));
+                                         });
                                  } else {
                                      this.editing = false;
                                  }
@@ -299,10 +312,22 @@ new class extends Component
                          },
                          save() {
                              if (this.currentValue !== this.originalValue) {
-                                 $wire.updateField('description', this.currentValue).then(() => {
-                                     this.originalValue = this.currentValue;
-                                     this.editing = false;
-                                 });
+                                $wire.updateField('description', this.currentValue)
+                                    .then(() => {
+                                        this.originalValue = this.currentValue;
+                                        this.editing = false;
+                                    })
+                                    .catch(() => {
+                                        this.currentValue = this.originalValue;
+                                        $wire.description = this.originalValue;
+                                        this.editing = false;
+                                        window.dispatchEvent(new CustomEvent('notify', {
+                                            detail: {
+                                                message: 'Failed to update description. Please try again.',
+                                                type: 'error',
+                                            },
+                                        }));
+                                    });
                              } else {
                                  this.editing = false;
                              }
@@ -491,9 +516,21 @@ new class extends Component
                                      this.mouseLeaveTimer = null;
                                  }
                                  if (this.currentValue !== this.originalValue) {
-                                     $wire.updateField('startDatetime', this.currentValue).then(() => {
-                                         this.originalValue = this.currentValue;
-                                     });
+                                    $wire.updateField('startDatetime', this.currentValue)
+                                        .then(() => {
+                                            this.originalValue = this.currentValue;
+                                        })
+                                        .catch(() => {
+                                            this.currentValue = this.originalValue;
+                                            $wire.startDatetime = this.originalValue;
+                                            this.editing = false;
+                                            window.dispatchEvent(new CustomEvent('notify', {
+                                                detail: {
+                                                    message: 'Failed to update start date & time. Please try again.',
+                                                    type: 'error',
+                                                },
+                                            }));
+                                        });
                                  } else {
                                      this.editing = false;
                                  }
@@ -583,9 +620,21 @@ new class extends Component
                                      this.mouseLeaveTimer = null;
                                  }
                                  if (this.currentValue !== this.originalValue) {
-                                     $wire.updateField('endDatetime', this.currentValue).then(() => {
-                                         this.originalValue = this.currentValue;
-                                     });
+                                    $wire.updateField('endDatetime', this.currentValue)
+                                        .then(() => {
+                                            this.originalValue = this.currentValue;
+                                        })
+                                        .catch(() => {
+                                            this.currentValue = this.originalValue;
+                                            $wire.endDatetime = this.originalValue;
+                                            this.editing = false;
+                                            window.dispatchEvent(new CustomEvent('notify', {
+                                                detail: {
+                                                    message: 'Failed to update due date & time. Please try again.',
+                                                    type: 'error',
+                                                },
+                                            }));
+                                        });
                                  } else {
                                      this.editing = false;
                                  }
@@ -718,7 +767,7 @@ new class extends Component
                 </div>
 
                 <!-- Delete Button -->
-                <div class="flex justify-end mt-6 mb-4">
+                <div class="flex justify-end mt-6 mb-4" x-data="{}">
                     <flux:button
                         variant="danger"
                         @click="$wire.showDeleteConfirm = true"
@@ -740,7 +789,17 @@ new class extends Component
             <flux:button variant="ghost" @click="$wire.showDeleteConfirm = false">
                 Cancel
             </flux:button>
-            <flux:button variant="danger" wire:click="deleteTask">
+            <flux:button
+                variant="danger"
+                x-data="{}"
+                @click="
+                    $dispatch('optimistic-item-deleted', {
+                        itemId: '{{ $task?->id }}',
+                        itemType: 'task',
+                    });
+                    $wire.deleteTask();
+                "
+            >
                 Delete
             </flux:button>
         </div>
