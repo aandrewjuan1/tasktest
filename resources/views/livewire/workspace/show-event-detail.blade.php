@@ -76,7 +76,7 @@ new class extends Component
             'description' => ['nullable', 'string'],
             'startDatetime' => ['required', 'date'],
             'endDatetime' => ['nullable', 'date'],
-            'status' => ['nullable', 'string', 'in:scheduled,cancelled,completed,tentative'],
+            'status' => ['nullable', 'string', 'in:scheduled,cancelled,completed,tentative,ongoing'],
             default => [],
         };
 
@@ -543,6 +543,7 @@ new class extends Component
                                     'tentative' => 'Tentative',
                                     'cancelled' => 'Cancelled',
                                     'completed' => 'Completed',
+                                    'ongoing' => 'In Progress',
                                     default => 'Scheduled'
                                 } }}
                             </span>
@@ -558,6 +559,12 @@ new class extends Component
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ ($event->status?->value ?? 'scheduled') === 'scheduled' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
                             >
                                 Scheduled
+                            </button>
+                            <button
+                                @click="selectStatus('ongoing')"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ ($event->status?->value ?? 'scheduled') === 'ongoing' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                            >
+                                In Progress
                             </button>
                             <button
                                 @click="selectStatus('tentative')"

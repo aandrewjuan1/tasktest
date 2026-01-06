@@ -22,7 +22,7 @@ return new class extends Migration
             $table->string('timezone');
             $table->string('location')->nullable();
             $table->string('color')->nullable();
-            $table->enum('status', ['scheduled', 'cancelled', 'completed', 'tentative'])->nullable();
+            $table->enum('status', ['scheduled', 'cancelled', 'completed', 'tentative', 'ongoing'])->nullable();
             $table->foreignId('recurring_event_id')->nullable()->constrained()->nullOnDelete();
             $table->timestamps();
         });

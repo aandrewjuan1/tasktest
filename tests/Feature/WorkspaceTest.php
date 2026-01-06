@@ -896,6 +896,36 @@ test('filter by status works for events', function () {
     expect($items->first()->title)->toBe('Scheduled Event');
 });
 
+test('ongoing events can be filtered and appear in doing column', function () {
+    $targetDate = now()->addDay();
+
+    $ongoingEvent = Event::factory()->create([
+        'user_id' => $this->user->id,
+        'status' => 'ongoing',
+        'title' => 'Ongoing Event',
+        'start_datetime' => $targetDate,
+        'end_datetime' => $targetDate->copy()->addHour(),
+    ]);
+
+    actingAs($this->user);
+
+    $component = Livewire::test('workspace.show-items')
+        ->set('currentDate', $targetDate)
+        ->call('setFilterType', 'event')
+        ->call('setFilterStatus', 'ongoing');
+
+    $items = $component->get('filteredItems');
+    expect($items)->toHaveCount(1);
+    expect($items->first()->status->value)->toBe('ongoing');
+    expect($items->first()->title)->toBe('Ongoing Event');
+
+    $component->set('viewMode', 'kanban');
+    $component->set('currentDate', $targetDate);
+    $itemsByStatus = $component->get('itemsByStatus');
+
+    expect($itemsByStatus['doing']->pluck('id'))->toContain($ongoingEvent->id);
+});
+
 test('filter by project shows tasks in that project', function () {
     $targetDate = now();
 

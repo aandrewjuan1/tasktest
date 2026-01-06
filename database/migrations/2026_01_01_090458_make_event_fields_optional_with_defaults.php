@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('timezone')->nullable()->change();
 
             // Add default status
-            $table->enum('status', ['scheduled', 'cancelled', 'completed', 'tentative'])
+            $table->enum('status', ['scheduled', 'cancelled', 'completed', 'tentative', 'ongoing'])
                 ->default('scheduled')
                 ->nullable()
                 ->change();
@@ -28,7 +28,7 @@ return new class extends Migration
         Schema::table('events', function (Blueprint $table) {
             $table->timestampTz('end_datetime')->nullable(false)->change();
             $table->string('timezone')->nullable(false)->change();
-            $table->enum('status', ['scheduled', 'cancelled', 'completed', 'tentative'])
+            $table->enum('status', ['scheduled', 'cancelled', 'completed', 'tentative', 'ongoing'])
                 ->default('scheduled')
                 ->nullable(false)
                 ->change();

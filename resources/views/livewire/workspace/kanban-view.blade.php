@@ -91,6 +91,7 @@ new class extends Component
             $statusLabel = match($this->filterStatus) {
                 'to_do' => 'To Do',
                 'doing' => 'In Progress',
+                'ongoing' => 'In Progress',
                 'done' => 'Done',
                 'scheduled' => 'Scheduled',
                 'completed' => 'Completed',
@@ -191,11 +192,6 @@ new class extends Component
 
                  const parsedItemId = parseInt(itemId);
                  if (parsedItemId <= 0) {
-                     return;
-                 }
-
-                 // Prevent events from being dropped in 'doing' column
-                 if (itemType === 'event' && '{{ $status }}' === 'doing') {
                      return;
                  }
 

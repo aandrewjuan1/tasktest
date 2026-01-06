@@ -153,7 +153,7 @@ new class extends Component
         try {
             $validated = $this->validate([
                 'eventTitle' => ['required', 'string', 'max:255'],
-                'eventStatus' => ['nullable', 'string', 'in:scheduled,cancelled,completed,tentative'],
+                'eventStatus' => ['nullable', 'string', 'in:scheduled,cancelled,completed,tentative,ongoing'],
                 'eventStartDatetime' => ['nullable', 'date'],
                 'eventEndDatetime' => ['nullable', 'date', 'after:eventStartDatetime'],
                 'eventTagIds' => ['nullable', 'array'],
@@ -822,6 +822,13 @@ new class extends Component
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 Scheduled
+                            </button>
+                            <button
+                                @click="formData.event.status = 'ongoing'; openDropdown = null"
+                                :class="formData.event.status === 'ongoing' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                            >
+                                In Progress
                             </button>
                             <button
                                 @click="formData.event.status = 'tentative'; openDropdown = null"

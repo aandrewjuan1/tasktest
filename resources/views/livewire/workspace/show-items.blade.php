@@ -343,13 +343,6 @@ new class extends Component
     public function updateItemStatus(int $itemId, string $itemType, string $newStatus): void
     {
         try {
-            // Prevent events from being dropped in 'doing' column
-            if ($itemType === 'event' && $newStatus === 'doing') {
-                $this->dispatch('notify', message: 'Events cannot be moved to In Progress', type: 'warning');
-
-                return;
-            }
-
             $model = match ($itemType) {
                 'task' => Task::findOrFail($itemId),
                 'event' => Event::findOrFail($itemId),
@@ -376,8 +369,10 @@ new class extends Component
             } elseif ($itemType === 'event') {
                 $statusEnum = match ($newStatus) {
                     'to_do' => EventStatus::Scheduled,
+                    'doing' => EventStatus::Ongoing,
                     'done' => EventStatus::Completed,
                     'scheduled' => EventStatus::Scheduled,
+                    'ongoing' => EventStatus::Ongoing,
                     'completed' => EventStatus::Completed,
                     'cancelled' => EventStatus::Cancelled,
                     'tentative' => EventStatus::Tentative,
@@ -607,7 +602,7 @@ new class extends Component
 
         return [
             'to_do' => $items->filter(fn ($item) => in_array($item->status?->value ?? '', ['to_do', 'scheduled', 'tentative'])),
-            'doing' => $items->filter(fn ($item) => $item->status?->value === 'doing'),
+            'doing' => $items->filter(fn ($item) => in_array($item->status?->value ?? '', ['doing', 'ongoing'])),
             'done' => $items->filter(fn ($item) => in_array($item->status?->value ?? '', ['done', 'completed'])),
         ];
     }

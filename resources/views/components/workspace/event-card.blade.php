@@ -23,19 +23,28 @@
                     $currentStatus = $event->status->value;
                     $availableStatuses = match($currentStatus) {
                         'scheduled' => [
+                            ['status' => 'ongoing', 'icon' => 'play', 'tooltip' => 'Mark as Ongoing'],
+                            ['status' => 'completed', 'icon' => 'check', 'tooltip' => 'Mark as Completed'],
+                            ['status' => 'cancelled', 'icon' => 'archive-box-x-mark', 'tooltip' => 'Mark as Cancelled'],
+                        ],
+                        'ongoing' => [
+                            ['status' => 'scheduled', 'icon' => 'clock', 'tooltip' => 'Mark as Scheduled'],
                             ['status' => 'completed', 'icon' => 'check', 'tooltip' => 'Mark as Completed'],
                             ['status' => 'cancelled', 'icon' => 'archive-box-x-mark', 'tooltip' => 'Mark as Cancelled'],
                         ],
                         'completed' => [
                             ['status' => 'scheduled', 'icon' => 'clock', 'tooltip' => 'Mark as Scheduled'],
+                            ['status' => 'ongoing', 'icon' => 'play', 'tooltip' => 'Mark as Ongoing'],
                             ['status' => 'cancelled', 'icon' => 'archive-box-x-mark', 'tooltip' => 'Mark as Cancelled'],
                         ],
                         'cancelled' => [
                             ['status' => 'scheduled', 'icon' => 'clock', 'tooltip' => 'Mark as Scheduled'],
+                            ['status' => 'ongoing', 'icon' => 'play', 'tooltip' => 'Mark as Ongoing'],
                             ['status' => 'completed', 'icon' => 'check', 'tooltip' => 'Mark as Completed'],
                         ],
                         'tentative' => [
                             ['status' => 'scheduled', 'icon' => 'clock', 'tooltip' => 'Mark as Scheduled'],
+                            ['status' => 'ongoing', 'icon' => 'play', 'tooltip' => 'Mark as Ongoing'],
                             ['status' => 'completed', 'icon' => 'check', 'tooltip' => 'Mark as Completed'],
                         ],
                         default => [],

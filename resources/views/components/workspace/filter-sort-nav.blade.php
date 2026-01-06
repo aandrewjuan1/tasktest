@@ -46,6 +46,7 @@
                     <flux:menu.radio wire:click="$dispatch('set-filter-status', [null])" :checked="!$filterStatus || $filterStatus === 'all'">All</flux:menu.radio>
                     <flux:menu.radio wire:click="$dispatch('set-filter-status', ['to_do'])" :checked="$filterStatus === 'to_do'">To Do</flux:menu.radio>
                     <flux:menu.radio wire:click="$dispatch('set-filter-status', ['doing'])" :checked="$filterStatus === 'doing'">Doing</flux:menu.radio>
+                    <flux:menu.radio wire:click="$dispatch('set-filter-status', ['ongoing'])" :checked="$filterStatus === 'ongoing'">Ongoing</flux:menu.radio>
                     <flux:menu.radio wire:click="$dispatch('set-filter-status', ['done'])" :checked="$filterStatus === 'done'">Done</flux:menu.radio>
                     <flux:menu.radio wire:click="$dispatch('set-filter-status', ['scheduled'])" :checked="$filterStatus === 'scheduled'">Scheduled</flux:menu.radio>
                     <flux:menu.radio wire:click="$dispatch('set-filter-status', ['completed'])" :checked="$filterStatus === 'completed'">Completed</flux:menu.radio>
