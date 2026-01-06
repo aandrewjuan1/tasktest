@@ -81,120 +81,15 @@ new class extends Component
         $this->eventId = (string) ($this->task->event_id ?? '');
     }
 
-    public function updateField(string $field, mixed $value): void
-    {
-        if (! $this->task) {
-            return;
-        }
-
-        $this->authorize('update', $this->task);
-
-        $validationRules = match ($field) {
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'status' => ['nullable', 'string', 'in:to_do,doing,done'],
-            'priority' => ['nullable', 'string', 'in:low,medium,high,urgent'],
-            'complexity' => ['nullable', 'string', 'in:simple,moderate,complex'],
-            'duration' => ['nullable', 'integer', 'min:1'],
-            'startDatetime' => ['nullable', 'date'],
-            'endDatetime' => ['nullable', 'date'],
-            'projectId' => ['nullable', 'exists:projects,id'],
-            default => [],
-        };
-
-        if (empty($validationRules)) {
-            return;
-        }
-
-        $this->validate([
-            $field => $validationRules,
-        ]);
-
-        try {
-            DB::transaction(function () use ($field, $value) {
-                $updateData = [];
-
-                switch ($field) {
-                    case 'title':
-                        $updateData['title'] = $value;
-                        break;
-                    case 'description':
-                        $updateData['description'] = $value ?: null;
-                        break;
-                    case 'status':
-                        $updateData['status'] = $value ?: null;
-                        break;
-                    case 'priority':
-                        $updateData['priority'] = $value ?: null;
-                        break;
-                    case 'complexity':
-                        $updateData['complexity'] = $value ?: null;
-                        break;
-                    case 'duration':
-                        $updateData['duration'] = $value ?: null;
-                        break;
-                    case 'startDatetime':
-                        $updateData['start_datetime'] = $value ? \Carbon\Carbon::parse($value) : null;
-                        break;
-                    case 'endDatetime':
-                        $updateData['end_datetime'] = $value ? \Carbon\Carbon::parse($value) : null;
-                        break;
-                    case 'projectId':
-                        $updateData['project_id'] = $value ?: null;
-                        break;
-                }
-
-                $this->task->update($updateData);
-                $this->task->refresh();
-            });
-
-            $this->loadTaskData();
-            $this->dispatch('task-updated');
-            $this->dispatch('item-updated');
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            throw $e;
-        } catch (\Exception $e) {
-            \Log::error('Failed to update task field', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'field' => $field,
-                'task_id' => $this->task->id,
-                'user_id' => auth()->id(),
-            ]);
-
-            $this->dispatch('notify', message: 'Failed to update task. Please try again.', type: 'error');
-        }
-    }
+    // All task update mutations are handled by the parent `show-items` component.
 
     public function confirmDelete(): void
     {
         $this->showDeleteConfirm = true;
     }
 
-    public function deleteTask(): void
-    {
-        $this->authorize('delete', $this->task);
-
-        try {
-            DB::transaction(function () {
-                $this->task->delete();
-            });
-
-            $this->closeModal();
-            $this->dispatch('task-deleted');
-            $this->dispatch('notify', message: 'Task deleted successfully', type: 'success');
-            session()->flash('message', 'Task deleted successfully!');
-        } catch (\Exception $e) {
-            \Log::error('Failed to delete task', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'task_id' => $this->task->id,
-                'user_id' => auth()->id(),
-            ]);
-
-            $this->dispatch('notify', message: 'Failed to delete task. Please try again.', type: 'error');
-        }
-    }
+    // Modal closes optimistically via Alpine when delete button is clicked
+    // No need for Livewire listener that would cause a second request
 
     #[Computed]
     public function projects(): Collection
@@ -228,19 +123,12 @@ new class extends Component
                                      this.originalValue = this.currentValue; // optimistic apply
                                      this.editing = false;
 
-                                     $wire.updateField('title', this.currentValue)
-                                         .catch(() => {
-                                             // rollback on failure
-                                             this.originalValue = previous;
-                                             this.currentValue = previous;
-                                             $wire.title = previous;
-                                             window.dispatchEvent(new CustomEvent('notify', {
-                                                 detail: {
-                                                     message: 'Failed to update title. Please try again.',
-                                                     type: 'error',
-                                                 },
-                                             }));
-                                         });
+                                     // Single parent request; no rollback hook (optimistic UI)
+                                     $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
+                                         taskId: {{ $task->id }},
+                                         field: 'title',
+                                         value: this.currentValue,
+                                     });
                                  } else {
                                      this.editing = false;
                                  }
@@ -317,18 +205,11 @@ new class extends Component
                                 this.originalValue = this.currentValue; // optimistic apply
                                 this.editing = false;
 
-                                $wire.updateField('description', this.currentValue)
-                                    .catch(() => {
-                                        this.originalValue = previous;
-                                        this.currentValue = previous;
-                                        $wire.description = previous;
-                                        window.dispatchEvent(new CustomEvent('notify', {
-                                            detail: {
-                                                message: 'Failed to update description. Please try again.',
-                                                type: 'error',
-                                            },
-                                        }));
-                                    });
+                                $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
+                                    taskId: {{ $task->id }},
+                                    field: 'description',
+                                    value: this.currentValue,
+                                });
                              } else {
                                  this.editing = false;
                              }
@@ -394,35 +275,40 @@ new class extends Component
                     <x-inline-edit-dropdown
                         label="Status"
                         field="status"
+                        :item-id="$task->id"
+                        :use-parent="true"
                         :value="$task->status?->value ?? 'to_do'"
                     >
                         <x-slot:trigger>
-                            <span class="text-sm font-medium">
-                                {{ match($task->status?->value ?? 'to_do') {
-                                    'to_do' => 'To Do',
-                                    'doing' => 'In Progress',
-                                    'done' => 'Done',
-                                    default => 'To Do'
-                                } }}
-                            </span>
+                            <span
+                                class="text-sm font-medium"
+                                x-text="{
+                                    to_do: 'To Do',
+                                    doing: 'In Progress',
+                                    done: 'Done'
+                                }[selectedValue || 'to_do']"
+                            ></span>
                         </x-slot:trigger>
 
                         <x-slot:options>
                             <button
                                 @click="select('to_do')"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ ($task->status?->value ?? 'to_do') === 'to_do' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                                :class="selectedValue === 'to_do' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                             >
                                 To Do
                             </button>
                             <button
                                 @click="select('doing')"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ ($task->status?->value ?? 'to_do') === 'doing' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                                :class="selectedValue === 'doing' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                             >
                                 In Progress
                             </button>
                             <button
                                 @click="select('done')"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ ($task->status?->value ?? 'to_do') === 'done' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                                :class="selectedValue === 'done' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                             >
                                 Done
                             </button>
@@ -433,44 +319,28 @@ new class extends Component
                     <x-inline-edit-dropdown
                         label="Duration"
                         field="duration"
+                        :item-id="$task->id"
+                        :use-parent="true"
                         :value="$task->duration"
                     >
                         <x-slot:trigger>
-                            <span class="text-sm font-medium">
-                                @if($task->duration)
-                                    @php
-                                        $duration = (int) $task->duration;
-                                        if ($duration >= 60) {
-                                            $hours = floor($duration / 60);
-                                            $minutes = $duration % 60;
-                                            if ($minutes === 0) {
-                                                $display = $hours . ($hours === 1 ? ' hour' : ' hours');
-                                            } else {
-                                                $display = $hours . ($hours === 1 ? ' hour' : ' hours') . ' ' . $minutes . ($minutes === 1 ? ' minute' : ' minutes');
-                                            }
-                                        } else {
-                                            $display = $duration . ($duration === 1 ? ' minute' : ' minutes');
-                                        }
-                                    @endphp
-                                    {{ $display }}
-                                @else
-                                    <span class="text-zinc-500 dark:text-zinc-400">Not set</span>
-                                @endif
-                            </span>
+                            <span class="text-sm font-medium" x-text="selectedValue ? formatDuration(selectedValue) : 'Not set'"></span>
                         </x-slot:trigger>
 
                         <x-slot:options>
                             @foreach([15, 30, 45, 60, 90, 120, 180, 240, 300] as $minutes)
                                 <button
                                     @click="select({{ $minutes }})"
-                                    class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ (int) $task->duration === $minutes ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                                    class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                                    :class="selectedValue == {{ $minutes }} ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                                 >
                                     {{ $minutes }} minutes
                                 </button>
                             @endforeach
                             <button
                                 @click="select(null)"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $task->duration === null ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                                :class="selectedValue === null ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                             >
                                 Clear
                             </button>
@@ -521,18 +391,11 @@ new class extends Component
                                     this.originalValue = this.currentValue; // optimistic
                                     this.editing = false;
 
-                                    $wire.updateField('startDatetime', this.currentValue)
-                                        .catch(() => {
-                                            this.originalValue = previous;
-                                            this.currentValue = previous;
-                                            $wire.startDatetime = previous;
-                                            window.dispatchEvent(new CustomEvent('notify', {
-                                                detail: {
-                                                    message: 'Failed to update start date & time. Please try again.',
-                                                    type: 'error',
-                                                },
-                                            }));
-                                        });
+                                    $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
+                                        taskId: {{ $task->id }},
+                                        field: 'startDatetime',
+                                        value: this.currentValue,
+                                    });
                                  } else {
                                      this.editing = false;
                                  }
@@ -626,18 +489,11 @@ new class extends Component
                                     this.originalValue = this.currentValue; // optimistic
                                     this.editing = false;
 
-                                    $wire.updateField('endDatetime', this.currentValue)
-                                        .catch(() => {
-                                            this.originalValue = previous;
-                                            this.currentValue = previous;
-                                            $wire.endDatetime = previous;
-                                            window.dispatchEvent(new CustomEvent('notify', {
-                                                detail: {
-                                                    message: 'Failed to update due date & time. Please try again.',
-                                                    type: 'error',
-                                                },
-                                            }));
-                                        });
+                                    $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
+                                        taskId: {{ $task->id }},
+                                        field: 'endDatetime',
+                                        value: this.currentValue,
+                                    });
                                  } else {
                                      this.editing = false;
                                  }
@@ -692,6 +548,8 @@ new class extends Component
                 <x-inline-edit-dropdown
                     label="Project"
                     field="projectId"
+                    :item-id="$task->id"
+                    :use-parent="true"
                     :value="$task->project_id"
                 >
                     <x-slot:trigger>
@@ -705,11 +563,19 @@ new class extends Component
                     </x-slot:trigger>
 
                     <x-slot:options>
+                        <button
+                            @click="select(null)"
+                            class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                            :class="selectedValue === null || selectedValue === '' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                        >
+                            None
+                        </button>
                         @foreach($this->projects as $project)
                             <button
                                 wire:key="project-{{ $project->id }}"
                                 @click="select('{{ $project->id }}')"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $task->project_id === $project->id ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                                :class="selectedValue == '{{ $project->id }}' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                             >
                                 {{ $project->name }}
                             </button>
@@ -796,11 +662,18 @@ new class extends Component
                 variant="danger"
                 x-data="{}"
                 @click="
-                    $dispatch('optimistic-item-deleted', {
-                        itemId: '{{ $task?->id }}',
-                        itemType: 'task',
-                    });
-                    $wire.deleteTask();
+                    const taskId = {{ $task?->id ?? 'null' }};
+                    if (taskId) {
+                        $dispatch('optimistic-item-deleted', {
+                            itemId: taskId,
+                            itemType: 'task',
+                        });
+                        $wire.showDeleteConfirm = false;
+                        $wire.isOpen = false;
+                        $wire.$dispatchTo('workspace.show-items', 'delete-task', {
+                            taskId: taskId,
+                        });
+                    }
                 "
             >
                 Delete

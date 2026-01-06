@@ -131,12 +131,35 @@ new class extends Component
         $this->updateItemDuration($itemId, $itemType, $newDurationMinutes);
     }
 
-    #[On('task-updated')]
-    #[On('task-deleted')]
-    public function refreshItemsFromTaskDetail(): void
+    #[On('delete-task')]
+    public function handleDeleteTask(int $taskId): void
     {
-        // Trigger a re-render so the list reflects changes made in the task detail modal.
-        // No additional logic is needed; computed queries will be re-run.
+        $this->deleteTask($taskId);
+    }
+
+    public function deleteTask(int $taskId): void
+    {
+        try {
+            $task = Task::findOrFail($taskId);
+            $this->authorize('delete', $task);
+
+            DB::transaction(function () use ($task) {
+                $task->delete();
+            });
+
+            // No need to dispatch 'task-deleted' - modal closes optimistically via Alpine
+            // Livewire will automatically re-render after this method completes
+            $this->dispatch('notify', message: 'Task deleted successfully', type: 'success');
+        } catch (\Exception $e) {
+            \Log::error('Failed to delete task from parent', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'task_id' => $taskId,
+                'user_id' => auth()->id(),
+            ]);
+
+            $this->dispatch('notify', message: 'Failed to delete task. Please try again.', type: 'error');
+        }
     }
 
     #[On('reset-filters-sorts')]
@@ -230,6 +253,12 @@ new class extends Component
         $this->clearSorting();
     }
 
+    #[On('update-task-field')]
+    public function handleUpdateTaskField(int $taskId, string $field, mixed $value): void
+    {
+        $this->updateTaskField($taskId, $field, $value);
+    }
+
     public function createTask(array $data): void
     {
         $this->authorize('create', Task::class);
@@ -295,6 +324,96 @@ new class extends Component
             ]);
 
             $this->dispatch('notify', message: 'Failed to create task. Please try again.', type: 'error');
+        }
+    }
+
+    public function updateTaskField(int $taskId, string $field, mixed $value): void
+    {
+        try {
+            $task = Task::with(['project', 'event', 'tags', 'reminders', 'pomodoroSessions'])
+                ->findOrFail($taskId);
+
+            $this->authorize('update', $task);
+
+            $validationRules = match ($field) {
+                'title' => ['required', 'string', 'max:255'],
+                'description' => ['nullable', 'string'],
+                'status' => ['nullable', 'string', 'in:to_do,doing,done'],
+                'priority' => ['nullable', 'string', 'in:low,medium,high,urgent'],
+                'complexity' => ['nullable', 'string', 'in:simple,moderate,complex'],
+                'duration' => ['nullable', 'integer', 'min:1'],
+                'startDatetime' => ['nullable', 'date'],
+                'endDatetime' => ['nullable', 'date'],
+                'projectId' => ['nullable', 'exists:projects,id'],
+                default => [],
+            };
+
+            if (empty($validationRules)) {
+                return;
+            }
+
+            validator(
+                [$field => $value],
+                [$field => $validationRules],
+                [],
+                [$field => $field],
+            )->validate();
+
+            DB::transaction(function () use ($task, $field, $value) {
+                $updateData = [];
+
+                switch ($field) {
+                    case 'title':
+                        $updateData['title'] = $value;
+                        break;
+                    case 'description':
+                        $updateData['description'] = $value ?: null;
+                        break;
+                    case 'status':
+                        $updateData['status'] = $value ?: null;
+                        break;
+                    case 'priority':
+                        $updateData['priority'] = $value ?: null;
+                        break;
+                    case 'complexity':
+                        $updateData['complexity'] = $value ?: null;
+                        break;
+                    case 'duration':
+                        $updateData['duration'] = $value ?: null;
+                        break;
+                    case 'startDatetime':
+                        $updateData['start_datetime'] = $value ? Carbon::parse($value) : null;
+                        break;
+                    case 'endDatetime':
+                        $updateData['end_datetime'] = $value ? Carbon::parse($value) : null;
+                        break;
+                    case 'projectId':
+                        $updateData['project_id'] = $value ?: null;
+                        break;
+                }
+
+                if (! empty($updateData)) {
+                    $task->update($updateData);
+                    $task->refresh();
+                }
+            });
+
+            // No need to dispatch 'task-updated' - Livewire will automatically re-render
+            // after this method completes, and computed properties will recompute.
+            // We only dispatch 'item-updated' for other components that might listen to it.
+            $this->dispatch('item-updated');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            \Log::error('Failed to update task field from parent', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'field' => $field,
+                'task_id' => $taskId,
+                'user_id' => auth()->id(),
+            ]);
+
+            $this->dispatch('notify', message: 'Failed to update task. Please try again.', type: 'error');
         }
     }
 

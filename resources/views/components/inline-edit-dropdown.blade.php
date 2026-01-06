@@ -3,6 +3,8 @@
     'field',
     'value' => null,
     'fullWidth' => true,
+    'useParent' => false,
+    'itemId' => null,
 ])
 
 <div
@@ -10,6 +12,22 @@
     x-data="{
         open: false,
         mouseLeaveTimer: null,
+        selectedValue: @js($value),
+        formatDuration(minutes) {
+            if (!minutes) return 'Not set';
+            const duration = parseInt(minutes);
+            if (duration >= 60) {
+                const hours = Math.floor(duration / 60);
+                const mins = duration % 60;
+                if (mins === 0) {
+                    return hours + (hours === 1 ? ' hour' : ' hours');
+                } else {
+                    return hours + (hours === 1 ? ' hour' : ' hours') + ' ' + mins + (mins === 1 ? ' minute' : ' minutes');
+                }
+            } else {
+                return duration + (duration === 1 ? ' minute' : ' minutes');
+            }
+        },
         toggleDropdown() {
             this.open = !this.open;
         },
@@ -28,9 +46,20 @@
             }, 300);
         },
         select(value) {
-            $wire.updateField('{{ $field }}', value).then(() => {
+            this.selectedValue = value;
+            @if($useParent && $itemId)
+                // Fire-and-forget to parent; close optimistically
+                $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
+                    taskId: {{ $itemId }},
+                    field: '{{ $field }}',
+                    value: value,
+                });
                 this.closeDropdown();
-            });
+            @else
+                $wire.updateField('{{ $field }}', value).then(() => {
+                    this.closeDropdown();
+                });
+            @endif
         }
     }"
     @mouseenter="handleMouseEnter()"
