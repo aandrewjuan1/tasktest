@@ -273,9 +273,7 @@ new class extends Component
 
 <div x-data="{
     activeTab: 'task',
-    openDropdown: null,
     isOpen: false,
-    mouseLeaveTimer: null,
     formData: {
         task: {
             title: '',
@@ -304,35 +302,15 @@ new class extends Component
     },
     openModal() {
         this.activeTab = 'task';
-        this.openDropdown = null;
         this.isOpen = true;
         document.body.style.overflow = 'hidden';
     },
     closeModal() {
         this.isOpen = false;
-        this.openDropdown = null;
         document.body.style.overflow = '';
     },
     switchTab(tab) {
         this.activeTab = tab;
-        this.openDropdown = null;
-    },
-    toggleDropdown(id) {
-        this.openDropdown = this.openDropdown === id ? null : id;
-    },
-    isDropdownOpen(id) {
-        return this.openDropdown === id;
-    },
-    handleMouseLeave() {
-        this.mouseLeaveTimer = setTimeout(() => {
-            this.openDropdown = null;
-        }, 300);
-    },
-    handleMouseEnter() {
-        if (this.mouseLeaveTimer) {
-            clearTimeout(this.mouseLeaveTimer);
-            this.mouseLeaveTimer = null;
-        }
     },
     get inputValue() {
         if (this.activeTab === 'task') {
@@ -509,126 +487,96 @@ new class extends Component
                 <template x-if="activeTab === 'task'">
                     <div class="contents">
                     <!-- Task Priority -->
-                    <div class="relative"
-                         @mouseenter="handleMouseEnter()"
-                         @mouseleave="handleMouseLeave()">
-                        <button
-                            type="button"
-                            @click.stop="toggleDropdown('task-priority')"
-                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
-                        >
+                    <x-inline-create-dropdown dropdown-class="w-48">
+                        <x-slot:trigger>
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
                             <span class="text-sm font-medium">Priority</span>
                             <span class="text-xs text-zinc-500 dark:text-zinc-400 capitalize" x-text="formData.task.priority || 'Medium'"></span>
-                        </button>
-                        <div
-                            x-show="isDropdownOpen('task-priority')"
-                            x-cloak
-                            x-transition
-                            class="absolute bottom-full mb-1 z-50 w-48 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1"
-                        >
+                        </x-slot:trigger>
+
+                        <x-slot:options>
                             <button
-                                @click="formData.task.priority = 'low'; openDropdown = null"
+                                @click="select(() => formData.task.priority = 'low')"
                                 :class="formData.task.priority === 'low' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 Low
                             </button>
                             <button
-                                @click="formData.task.priority = 'medium'; openDropdown = null"
+                                @click="select(() => formData.task.priority = 'medium')"
                                 :class="formData.task.priority === 'medium' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 Medium
                             </button>
                             <button
-                                @click="formData.task.priority = 'high'; openDropdown = null"
+                                @click="select(() => formData.task.priority = 'high')"
                                 :class="formData.task.priority === 'high' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 High
                             </button>
                             <button
-                                @click="formData.task.priority = 'urgent'; openDropdown = null"
+                                @click="select(() => formData.task.priority = 'urgent')"
                                 :class="formData.task.priority === 'urgent' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 Urgent
                             </button>
-                        </div>
-                    </div>
+                        </x-slot:options>
+                    </x-inline-create-dropdown>
 
                     <!-- Task Complexity -->
-                    <div class="relative"
-                         @mouseenter="handleMouseEnter()"
-                         @mouseleave="handleMouseLeave()">
-                        <button
-                            type="button"
-                            @click.stop="toggleDropdown('task-complexity')"
-                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
-                        >
+                    <x-inline-create-dropdown dropdown-class="w-48">
+                        <x-slot:trigger>
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                             </svg>
                             <span class="text-sm font-medium">Complexity</span>
                             <span class="text-xs text-zinc-500 dark:text-zinc-400 capitalize" x-text="formData.task.complexity || 'Moderate'"></span>
-                        </button>
-                        <div
-                            x-show="isDropdownOpen('task-complexity')"
-                            x-cloak
-                            x-transition
-                            class="absolute bottom-full mb-1 z-50 w-48 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1"
-                        >
+                        </x-slot:trigger>
+
+                        <x-slot:options>
                             <button
-                                @click="formData.task.complexity = 'simple'; openDropdown = null"
+                                @click="select(() => formData.task.complexity = 'simple')"
                                 :class="formData.task.complexity === 'simple' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 Simple
                             </button>
                             <button
-                                @click="formData.task.complexity = 'moderate'; openDropdown = null"
+                                @click="select(() => formData.task.complexity = 'moderate')"
                                 :class="formData.task.complexity === 'moderate' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 Moderate
                             </button>
                             <button
-                                @click="formData.task.complexity = 'complex'; openDropdown = null"
+                                @click="select(() => formData.task.complexity = 'complex')"
                                 :class="formData.task.complexity === 'complex' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 Complex
                             </button>
-                        </div>
-                    </div>
+                        </x-slot:options>
+                    </x-inline-create-dropdown>
 
                     <!-- Task Duration -->
-                    <div class="relative"
-                         @mouseenter="handleMouseEnter()"
-                         @mouseleave="handleMouseLeave()">
-                        <button
-                            type="button"
-                            @click.stop="toggleDropdown('task-duration')"
-                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
-                        >
+                    <x-inline-create-dropdown dropdown-class="w-48 max-h-60 overflow-y-auto">
+                        <x-slot:trigger>
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             <span class="text-sm font-medium">Duration</span>
                             <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.task.duration ? formData.task.duration + ' min' : 'Not set'"></span>
-                        </button>
-                        <div
-                            x-show="isDropdownOpen('task-duration')"
-                            x-cloak
-                            x-transition
-                            class="absolute bottom-full mb-1 z-50 w-48 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 max-h-60 overflow-y-auto"
-                        >
+                        </x-slot:trigger>
+
+                        <x-slot:options>
                             @foreach([15, 30, 45, 60, 90, 120, 180, 240, 300] as $minutes)
                                 <button
-                                    @click="formData.task.duration = {{ $minutes }}; openDropdown = null"
+                                    @click="select(() => formData.task.duration = {{ $minutes }})"
                                     :class="formData.task.duration === {{ $minutes }} ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                                     class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                                 >
@@ -636,436 +584,322 @@ new class extends Component
                                 </button>
                             @endforeach
                             <button
-                                @click="formData.task.duration = null; openDropdown = null"
+                                @click="select(() => formData.task.duration = null)"
                                 :class="formData.task.duration === null ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 Clear
                             </button>
-                        </div>
-                    </div>
+                        </x-slot:options>
+                    </x-inline-create-dropdown>
 
                     <!-- Task Start Date & Time -->
-                    <div class="relative"
-                         @mouseenter="handleMouseEnter()"
-                         @mouseleave="handleMouseLeave()">
-                        <button
-                            type="button"
-                            @click.stop="toggleDropdown('task-start-datetime')"
-                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
-                        >
+                    <x-inline-create-dropdown dropdown-class="w-64 p-4">
+                        <x-slot:trigger>
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                             <span class="text-sm font-medium">Start Date & Time</span>
                             <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.task.startDatetime || 'Not set'"></span>
-                        </button>
-                        <div
-                            x-show="isDropdownOpen('task-start-datetime')"
-                            x-cloak
-                            x-transition
-                            class="absolute bottom-full mb-1 z-50 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 p-4"
-                        >
-                            <div class="space-y-3">
+                        </x-slot:trigger>
+
+                        <x-slot:options>
+                            <div class="space-y-3 px-3 pb-3 pt-1">
                                 <flux:input x-model="formData.task.startDatetime" type="datetime-local" />
                                 <button
-                                    @click="formData.task.startDatetime = null; openDropdown = null"
+                                    @click="select(() => formData.task.startDatetime = null)"
                                     class="w-full px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
                                 >
                                     Clear
                                 </button>
                             </div>
-                        </div>
-                    </div>
+                        </x-slot:options>
+                    </x-inline-create-dropdown>
 
                     <!-- Task End Date & Time -->
-                    <div class="relative"
-                         @mouseenter="handleMouseEnter()"
-                         @mouseleave="handleMouseLeave()">
-                        <button
-                            type="button"
-                            @click.stop="toggleDropdown('task-end-datetime')"
-                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
-                        >
+                    <x-inline-create-dropdown dropdown-class="w-64 p-4">
+                        <x-slot:trigger>
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                             <span class="text-sm font-medium">End Date & Time</span>
                             <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.task.endDatetime || 'Not set'"></span>
-                        </button>
-                        <div
-                            x-show="isDropdownOpen('task-end-datetime')"
-                            x-cloak
-                            x-transition
-                            class="absolute bottom-full mb-1 z-50 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 p-4"
-                        >
-                            <div class="space-y-3">
+                        </x-slot:trigger>
+
+                        <x-slot:options>
+                            <div class="space-y-3 px-3 pb-3 pt-1">
                                 <flux:input x-model="formData.task.endDatetime" type="datetime-local" />
                                 <button
-                                    @click="formData.task.endDatetime = null; openDropdown = null"
+                                    @click="select(() => formData.task.endDatetime = null)"
                                     class="w-full px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
                                 >
                                     Clear
                                 </button>
                             </div>
-                        </div>
-                    </div>
+                        </x-slot:options>
+                    </x-inline-create-dropdown>
 
                     <!-- Task Project -->
-                    <div class="relative"
-                         @mouseenter="handleMouseEnter()"
-                         @mouseleave="handleMouseLeave()">
-                        <button
-                            type="button"
-                            @click.stop="toggleDropdown('task-project')"
-                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
-                        >
+                    <x-inline-create-dropdown dropdown-class="w-48 max-h-60 overflow-y-auto">
+                        <x-slot:trigger>
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                             </svg>
                             <span class="text-sm font-medium">Project</span>
                             <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.task.projectId ? 'Selected' : 'None'"></span>
-                        </button>
-                        <template x-if="isDropdownOpen('task-project')">
-                            <div
-                                x-cloak
-                                x-transition
-                                class="absolute bottom-full mb-1 z-50 w-48 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 max-h-60 overflow-y-auto"
+                        </x-slot:trigger>
+
+                        <x-slot:options>
+                            <button
+                                @click="select(() => formData.task.projectId = null)"
+                                :class="formData.task.projectId === null ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
-                                <button
-                                    @click="formData.task.projectId = null; openDropdown = null"
-                                    :class="formData.task.projectId === null ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
-                                    class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                                >
-                                    None
-                                </button>
-                                @foreach($this->availableProjects as $project)
-                                <button
-                                    wire:key="project-{{ $project->id }}"
-                                    @click="formData.task.projectId = {{ $project->id }}; openDropdown = null"
-                                    :class="formData.task.projectId === {{ $project->id }} ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
-                                    class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                                >
-                                    {{ $project->name }}
-                                </button>
-                                @endforeach
-                            </div>
-                        </template>
-                    </div>
+                                None
+                            </button>
+                            @foreach($this->availableProjects as $project)
+                            <button
+                                wire:key="project-{{ $project->id }}"
+                                @click="select(() => formData.task.projectId = {{ $project->id }})"
+                                :class="formData.task.projectId === {{ $project->id }} ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                            >
+                                {{ $project->name }}
+                            </button>
+                            @endforeach
+                        </x-slot:options>
+                    </x-inline-create-dropdown>
 
                     <!-- Task Tags -->
-                    <div class="relative"
-                         @mouseenter="handleMouseEnter()"
-                         @mouseleave="handleMouseLeave()">
-                        <button
-                            type="button"
-                            @click.stop="toggleDropdown('task-tags')"
-                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
-                        >
+                    <x-inline-create-dropdown dropdown-class="w-64 max-h-60 overflow-y-auto">
+                        <x-slot:trigger>
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                             </svg>
                             <span class="text-sm font-medium">Tags</span>
                             <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.task.tagIds.length > 0 ? formData.task.tagIds.length + ' selected' : 'None'"></span>
-                        </button>
-                        <template x-if="isDropdownOpen('task-tags')">
-                            <div
-                                x-cloak
-                                x-transition
-                                class="absolute bottom-full mb-1 z-50 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 max-h-60 overflow-y-auto"
-                            >
-                                @foreach($this->availableTags as $tag)
-                                    <label wire:key="task-tag-{{ $tag->id }}" class="flex items-center px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            :checked="isTagSelected({{ $tag->id }}, 'task')"
-                                            @change="toggleTag({{ $tag->id }}, 'task')"
-                                            class="rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
-                                        />
-                                        <span class="ml-2 text-sm">{{ $tag->name }}</span>
-                                    </label>
-                                @endforeach
-                                @if($this->availableTags->isEmpty())
-                                    <div class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400">No tags available</div>
-                                @endif
-                            </div>
-                        </template>
-                    </div>
+                        </x-slot:trigger>
+
+                        <x-slot:options>
+                            @foreach($this->availableTags as $tag)
+                                <label wire:key="task-tag-{{ $tag->id }}" class="flex items-center px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        :checked="isTagSelected({{ $tag->id }}, 'task')"
+                                        @change="select(() => toggleTag({{ $tag->id }}, 'task'), false)"
+                                        class="rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
+                                    />
+                                    <span class="ml-2 text-sm">{{ $tag->name }}</span>
+                                </label>
+                            @endforeach
+                            @if($this->availableTags->isEmpty())
+                                <div class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400">No tags available</div>
+                            @endif
+                        </x-slot:options>
+                    </x-inline-create-dropdown>
                     </div>
                 </template>
                 <template x-if="activeTab === 'event'">
                     <div class="contents">
                     <!-- Event Status -->
-                    <div class="relative"
-                         @mouseenter="handleMouseEnter()"
-                         @mouseleave="handleMouseLeave()">
-                        <button
-                            type="button"
-                            @click.stop="toggleDropdown('event-status')"
-                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
-                        >
+                    <x-inline-create-dropdown dropdown-class="w-48">
+                        <x-slot:trigger>
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
                             </svg>
                             <span class="text-sm font-medium">Status</span>
                             <span class="text-xs text-zinc-500 dark:text-zinc-400 capitalize" x-text="formData.event.status || 'Scheduled'"></span>
-                        </button>
-                        <div
-                            x-show="isDropdownOpen('event-status')"
-                            x-cloak
-                            x-transition
-                            class="absolute bottom-full mb-1 z-50 w-48 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1"
-                        >
+                        </x-slot:trigger>
+
+                        <x-slot:options>
                             <button
-                                @click="formData.event.status = 'scheduled'; openDropdown = null"
+                                @click="select(() => formData.event.status = 'scheduled')"
                                 :class="formData.event.status === 'scheduled' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 Scheduled
                             </button>
                             <button
-                                @click="formData.event.status = 'ongoing'; openDropdown = null"
+                                @click="select(() => formData.event.status = 'ongoing')"
                                 :class="formData.event.status === 'ongoing' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 In Progress
                             </button>
                             <button
-                                @click="formData.event.status = 'tentative'; openDropdown = null"
+                                @click="select(() => formData.event.status = 'tentative')"
                                 :class="formData.event.status === 'tentative' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 Tentative
                             </button>
                             <button
-                                @click="formData.event.status = 'completed'; openDropdown = null"
+                                @click="select(() => formData.event.status = 'completed')"
                                 :class="formData.event.status === 'completed' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 Completed
                             </button>
                             <button
-                                @click="formData.event.status = 'cancelled'; openDropdown = null"
+                                @click="select(() => formData.event.status = 'cancelled')"
                                 :class="formData.event.status === 'cancelled' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             >
                                 Cancelled
                             </button>
-                        </div>
-                    </div>
+                        </x-slot:options>
+                    </x-inline-create-dropdown>
 
                     <!-- Event Start Date & Time -->
-                    <div class="relative"
-                         @mouseenter="handleMouseEnter()"
-                         @mouseleave="handleMouseLeave()">
-                        <button
-                            type="button"
-                            @click.stop="toggleDropdown('event-start-datetime')"
-                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
-                        >
+                    <x-inline-create-dropdown dropdown-class="w-64 p-4">
+                        <x-slot:trigger>
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                             <span class="text-sm font-medium">Start Date & Time</span>
                             <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.event.startDatetime || 'Not set'"></span>
-                        </button>
-                        <div
-                            x-show="isDropdownOpen('event-start-datetime')"
-                            x-cloak
-                            x-transition
-                            class="absolute bottom-full mb-1 z-50 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 p-4"
-                        >
-                            <div class="space-y-3">
+                        </x-slot:trigger>
+
+                        <x-slot:options>
+                            <div class="space-y-3 px-3 pb-3 pt-1">
                                 <flux:input x-model="formData.event.startDatetime" type="datetime-local" />
                                 <button
-                                    @click="formData.event.startDatetime = null; openDropdown = null"
+                                    @click="select(() => formData.event.startDatetime = null)"
                                     class="w-full px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
                                 >
                                     Clear
                                 </button>
                             </div>
-                        </div>
-                    </div>
+                        </x-slot:options>
+                    </x-inline-create-dropdown>
 
                     <!-- Event End Date & Time -->
-                    <div class="relative"
-                         @mouseenter="handleMouseEnter()"
-                         @mouseleave="handleMouseLeave()">
-                        <button
-                            type="button"
-                            @click.stop="toggleDropdown('event-end-datetime')"
-                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
-                        >
+                    <x-inline-create-dropdown dropdown-class="w-64 p-4">
+                        <x-slot:trigger>
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                             <span class="text-sm font-medium">End Date & Time</span>
                             <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.event.endDatetime || 'Not set'"></span>
-                        </button>
-                        <div
-                            x-show="isDropdownOpen('event-end-datetime')"
-                            x-cloak
-                            x-transition
-                            class="absolute bottom-full mb-1 z-50 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 p-4"
-                        >
-                            <div class="space-y-3">
+                        </x-slot:trigger>
+
+                        <x-slot:options>
+                            <div class="space-y-3 px-3 pb-3 pt-1">
                                 <flux:input x-model="formData.event.endDatetime" type="datetime-local" />
                                 <button
-                                    @click="formData.event.endDatetime = null; openDropdown = null"
+                                    @click="select(() => formData.event.endDatetime = null)"
                                     class="w-full px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
                                 >
                                     Clear
                                 </button>
                             </div>
-                        </div>
-                    </div>
+                        </x-slot:options>
+                    </x-inline-create-dropdown>
 
                     <!-- Event Tags -->
-                    <div class="relative"
-                         @mouseenter="handleMouseEnter()"
-                         @mouseleave="handleMouseLeave()">
-                        <button
-                            type="button"
-                            @click.stop="toggleDropdown('event-tags')"
-                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
-                        >
+                    <x-inline-create-dropdown dropdown-class="w-64 max-h-60 overflow-y-auto">
+                        <x-slot:trigger>
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                             </svg>
                             <span class="text-sm font-medium">Tags</span>
                             <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.event.tagIds.length > 0 ? formData.event.tagIds.length + ' selected' : 'None'"></span>
-                        </button>
-                        <template x-if="isDropdownOpen('event-tags')">
-                            <div
-                                x-cloak
-                                x-transition
-                                class="absolute bottom-full mb-1 z-50 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 max-h-60 overflow-y-auto"
-                            >
-                                @foreach($this->availableTags as $tag)
-                                    <label wire:key="event-tag-{{ $tag->id }}" class="flex items-center px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            :checked="isTagSelected({{ $tag->id }}, 'event')"
-                                            @change="toggleTag({{ $tag->id }}, 'event')"
-                                            class="rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
-                                        />
-                                        <span class="ml-2 text-sm">{{ $tag->name }}</span>
-                                    </label>
-                                @endforeach
-                                @if($this->availableTags->isEmpty())
-                                    <div class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400">No tags available</div>
-                                @endif
-                            </div>
-                        </template>
-                    </div>
+                        </x-slot:trigger>
+
+                        <x-slot:options>
+                            @foreach($this->availableTags as $tag)
+                                <label wire:key="event-tag-{{ $tag->id }}" class="flex items-center px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        :checked="isTagSelected({{ $tag->id }}, 'event')"
+                                        @change="select(() => toggleTag({{ $tag->id }}, 'event'), false)"
+                                        class="rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
+                                    />
+                                    <span class="ml-2 text-sm">{{ $tag->name }}</span>
+                                </label>
+                            @endforeach
+                            @if($this->availableTags->isEmpty())
+                                <div class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400">No tags available</div>
+                            @endif
+                        </x-slot:options>
+                    </x-inline-create-dropdown>
                     </div>
                 </template>
                 <template x-if="activeTab === 'project'">
                     <div class="contents">
                         <!-- Project Start Date -->
-                    <div class="relative"
-                         @mouseenter="handleMouseEnter()"
-                         @mouseleave="handleMouseLeave()">
-                        <button
-                            type="button"
-                            @click.stop="toggleDropdown('project-start-date')"
-                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
-                        >
+                    <x-inline-create-dropdown dropdown-class="w-64 p-4">
+                        <x-slot:trigger>
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                             <span class="text-sm font-medium">Start Date</span>
                             <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.project.startDate || 'Not set'"></span>
-                        </button>
-                        <div
-                            x-show="isDropdownOpen('project-start-date')"
-                            x-cloak
-                            x-transition
-                            class="absolute bottom-full mb-1 z-50 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 p-4"
-                        >
-                            <div class="space-y-3">
+                        </x-slot:trigger>
+
+                        <x-slot:options>
+                            <div class="space-y-3 px-3 pb-3 pt-1">
                                 <flux:input x-model="formData.project.startDate" type="date" />
                                 <button
-                                    @click="formData.project.startDate = null; openDropdown = null"
+                                    @click="select(() => formData.project.startDate = null)"
                                     class="w-full px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
                                 >
                                     Clear
                                 </button>
                             </div>
-                        </div>
-                    </div>
+                        </x-slot:options>
+                    </x-inline-create-dropdown>
 
                         <!-- Project End Date -->
-                    <div class="relative"
-                         @mouseenter="handleMouseEnter()"
-                         @mouseleave="handleMouseLeave()">
-                        <button
-                            type="button"
-                            @click.stop="toggleDropdown('project-end-date')"
-                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
-                        >
+                    <x-inline-create-dropdown dropdown-class="w-64 p-4">
+                        <x-slot:trigger>
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                             <span class="text-sm font-medium">End Date</span>
                             <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.project.endDate || 'Not set'"></span>
-                        </button>
-                        <div
-                            x-show="isDropdownOpen('project-end-date')"
-                            x-cloak
-                            x-transition
-                            class="absolute bottom-full mb-1 z-50 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 p-4"
-                        >
-                            <div class="space-y-3">
+                        </x-slot:trigger>
+
+                        <x-slot:options>
+                            <div class="space-y-3 px-3 pb-3 pt-1">
                                 <flux:input x-model="formData.project.endDate" type="date" />
                                 <button
-                                    @click="formData.project.endDate = null; openDropdown = null"
+                                    @click="select(() => formData.project.endDate = null)"
                                     class="w-full px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
                                 >
                                     Clear
                                 </button>
                             </div>
-                        </div>
-                    </div>
+                        </x-slot:options>
+                    </x-inline-create-dropdown>
 
                         <!-- Project Tags -->
-                    <div class="relative"
-                         @mouseenter="handleMouseEnter()"
-                         @mouseleave="handleMouseLeave()">
-                        <button
-                            type="button"
-                            @click.stop="toggleDropdown('project-tags')"
-                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
-                        >
+                    <x-inline-create-dropdown dropdown-class="w-64 max-h-60 overflow-y-auto">
+                        <x-slot:trigger>
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                             </svg>
                             <span class="text-sm font-medium">Tags</span>
                             <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.project.tagIds.length > 0 ? formData.project.tagIds.length + ' selected' : 'None'"></span>
-                        </button>
-                        <template x-if="isDropdownOpen('project-tags')">
-                            <div
-                                x-cloak
-                                x-transition
-                                class="absolute bottom-full mb-1 z-50 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 max-h-60 overflow-y-auto"
-                            >
-                                @foreach($this->availableTags as $tag)
-                                    <label wire:key="project-tag-{{ $tag->id }}" class="flex items-center px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            :checked="isTagSelected({{ $tag->id }}, 'project')"
-                                            @change="toggleTag({{ $tag->id }}, 'project')"
-                                            class="rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
-                                        />
-                                        <span class="ml-2 text-sm">{{ $tag->name }}</span>
-                                    </label>
-                                @endforeach
-                                @if($this->availableTags->isEmpty())
-                                    <div class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400">No tags available</div>
-                                @endif
-                            </div>
-                        </template>
-                    </div>
+                        </x-slot:trigger>
+
+                        <x-slot:options>
+                            @foreach($this->availableTags as $tag)
+                                <label wire:key="project-tag-{{ $tag->id }}" class="flex items-center px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        :checked="isTagSelected({{ $tag->id }}, 'project')"
+                                        @change="select(() => toggleTag({{ $tag->id }}, 'project'), false)"
+                                        class="rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
+                                    />
+                                    <span class="ml-2 text-sm">{{ $tag->name }}</span>
+                                </label>
+                            @endforeach
+                            @if($this->availableTags->isEmpty())
+                                <div class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400">No tags available</div>
+                            @endif
+                        </x-slot:options>
+                    </x-inline-create-dropdown>
                     </div>
                 </template>
             </div>

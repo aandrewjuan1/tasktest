@@ -499,44 +499,12 @@ new class extends Component
                     </div>
 
                     <!-- Status -->
-                    <div class="relative" @click.away="openDropdown = null"
-                         x-data="{
-                             openDropdown: null,
-                             mouseLeaveTimer: null,
-                             toggleDropdown() {
-                                 this.openDropdown = this.openDropdown === 'status' ? null : 'status';
-                             },
-                             isOpen() {
-                                 return this.openDropdown === 'status';
-                             },
-                             selectStatus(value) {
-                                 $wire.updateField('status', value).then(() => {
-                                     this.openDropdown = null;
-                                 });
-                             },
-                             handleMouseLeave() {
-                                 this.mouseLeaveTimer = setTimeout(() => {
-                                     this.openDropdown = null;
-                                 }, 300);
-                             },
-                             handleMouseEnter() {
-                                 if (this.mouseLeaveTimer) {
-                                     clearTimeout(this.mouseLeaveTimer);
-                                     this.mouseLeaveTimer = null;
-                                 }
-                             }
-                         }"
-                         @mouseenter="handleMouseEnter()"
-                         @mouseleave="handleMouseLeave()"
+                    <x-inline-edit-dropdown
+                        label="Status"
+                        field="status"
+                        :value="$event->status?->value ?? 'scheduled'"
                     >
-                        <div class="flex items-center gap-2 mb-2">
-                            <flux:heading size="sm">Status</flux:heading>
-                        </div>
-                        <button
-                            type="button"
-                            @click.stop="toggleDropdown()"
-                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors w-full"
-                        >
+                        <x-slot:trigger>
                             <span class="text-sm font-medium">
                                 {{ match($event->status?->value ?? 'scheduled') {
                                     'scheduled' => 'Scheduled',
@@ -547,48 +515,45 @@ new class extends Component
                                     default => 'Scheduled'
                                 } }}
                             </span>
-                        </button>
-                        <div
-                            x-show="isOpen()"
-                            x-cloak
-                            x-transition
-                            class="absolute z-50 mt-1 w-full bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1"
-                        >
+                        </x-slot:trigger>
+
+                        <x-slot:options>
                             <button
-                                @click="selectStatus('scheduled')"
+                                @click="select('scheduled')"
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ ($event->status?->value ?? 'scheduled') === 'scheduled' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
                             >
                                 Scheduled
                             </button>
                             <button
-                                @click="selectStatus('ongoing')"
+                                @click="select('ongoing')"
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ ($event->status?->value ?? 'scheduled') === 'ongoing' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
                             >
                                 In Progress
                             </button>
                             <button
-                                @click="selectStatus('tentative')"
+                                @click="select('tentative')"
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ ($event->status?->value ?? 'scheduled') === 'tentative' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
                             >
                                 Tentative
                             </button>
                             <button
-                                @click="selectStatus('cancelled')"
+                                @click="select('cancelled')"
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ ($event->status?->value ?? 'scheduled') === 'cancelled' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
                             >
                                 Cancelled
                             </button>
                             <button
-                                @click="selectStatus('completed')"
+                                @click="select('completed')"
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ ($event->status?->value ?? 'scheduled') === 'completed' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
                             >
                                 Completed
                             </button>
-                        </div>
+                        </x-slot:options>
+
                         @error('status')
                             <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
                         @enderror
-                    </div>
+                    </x-inline-edit-dropdown>
                 </div>
 
                 <!-- Tags -->

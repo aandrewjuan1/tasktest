@@ -365,44 +365,12 @@ new class extends Component
                 <!-- Task Details Grid -->
                 <div class="grid grid-cols-2 gap-4">
                     <!-- Status -->
-                    <div class="relative" @click.away="openDropdown = null"
-                         x-data="{
-                             openDropdown: null,
-                             mouseLeaveTimer: null,
-                             toggleDropdown() {
-                                 this.openDropdown = this.openDropdown === 'status' ? null : 'status';
-                             },
-                             isOpen() {
-                                 return this.openDropdown === 'status';
-                             },
-                             selectStatus(value) {
-                                 $wire.updateField('status', value).then(() => {
-                                     this.openDropdown = null;
-                                 });
-                             },
-                             handleMouseLeave() {
-                                 this.mouseLeaveTimer = setTimeout(() => {
-                                     this.openDropdown = null;
-                                 }, 300);
-                             },
-                             handleMouseEnter() {
-                                 if (this.mouseLeaveTimer) {
-                                     clearTimeout(this.mouseLeaveTimer);
-                                     this.mouseLeaveTimer = null;
-                                 }
-                             }
-                         }"
-                         @mouseenter="handleMouseEnter()"
-                         @mouseleave="handleMouseLeave()"
+                    <x-inline-edit-dropdown
+                        label="Status"
+                        field="status"
+                        :value="$task->status?->value ?? 'to_do'"
                     >
-                        <div class="flex items-center gap-2 mb-2">
-                            <flux:heading size="sm">Status</flux:heading>
-                        </div>
-                        <button
-                            type="button"
-                            @click.stop="toggleDropdown()"
-                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors w-full"
-                        >
+                        <x-slot:trigger>
                             <span class="text-sm font-medium">
                                 {{ match($task->status?->value ?? 'to_do') {
                                     'to_do' => 'To Do',
@@ -411,241 +379,37 @@ new class extends Component
                                     default => 'To Do'
                                 } }}
                             </span>
-                        </button>
-                        <div
-                            x-show="isOpen()"
-                            x-cloak
-                            x-transition
-                            class="absolute z-50 mt-1 w-full bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1"
-                        >
+                        </x-slot:trigger>
+
+                        <x-slot:options>
                             <button
-                                @click="selectStatus('to_do')"
+                                @click="select('to_do')"
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ ($task->status?->value ?? 'to_do') === 'to_do' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
                             >
                                 To Do
                             </button>
                             <button
-                                @click="selectStatus('doing')"
+                                @click="select('doing')"
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ ($task->status?->value ?? 'to_do') === 'doing' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
                             >
                                 In Progress
                             </button>
                             <button
-                                @click="selectStatus('done')"
+                                @click="select('done')"
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ ($task->status?->value ?? 'to_do') === 'done' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
                             >
                                 Done
                             </button>
-                        </div>
-                        @error('status')
-                            <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
-                        @enderror
-                    </div>
-
-                    <!-- Priority -->
-                    <div class="relative" @click.away="openDropdown = null"
-                         x-data="{
-                             openDropdown: null,
-                             mouseLeaveTimer: null,
-                             toggleDropdown() {
-                                 this.openDropdown = this.openDropdown === 'priority' ? null : 'priority';
-                             },
-                             isOpen() {
-                                 return this.openDropdown === 'priority';
-                             },
-                             selectPriority(value) {
-                                 $wire.updateField('priority', value).then(() => {
-                                     this.openDropdown = null;
-                                 });
-                             },
-                             handleMouseLeave() {
-                                 this.mouseLeaveTimer = setTimeout(() => {
-                                     this.openDropdown = null;
-                                 }, 300);
-                             },
-                             handleMouseEnter() {
-                                 if (this.mouseLeaveTimer) {
-                                     clearTimeout(this.mouseLeaveTimer);
-                                     this.mouseLeaveTimer = null;
-                                 }
-                             }
-                         }"
-                         @mouseenter="handleMouseEnter()"
-                         @mouseleave="handleMouseLeave()"
-                    >
-                        <div class="flex items-center gap-2 mb-2">
-                            <flux:heading size="sm">Priority</flux:heading>
-                        </div>
-                        <button
-                            type="button"
-                            @click.stop="toggleDropdown()"
-                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors w-full"
-                        >
-                            <span class="text-sm font-medium">
-                                @if($task->priority)
-                                    <span class="inline-flex items-center gap-2">
-                                        <span class="w-3 h-3 rounded-full {{ $task->priority->dotColor() }}"></span>
-                                        <span>{{ ucfirst($task->priority->value) }}</span>
-                                    </span>
-                                @else
-                                    <span class="text-zinc-500 dark:text-zinc-400">Not set</span>
-                                @endif
-                            </span>
-                        </button>
-                        <div
-                            x-show="isOpen()"
-                            x-cloak
-                            x-transition
-                            class="absolute z-50 mt-1 w-full bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1"
-                        >
-                            <button
-                                @click="selectPriority('low')"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $task->priority?->value === 'low' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
-                            >
-                                Low
-                            </button>
-                            <button
-                                @click="selectPriority('medium')"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $task->priority?->value === 'medium' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
-                            >
-                                Medium
-                            </button>
-                            <button
-                                @click="selectPriority('high')"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $task->priority?->value === 'high' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
-                            >
-                                High
-                            </button>
-                            <button
-                                @click="selectPriority('urgent')"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $task->priority?->value === 'urgent' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
-                            >
-                                Urgent
-                            </button>
-                        </div>
-                        @error('priority')
-                            <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
-                        @enderror
-                    </div>
-
-                    <!-- Complexity -->
-                    <div class="relative" @click.away="openDropdown = null"
-                         x-data="{
-                             openDropdown: null,
-                             mouseLeaveTimer: null,
-                             toggleDropdown() {
-                                 this.openDropdown = this.openDropdown === 'complexity' ? null : 'complexity';
-                             },
-                             isOpen() {
-                                 return this.openDropdown === 'complexity';
-                             },
-                             selectComplexity(value) {
-                                 $wire.updateField('complexity', value).then(() => {
-                                     this.openDropdown = null;
-                                 });
-                             },
-                             handleMouseLeave() {
-                                 this.mouseLeaveTimer = setTimeout(() => {
-                                     this.openDropdown = null;
-                                 }, 300);
-                             },
-                             handleMouseEnter() {
-                                 if (this.mouseLeaveTimer) {
-                                     clearTimeout(this.mouseLeaveTimer);
-                                     this.mouseLeaveTimer = null;
-                                 }
-                             }
-                         }"
-                         @mouseenter="handleMouseEnter()"
-                         @mouseleave="handleMouseLeave()"
-                    >
-                        <div class="flex items-center gap-2 mb-2">
-                            <flux:heading size="sm">Complexity</flux:heading>
-                        </div>
-                        <button
-                            type="button"
-                            @click.stop="toggleDropdown()"
-                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors w-full"
-                        >
-                            <span class="text-sm font-medium">
-                                @if($task->complexity)
-                                    <span class="inline-flex items-center px-3 py-1 text-sm font-medium rounded {{ $task->complexity->badgeColor() }}">
-                                        {{ ucfirst($task->complexity->value) }}
-                                    </span>
-                                @else
-                                    <span class="text-zinc-500 dark:text-zinc-400">Not set</span>
-                                @endif
-                            </span>
-                        </button>
-                        <div
-                            x-show="isOpen()"
-                            x-cloak
-                            x-transition
-                            class="absolute z-50 mt-1 w-full bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1"
-                        >
-                            <button
-                                @click="selectComplexity('simple')"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $task->complexity?->value === 'simple' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
-                            >
-                                Simple
-                            </button>
-                            <button
-                                @click="selectComplexity('moderate')"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $task->complexity?->value === 'moderate' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
-                            >
-                                Moderate
-                            </button>
-                            <button
-                                @click="selectComplexity('complex')"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $task->complexity?->value === 'complex' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
-                            >
-                                Complex
-                            </button>
-                        </div>
-                        @error('complexity')
-                            <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
-                        @enderror
-                    </div>
+                        </x-slot:options>
+                    </x-inline-edit-dropdown>
 
                     <!-- Duration -->
-                    <div class="relative" @click.away="openDropdown = null"
-                         x-data="{
-                             openDropdown: null,
-                             mouseLeaveTimer: null,
-                             toggleDropdown() {
-                                 this.openDropdown = this.openDropdown === 'duration' ? null : 'duration';
-                             },
-                             isOpen() {
-                                 return this.openDropdown === 'duration';
-                             },
-                             selectDuration(value) {
-                                 $wire.updateField('duration', value).then(() => {
-                                     this.openDropdown = null;
-                                 });
-                             },
-                             handleMouseLeave() {
-                                 this.mouseLeaveTimer = setTimeout(() => {
-                                     this.openDropdown = null;
-                                 }, 300);
-                             },
-                             handleMouseEnter() {
-                                 if (this.mouseLeaveTimer) {
-                                     clearTimeout(this.mouseLeaveTimer);
-                                     this.mouseLeaveTimer = null;
-                                 }
-                             }
-                         }"
-                         @mouseenter="handleMouseEnter()"
-                         @mouseleave="handleMouseLeave()"
+                    <x-inline-edit-dropdown
+                        label="Duration"
+                        field="duration"
+                        :value="$task->duration"
                     >
-                        <div class="flex items-center gap-2 mb-2">
-                            <flux:heading size="sm">Duration</flux:heading>
-                        </div>
-                        <button
-                            type="button"
-                            @click.stop="toggleDropdown()"
-                            class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors w-full"
-                        >
+                        <x-slot:trigger>
                             <span class="text-sm font-medium">
                                 @if($task->duration)
                                     @php
@@ -667,32 +431,25 @@ new class extends Component
                                     <span class="text-zinc-500 dark:text-zinc-400">Not set</span>
                                 @endif
                             </span>
-                        </button>
-                        <div
-                            x-show="isOpen()"
-                            x-cloak
-                            x-transition
-                            class="absolute z-50 mt-1 w-full bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 max-h-60 overflow-y-auto"
-                        >
+                        </x-slot:trigger>
+
+                        <x-slot:options>
                             @foreach([15, 30, 45, 60, 90, 120, 180, 240, 300] as $minutes)
                                 <button
-                                    @click="selectDuration({{ $minutes }})"
-                                    class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $task->duration == $minutes ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
+                                    @click="select({{ $minutes }})"
+                                    class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ (int) $task->duration === $minutes ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
                                 >
                                     {{ $minutes }} minutes
                                 </button>
                             @endforeach
                             <button
-                                @click="selectDuration(null)"
+                                @click="select(null)"
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $task->duration === null ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
                             >
                                 Clear
                             </button>
-                        </div>
-                        @error('duration')
-                            <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
-                        @enderror
-                    </div>
+                        </x-slot:options>
+                    </x-inline-edit-dropdown>
 
                     <!-- Start Datetime -->
                     <div
@@ -880,44 +637,12 @@ new class extends Component
                 </div>
 
                 <!-- Project -->
-                <div class="relative" @click.away="openDropdown = null"
-                     x-data="{
-                         openDropdown: null,
-                         mouseLeaveTimer: null,
-                         toggleDropdown() {
-                             this.openDropdown = this.openDropdown === 'project' ? null : 'project';
-                         },
-                         isOpen() {
-                             return this.openDropdown === 'project';
-                         },
-                         selectProject(value) {
-                             $wire.updateField('projectId', value).then(() => {
-                                 this.openDropdown = null;
-                             });
-                         },
-                         handleMouseLeave() {
-                             this.mouseLeaveTimer = setTimeout(() => {
-                                 this.openDropdown = null;
-                             }, 300);
-                         },
-                         handleMouseEnter() {
-                             if (this.mouseLeaveTimer) {
-                                 clearTimeout(this.mouseLeaveTimer);
-                                 this.mouseLeaveTimer = null;
-                             }
-                         }
-                     }"
-                     @mouseenter="handleMouseEnter()"
-                     @mouseleave="handleMouseLeave()"
+                <x-inline-edit-dropdown
+                    label="Project"
+                    field="projectId"
+                    :value="$task->project_id"
                 >
-                    <div class="flex items-center gap-2 mb-2">
-                        <flux:heading size="sm">Project</flux:heading>
-                    </div>
-                    <button
-                        type="button"
-                        @click.stop="toggleDropdown()"
-                        class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors w-full"
-                    >
+                    <x-slot:trigger>
                         <span class="text-sm font-medium">
                             @if($task->project)
                                 <span class="text-blue-600 dark:text-blue-400">{{ $task->project->name }}</span>
@@ -925,17 +650,13 @@ new class extends Component
                                 <span class="text-zinc-500 dark:text-zinc-400">Not assigned to a project</span>
                             @endif
                         </span>
-                    </button>
-                    <div
-                        x-show="isOpen()"
-                        x-cloak
-                        x-transition
-                        class="absolute z-50 mt-1 w-full bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 max-h-60 overflow-y-auto"
-                    >
+                    </x-slot:trigger>
+
+                    <x-slot:options>
                         @foreach($this->projects as $project)
                             <button
                                 wire:key="project-{{ $project->id }}"
-                                @click="selectProject('{{ $project->id }}')"
+                                @click="select('{{ $project->id }}')"
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ $task->project_id === $project->id ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
                             >
                                 {{ $project->name }}
@@ -944,11 +665,8 @@ new class extends Component
                         @if($this->projects->isEmpty())
                             <div class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400">No projects available</div>
                         @endif
-                    </div>
-                    @error('projectId')
-                        <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
-                    @enderror
-                </div>
+                    </x-slot:options>
+                </x-inline-edit-dropdown>
 
                 <!-- Tags -->
                 @if($task->tags->isNotEmpty())
