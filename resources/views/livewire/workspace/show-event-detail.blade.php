@@ -2,7 +2,6 @@
 
 use App\Models\Event;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
 
@@ -65,76 +64,7 @@ new class extends Component
 
     public function updateField(string $field, mixed $value): void
     {
-        if (! $this->event) {
-            return;
-        }
-
-        $this->authorize('update', $this->event);
-
-        $validationRules = match ($field) {
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'startDatetime' => ['required', 'date'],
-            'endDatetime' => ['nullable', 'date'],
-            'status' => ['nullable', 'string', 'in:scheduled,cancelled,completed,tentative,ongoing'],
-            default => [],
-        };
-
-        if (empty($validationRules)) {
-            return;
-        }
-
-        $this->validate([
-            $field => $validationRules,
-        ]);
-
-        try {
-            DB::transaction(function () use ($field, $value) {
-                $updateData = [];
-
-                switch ($field) {
-                    case 'title':
-                        $updateData['title'] = $value;
-                        break;
-                    case 'description':
-                        $updateData['description'] = $value ?: null;
-                        break;
-                    case 'startDatetime':
-                        $startDatetime = Carbon::parse($value);
-                        $updateData['start_datetime'] = $startDatetime;
-                        // Auto-calculate end_datetime if not provided
-                        if (empty($this->endDatetime)) {
-                            $updateData['end_datetime'] = $startDatetime->copy()->addHour();
-                        }
-                        break;
-                    case 'endDatetime':
-                        $updateData['end_datetime'] = $value ? Carbon::parse($value) : null;
-                        break;
-                    case 'status':
-                        $updateData['status'] = $value ?: 'scheduled';
-                        break;
-                }
-
-                $this->event->update($updateData);
-                $this->event->refresh();
-            });
-
-            $this->loadEventData();
-            $this->dispatch('event-updated');
-            $this->dispatch('item-updated');
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            throw $e;
-        } catch (\Exception $e) {
-            \Log::error('Failed to update event field', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'field' => $field,
-                'event_id' => $this->event->id,
-                'user_id' => auth()->id(),
-            ]);
-
-            $this->dispatch('notify', message: 'Failed to update event. Please try again.', type: 'error');
-        }
+        // Intentionally left blank; updates are handled by the parent show-items component.
     }
 
     public function confirmDelete(): void
@@ -144,27 +74,7 @@ new class extends Component
 
     public function deleteEvent(): void
     {
-        $this->authorize('delete', $this->event);
-
-        try {
-            DB::transaction(function () {
-                $this->event->delete();
-            });
-
-            $this->closeModal();
-            $this->dispatch('event-deleted');
-            $this->dispatch('notify', message: 'Event deleted successfully', type: 'success');
-            session()->flash('message', 'Event deleted successfully!');
-        } catch (\Exception $e) {
-            \Log::error('Failed to delete event', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'event_id' => $this->event->id,
-                'user_id' => auth()->id(),
-            ]);
-
-            $this->dispatch('notify', message: 'Failed to delete event. Please try again.', type: 'error');
-        }
+        // Intentionally left blank; deletes are handled by the parent show-items component.
     }
 }; ?>
 
@@ -191,18 +101,11 @@ new class extends Component
                                     this.originalValue = this.currentValue; // optimistic
                                     this.editing = false;
 
-                                    $wire.updateField('title', this.currentValue)
-                                        .catch(() => {
-                                            this.originalValue = previous;
-                                            this.currentValue = previous;
-                                            $wire.title = previous;
-                                            window.dispatchEvent(new CustomEvent('notify', {
-                                                detail: {
-                                                    message: 'Failed to update title. Please try again.',
-                                                    type: 'error',
-                                                },
-                                            }));
-                                        });
+                                    $wire.$dispatchTo('workspace.show-items', 'update-event-field', {
+                                        eventId: {{ $event->id }},
+                                        field: 'title',
+                                        value: this.currentValue,
+                                    });
                                  } else {
                                      this.editing = false;
                                  }
@@ -279,18 +182,11 @@ new class extends Component
                                 this.originalValue = this.currentValue; // optimistic
                                 this.editing = false;
 
-                                $wire.updateField('description', this.currentValue)
-                                    .catch(() => {
-                                        this.originalValue = previous;
-                                        this.currentValue = previous;
-                                        $wire.description = previous;
-                                        window.dispatchEvent(new CustomEvent('notify', {
-                                            detail: {
-                                                message: 'Failed to update description. Please try again.',
-                                                type: 'error',
-                                            },
-                                        }));
-                                    });
+                                $wire.$dispatchTo('workspace.show-items', 'update-event-field', {
+                                    eventId: {{ $event->id }},
+                                    field: 'description',
+                                    value: this.currentValue,
+                                });
                              } else {
                                  this.editing = false;
                              }
@@ -396,18 +292,11 @@ new class extends Component
                                     this.originalValue = this.currentValue; // optimistic
                                     this.editing = false;
 
-                                    $wire.updateField('startDatetime', this.currentValue)
-                                        .catch(() => {
-                                            this.originalValue = previous;
-                                            this.currentValue = previous;
-                                            $wire.startDatetime = previous;
-                                            window.dispatchEvent(new CustomEvent('notify', {
-                                                detail: {
-                                                    message: 'Failed to update start date & time. Please try again.',
-                                                    type: 'error',
-                                                },
-                                            }));
-                                        });
+                                    $wire.$dispatchTo('workspace.show-items', 'update-event-field', {
+                                        eventId: {{ $event->id }},
+                                        field: 'startDatetime',
+                                        value: this.currentValue,
+                                    });
                                  } else {
                                      this.editing = false;
                                  }
@@ -495,18 +384,11 @@ new class extends Component
                                     this.originalValue = this.currentValue; // optimistic
                                     this.editing = false;
 
-                                    $wire.updateField('endDatetime', this.currentValue)
-                                        .catch(() => {
-                                            this.originalValue = previous;
-                                            this.currentValue = previous;
-                                            $wire.endDatetime = previous;
-                                            window.dispatchEvent(new CustomEvent('notify', {
-                                                detail: {
-                                                    message: 'Failed to update end date & time. Please try again.',
-                                                    type: 'error',
-                                                },
-                                            }));
-                                        });
+                                    $wire.$dispatchTo('workspace.show-items', 'update-event-field', {
+                                        eventId: {{ $event->id }},
+                                        field: 'endDatetime',
+                                        value: this.currentValue,
+                                    });
                                  } else {
                                      this.editing = false;
                                  }
@@ -570,31 +452,66 @@ new class extends Component
 
                         <x-slot:options>
                             <button
-                                @click="select('scheduled')"
+                                @click="
+                                    select('scheduled');
+                                    $wire.$dispatchTo('workspace.show-items', 'update-event-field', {
+                                        eventId: {{ $event->id }},
+                                        field: 'status',
+                                        value: 'scheduled',
+                                    });
+                                "
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ ($event->status?->value ?? 'scheduled') === 'scheduled' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
                             >
                                 Scheduled
                             </button>
                             <button
-                                @click="select('ongoing')"
+                                @click="
+                                    select('ongoing');
+                                    $wire.$dispatchTo('workspace.show-items', 'update-event-field', {
+                                        eventId: {{ $event->id }},
+                                        field: 'status',
+                                        value: 'ongoing',
+                                    });
+                                "
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ ($event->status?->value ?? 'scheduled') === 'ongoing' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
                             >
                                 In Progress
                             </button>
                             <button
-                                @click="select('tentative')"
+                                @click="
+                                    select('tentative');
+                                    $wire.$dispatchTo('workspace.show-items', 'update-event-field', {
+                                        eventId: {{ $event->id }},
+                                        field: 'status',
+                                        value: 'tentative',
+                                    });
+                                "
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ ($event->status?->value ?? 'scheduled') === 'tentative' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
                             >
                                 Tentative
                             </button>
                             <button
-                                @click="select('cancelled')"
+                                @click="
+                                    select('cancelled');
+                                    $wire.$dispatchTo('workspace.show-items', 'update-event-field', {
+                                        eventId: {{ $event->id }},
+                                        field: 'status',
+                                        value: 'cancelled',
+                                    });
+                                "
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ ($event->status?->value ?? 'scheduled') === 'cancelled' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
                             >
                                 Cancelled
                             </button>
                             <button
-                                @click="select('completed')"
+                                @click="
+                                    select('completed');
+                                    $wire.$dispatchTo('workspace.show-items', 'update-event-field', {
+                                        eventId: {{ $event->id }},
+                                        field: 'status',
+                                        value: 'completed',
+                                    });
+                                "
                                 class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 {{ ($event->status?->value ?? 'scheduled') === 'completed' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : '' }}"
                             >
                                 Completed
@@ -673,11 +590,18 @@ new class extends Component
                 variant="danger"
                 x-data="{}"
                 @click="
-                    $dispatch('optimistic-item-deleted', {
-                        itemId: '{{ $event?->id }}',
-                        itemType: 'event',
-                    });
-                    $wire.deleteEvent();
+                    const eventId = {{ $event?->id ?? 'null' }};
+                    if (eventId) {
+                        $dispatch('optimistic-item-deleted', {
+                            itemId: eventId,
+                            itemType: 'event',
+                        });
+                        $wire.showDeleteConfirm = false;
+                        $wire.isOpen = false;
+                        $wire.$dispatchTo('workspace.show-items', 'delete-event', {
+                            eventId: eventId,
+                        });
+                    }
                 "
             >
                 Delete

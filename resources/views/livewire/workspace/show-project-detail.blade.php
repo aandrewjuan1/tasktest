@@ -3,7 +3,6 @@
 use App\Enums\TaskStatus;
 use App\Models\Project;
 use App\Models\Tag;
-use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
@@ -58,74 +57,7 @@ new class extends Component {
 
     public function updateField(string $field, mixed $value): void
     {
-        if (!$this->project) {
-            return;
-        }
-
-        $this->authorize('update', $this->project);
-
-        $validationRules = match ($field) {
-            'name' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'startDate' => ['nullable', 'date'],
-            'endDate' => ['nullable', 'date'],
-            default => [],
-        };
-
-        if (empty($validationRules)) {
-            return;
-        }
-
-        // Validate endDate after startDate if both are being set
-        if ($field === 'endDate' && $this->startDate) {
-            $this->validate([
-                $field => array_merge($validationRules, ['after_or_equal:startDate']),
-            ]);
-        } else {
-            $this->validate([
-                $field => $validationRules,
-            ]);
-        }
-
-        try {
-            DB::transaction(function () use ($field, $value) {
-                $updateData = [];
-
-                switch ($field) {
-                    case 'name':
-                        $updateData['name'] = $value;
-                        break;
-                    case 'description':
-                        $updateData['description'] = $value ?: null;
-                        break;
-                    case 'startDate':
-                        $updateData['start_date'] = $value ?: null;
-                        break;
-                    case 'endDate':
-                        $updateData['end_date'] = $value ?: null;
-                        break;
-                }
-
-                $this->project->update($updateData);
-                $this->project->refresh();
-            });
-
-            $this->loadProjectData();
-            $this->dispatch('project-updated');
-            $this->dispatch('item-updated');
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            throw $e;
-        } catch (\Exception $e) {
-            \Log::error('Failed to update project field', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'field' => $field,
-                'project_id' => $this->project->id,
-                'user_id' => auth()->id(),
-            ]);
-
-            $this->dispatch('notify', message: 'Failed to update project. Please try again.', type: 'error');
-        }
+        // Intentionally left blank; updates are handled by the parent show-items component.
     }
 
     public function confirmDelete(): void
@@ -135,27 +67,7 @@ new class extends Component {
 
     public function deleteProject(): void
     {
-        $this->authorize('delete', $this->project);
-
-        try {
-            DB::transaction(function () {
-                $this->project->delete();
-            });
-
-            $this->closeModal();
-            $this->dispatch('project-deleted');
-            $this->dispatch('notify', message: 'Project deleted successfully', type: 'success');
-            session()->flash('message', 'Project deleted successfully!');
-        } catch (\Exception $e) {
-            \Log::error('Failed to delete project', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'project_id' => $this->project->id,
-                'user_id' => auth()->id(),
-            ]);
-
-            $this->dispatch('notify', message: 'Failed to delete project. Please try again.', type: 'error');
-        }
+        // Intentionally left blank; deletes are handled by the parent show-items component.
     }
 
     #[Computed]
@@ -200,18 +112,11 @@ new class extends Component {
                                     this.originalValue = this.currentValue; // optimistic
                                     this.editing = false;
 
-                                    $wire.updateField('name', this.currentValue)
-                                        .catch(() => {
-                                            this.originalValue = previous;
-                                            this.currentValue = previous;
-                                            $wire.name = previous;
-                                            window.dispatchEvent(new CustomEvent('notify', {
-                                                detail: {
-                                                    message: 'Failed to update name. Please try again.',
-                                                    type: 'error',
-                                                },
-                                            }));
-                                        });
+                                    $wire.$dispatchTo('workspace.show-items', 'update-project-field', {
+                                        projectId: {{ $project->id }},
+                                        field: 'name',
+                                        value: this.currentValue,
+                                    });
                                  } else {
                                      this.editing = false;
                                  }
@@ -288,20 +193,13 @@ new class extends Component {
                                 this.originalValue = this.currentValue; // optimistic
                                 this.editing = false;
 
-                                $wire.updateField('description', this.currentValue)
-                                    .catch(() => {
-                                        this.originalValue = previous;
-                                        this.currentValue = previous;
-                                        $wire.description = previous;
-                                        window.dispatchEvent(new CustomEvent('notify', {
-                                            detail: {
-                                                message: 'Failed to update description. Please try again.',
-                                                type: 'error',
-                                            },
-                                        }));
-                                    });
+                                $wire.$dispatchTo('workspace.show-items', 'update-project-field', {
+                                    projectId: {{ $project->id }},
+                                    field: 'description',
+                                    value: this.currentValue,
+                                });
                              } else {
-                                 this.editing = false;
+                             this.editing = false;
                              }
                          },
                          cancel() {
@@ -405,18 +303,11 @@ new class extends Component {
                                     this.originalValue = this.currentValue; // optimistic
                                     this.editing = false;
 
-                                    $wire.updateField('startDate', this.currentValue)
-                                        .catch(() => {
-                                            this.originalValue = previous;
-                                            this.currentValue = previous;
-                                            $wire.startDate = previous;
-                                            window.dispatchEvent(new CustomEvent('notify', {
-                                                detail: {
-                                                    message: 'Failed to update start date. Please try again.',
-                                                    type: 'error',
-                                                },
-                                            }));
-                                        });
+                                    $wire.$dispatchTo('workspace.show-items', 'update-project-field', {
+                                        projectId: {{ $project->id }},
+                                        field: 'startDate',
+                                        value: this.currentValue,
+                                    });
                                  } else {
                                      this.editing = false;
                                  }
@@ -503,18 +394,11 @@ new class extends Component {
                                     this.originalValue = this.currentValue; // optimistic
                                     this.editing = false;
 
-                                    $wire.updateField('endDate', this.currentValue)
-                                        .catch(() => {
-                                            this.originalValue = previous;
-                                            this.currentValue = previous;
-                                            $wire.endDate = previous;
-                                            window.dispatchEvent(new CustomEvent('notify', {
-                                                detail: {
-                                                    message: 'Failed to update end date. Please try again.',
-                                                    type: 'error',
-                                                },
-                                            }));
-                                        });
+                                    $wire.$dispatchTo('workspace.show-items', 'update-project-field', {
+                                        projectId: {{ $project->id }},
+                                        field: 'endDate',
+                                        value: this.currentValue,
+                                    });
                                  } else {
                                      this.editing = false;
                                  }
@@ -671,11 +555,18 @@ new class extends Component {
                 variant="danger"
                 x-data="{}"
                 @click="
-                    $dispatch('optimistic-item-deleted', {
-                        itemId: '{{ $project?->id }}',
-                        itemType: 'project',
-                    });
-                    $wire.deleteProject();
+                    const projectId = {{ $project?->id ?? 'null' }};
+                    if (projectId) {
+                        $dispatch('optimistic-item-deleted', {
+                            itemId: projectId,
+                            itemType: 'project',
+                        });
+                        $wire.showDeleteConfirm = false;
+                        $wire.isOpen = false;
+                        $wire.$dispatchTo('workspace.show-items', 'delete-project', {
+                            projectId: projectId,
+                        });
+                    }
                 "
             >
                 Delete

@@ -11,6 +11,7 @@ use App\Models\Task;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
@@ -259,6 +260,30 @@ new class extends Component
         $this->updateTaskField($taskId, $field, $value);
     }
 
+    #[On('update-event-field')]
+    public function handleUpdateEventField(int $eventId, string $field, mixed $value): void
+    {
+        $this->updateEventField($eventId, $field, $value);
+    }
+
+    #[On('delete-event')]
+    public function handleDeleteEvent(int $eventId): void
+    {
+        $this->deleteEvent($eventId);
+    }
+
+    #[On('update-project-field')]
+    public function handleUpdateProjectField(int $projectId, string $field, mixed $value): void
+    {
+        $this->updateProjectField($projectId, $field, $value);
+    }
+
+    #[On('delete-project')]
+    public function handleDeleteProject(int $projectId): void
+    {
+        $this->deleteProject($projectId);
+    }
+
     public function createTask(array $data): void
     {
         $this->authorize('create', Task::class);
@@ -335,18 +360,7 @@ new class extends Component
 
             $this->authorize('update', $task);
 
-            $validationRules = match ($field) {
-                'title' => ['required', 'string', 'max:255'],
-                'description' => ['nullable', 'string'],
-                'status' => ['nullable', 'string', 'in:to_do,doing,done'],
-                'priority' => ['nullable', 'string', 'in:low,medium,high,urgent'],
-                'complexity' => ['nullable', 'string', 'in:simple,moderate,complex'],
-                'duration' => ['nullable', 'integer', 'min:1'],
-                'startDatetime' => ['nullable', 'date'],
-                'endDatetime' => ['nullable', 'date'],
-                'projectId' => ['nullable', 'exists:projects,id'],
-                default => [],
-            };
+            $validationRules = $this->taskFieldRules($field);
 
             if (empty($validationRules)) {
                 return;
@@ -414,6 +428,183 @@ new class extends Component
             ]);
 
             $this->dispatch('notify', message: 'Failed to update task. Please try again.', type: 'error');
+        }
+    }
+
+    public function updateEventField(int $eventId, string $field, mixed $value): void
+    {
+        try {
+            $event = Event::with(['tags', 'reminders'])
+                ->findOrFail($eventId);
+
+            $this->authorize('update', $event);
+
+            $validationRules = $this->eventFieldRules($field);
+
+            if (empty($validationRules)) {
+                return;
+            }
+
+            validator(
+                [$field => $value],
+                [$field => $validationRules],
+                [],
+                [$field => $field],
+            )->validate();
+
+            DB::transaction(function () use ($event, $field, $value) {
+                $updateData = [];
+
+                switch ($field) {
+                    case 'title':
+                        $updateData['title'] = $value;
+                        break;
+                    case 'description':
+                        $updateData['description'] = $value ?: null;
+                        break;
+                    case 'startDatetime':
+                        $startDatetime = Carbon::parse($value);
+                        $updateData['start_datetime'] = $startDatetime;
+                        if (! $event->end_datetime) {
+                            $updateData['end_datetime'] = $startDatetime->copy()->addHour();
+                        }
+                        break;
+                    case 'endDatetime':
+                        $updateData['end_datetime'] = $value ? Carbon::parse($value) : null;
+                        break;
+                    case 'status':
+                        $updateData['status'] = $value ?: 'scheduled';
+                        break;
+                }
+
+                if (! empty($updateData)) {
+                    $event->update($updateData);
+                    $event->refresh();
+                }
+            });
+
+            $this->dispatch('item-updated');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            \Log::error('Failed to update event field from parent', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'field' => $field,
+                'event_id' => $eventId,
+                'user_id' => auth()->id(),
+            ]);
+
+            $this->dispatch('notify', message: 'Failed to update event. Please try again.', type: 'error');
+        }
+    }
+
+    public function deleteEvent(int $eventId): void
+    {
+        try {
+            $event = Event::findOrFail($eventId);
+            $this->authorize('delete', $event);
+
+            DB::transaction(function () use ($event) {
+                $event->delete();
+            });
+
+            $this->dispatch('item-updated');
+            $this->dispatch('notify', message: 'Event deleted successfully', type: 'success');
+        } catch (\Exception $e) {
+            \Log::error('Failed to delete event from parent', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'event_id' => $eventId,
+                'user_id' => auth()->id(),
+            ]);
+
+            $this->dispatch('notify', message: 'Failed to delete event. Please try again.', type: 'error');
+        }
+    }
+
+    public function updateProjectField(int $projectId, string $field, mixed $value): void
+    {
+        try {
+            $project = Project::with(['tags', 'tasks', 'reminders'])
+                ->findOrFail($projectId);
+
+            $this->authorize('update', $project);
+
+            $validationRules = $this->projectFieldRules($field);
+
+            if (empty($validationRules)) {
+                return;
+            }
+
+            validator(
+                [$field => $value],
+                [$field => $validationRules],
+                [],
+                [$field => $field],
+            )->validate();
+
+            DB::transaction(function () use ($project, $field, $value) {
+                $updateData = [];
+
+                switch ($field) {
+                    case 'name':
+                        $updateData['name'] = $value;
+                        break;
+                    case 'description':
+                        $updateData['description'] = $value ?: null;
+                        break;
+                    case 'startDate':
+                        $updateData['start_date'] = $value ?: null;
+                        break;
+                    case 'endDate':
+                        $updateData['end_date'] = $value ?: null;
+                        break;
+                }
+
+                if (! empty($updateData)) {
+                    $project->update($updateData);
+                    $project->refresh();
+                }
+            });
+
+            $this->dispatch('item-updated');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            \Log::error('Failed to update project field from parent', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'field' => $field,
+                'project_id' => $projectId,
+                'user_id' => auth()->id(),
+            ]);
+
+            $this->dispatch('notify', message: 'Failed to update project. Please try again.', type: 'error');
+        }
+    }
+
+    public function deleteProject(int $projectId): void
+    {
+        try {
+            $project = Project::findOrFail($projectId);
+            $this->authorize('delete', $project);
+
+            DB::transaction(function () use ($project) {
+                $project->delete();
+            });
+
+            $this->dispatch('item-updated');
+            $this->dispatch('notify', message: 'Project deleted successfully', type: 'success');
+        } catch (\Exception $e) {
+            \Log::error('Failed to delete project from parent', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'project_id' => $projectId,
+                'user_id' => auth()->id(),
+            ]);
+
+            $this->dispatch('notify', message: 'Failed to delete project. Please try again.', type: 'error');
         }
     }
 
@@ -605,14 +796,12 @@ new class extends Component
             $this->authorize('update', $model);
 
             if ($itemType === 'task') {
-                // For tasks, update duration and recalculate end_date if needed
+                // For tasks, update duration and recalculate end_datetime if needed
                 $model->duration = $newDurationMinutes;
 
-                if ($model->start_date && $model->start_time) {
-                    $startDateString = Carbon::parse($model->start_date)->format('Y-m-d');
-                    $startDateTime = Carbon::parse($startDateString.' '.$model->start_time);
-                    $endDateTime = $startDateTime->copy()->addMinutes($newDurationMinutes);
-                    $model->end_date = $endDateTime->toDateString();
+                if ($model->start_datetime) {
+                    $endDateTime = $model->start_datetime->copy()->addMinutes($newDurationMinutes);
+                    $model->end_datetime = $endDateTime;
                 }
             } elseif ($itemType === 'event') {
                 // For events, update end_datetime while keeping start_datetime
@@ -627,6 +816,51 @@ new class extends Component
             \Log::error('Failed to update item duration', ['error' => $e->getMessage(), 'itemId' => $itemId, 'itemType' => $itemType]);
             $this->dispatch('notify', message: 'Failed to update duration', type: 'error');
         }
+    }
+
+    protected function taskFieldRules(string $field): array
+    {
+        $statusValues = array_map(fn ($c) => $c->value, TaskStatus::cases());
+        $priorityValues = array_map(fn ($c) => $c->value, TaskPriority::cases());
+        $complexityValues = array_map(fn ($c) => $c->value, TaskComplexity::cases());
+
+        return match ($field) {
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'status' => ['nullable', 'string', Rule::in($statusValues)],
+            'priority' => ['nullable', 'string', Rule::in($priorityValues)],
+            'complexity' => ['nullable', 'string', Rule::in($complexityValues)],
+            'duration' => ['nullable', 'integer', 'min:1'],
+            'startDatetime' => ['nullable', 'date'],
+            'endDatetime' => ['nullable', 'date'],
+            'projectId' => ['nullable', 'exists:projects,id'],
+            default => [],
+        };
+    }
+
+    protected function eventFieldRules(string $field): array
+    {
+        $statusValues = array_map(fn ($c) => $c->value, EventStatus::cases());
+
+        return match ($field) {
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'startDatetime' => ['required', 'date'],
+            'endDatetime' => ['nullable', 'date'],
+            'status' => ['nullable', 'string', Rule::in($statusValues)],
+            default => [],
+        };
+    }
+
+    protected function projectFieldRules(string $field): array
+    {
+        return match ($field) {
+            'name' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'startDate' => ['nullable', 'date'],
+            'endDate' => ['nullable', 'date', 'after_or_equal:startDate'],
+            default => [],
+        };
     }
 
     public function updateItemStatus(int $itemId, string $itemType, string $newStatus): void
