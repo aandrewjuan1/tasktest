@@ -1,249 +1,14 @@
 <?php
 
-use App\Enums\EventStatus;
-use App\Enums\TaskComplexity;
-use App\Enums\TaskPriority;
-use App\Enums\TaskStatus;
-use App\Models\Event;
 use App\Models\Project;
 use App\Models\Tag;
-use App\Models\Task;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
-use Livewire\Attributes\On;
 use Livewire\Volt\Component;
 
 new class extends Component
 {
-    public string $activeTab = 'task';
-
-    // Task fields
-    public string $taskTitle = '';
-    public ?string $taskStatus = 'to_do';
-    public ?string $taskPriority = 'medium';
-    public ?string $taskComplexity = 'moderate';
-    public ?int $taskDuration = 60;
-    public ?string $taskStartDatetime = null;
-    public ?string $taskEndDatetime = null;
-    public ?int $taskProjectId = null;
-    public array $taskTagIds = [];
-
-    // Event fields
-    public string $eventTitle = '';
-    public ?string $eventStatus = 'scheduled';
-    public ?string $eventStartDatetime = null;
-    public ?string $eventEndDatetime = null;
-    public array $eventTagIds = [];
-
-    // Project fields
-    public string $projectName = '';
-    public ?string $projectStartDate = null;
-    public ?string $projectEndDate = null;
-    public array $projectTagIds = [];
-
-    public function mount(): void
-    {
-        $this->resetForm();
-    }
-
-    public function switchTab(string $tab): void
-    {
-        $this->activeTab = $tab;
-        $this->resetValidation();
-    }
-
-    public function resetForm(): void
-    {
-        $this->activeTab = 'task';
-        $this->taskTitle = '';
-        $this->taskStatus = 'to_do';
-        $this->taskPriority = 'medium';
-        $this->taskComplexity = 'moderate';
-        $this->taskDuration = 60;
-        $this->taskStartDatetime = Carbon::now()->format('Y-m-d\TH:i');
-        $this->taskEndDatetime = null;
-        $this->taskProjectId = null;
-        $this->taskTagIds = [];
-
-        $this->eventTitle = '';
-        $this->eventStatus = 'scheduled';
-        $this->eventStartDatetime = Carbon::now()->format('Y-m-d\TH:i');
-        $this->eventEndDatetime = null;
-        $this->eventTagIds = [];
-
-        $this->projectName = '';
-        $this->projectStartDate = Carbon::today()->toDateString();
-        $this->projectEndDate = null;
-        $this->projectTagIds = [];
-
-        $this->resetValidation();
-    }
-
-    public function createTask(): void
-    {
-        $this->authorize('create', Task::class);
-
-        try {
-            $validated = $this->validate([
-                'taskTitle' => ['required', 'string', 'max:255'],
-                'taskStatus' => ['nullable', 'string', 'in:to_do,doing,done'],
-                'taskPriority' => ['nullable', 'string', 'in:low,medium,high,urgent'],
-                'taskComplexity' => ['nullable', 'string', 'in:simple,moderate,complex'],
-                'taskDuration' => ['nullable', 'integer', 'min:1'],
-                'taskStartDatetime' => ['nullable', 'date'],
-                'taskEndDatetime' => ['nullable', 'date', 'after_or_equal:taskStartDatetime'],
-                'taskProjectId' => ['nullable', 'exists:projects,id'],
-                'taskTagIds' => ['nullable', 'array'],
-                'taskTagIds.*' => ['exists:tags,id'],
-            ], [], [
-                'taskTitle' => 'title',
-                'taskStatus' => 'status',
-                'taskPriority' => 'priority',
-                'taskComplexity' => 'complexity',
-                'taskDuration' => 'duration',
-                'taskStartDatetime' => 'start datetime',
-                'taskEndDatetime' => 'end datetime',
-                'taskProjectId' => 'project',
-            ]);
-
-            $startDatetime = $validated['taskStartDatetime'] ? Carbon::parse($validated['taskStartDatetime']) : null;
-            $endDatetime = $validated['taskEndDatetime'] ? Carbon::parse($validated['taskEndDatetime']) : null;
-
-            DB::transaction(function () use ($validated, $startDatetime, $endDatetime) {
-                $task = Task::create([
-                    'user_id' => auth()->id(),
-                    'title' => $validated['taskTitle'],
-                    'status' => $validated['taskStatus'] ? TaskStatus::from($validated['taskStatus']) : null,
-                    'priority' => $validated['taskPriority'] ? TaskPriority::from($validated['taskPriority']) : null,
-                    'complexity' => $validated['taskComplexity'] ? TaskComplexity::from($validated['taskComplexity']) : null,
-                    'duration' => $validated['taskDuration'] ?? null,
-                    'start_datetime' => $startDatetime,
-                    'end_datetime' => $endDatetime,
-                    'project_id' => $validated['taskProjectId'] ?? null,
-                ]);
-
-                if (!empty($validated['taskTagIds'])) {
-                    $task->tags()->attach($validated['taskTagIds']);
-                }
-            });
-
-            $this->resetForm();
-            $this->dispatch('notify', message: 'Task created successfully', type: 'success');
-            $this->dispatch('item-created');
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            throw $e;
-        } catch (\Exception $e) {
-            \Log::error('Failed to create task', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'user_id' => auth()->id(),
-            ]);
-
-            $this->dispatch('notify', message: 'Failed to create task. Please try again.', type: 'error');
-        }
-    }
-
-    public function createEvent(): void
-    {
-        $this->authorize('create', Event::class);
-
-        try {
-            $validated = $this->validate([
-                'eventTitle' => ['required', 'string', 'max:255'],
-                'eventStatus' => ['nullable', 'string', 'in:scheduled,cancelled,completed,tentative,ongoing'],
-                'eventStartDatetime' => ['nullable', 'date'],
-                'eventEndDatetime' => ['nullable', 'date', 'after:eventStartDatetime'],
-                'eventTagIds' => ['nullable', 'array'],
-                'eventTagIds.*' => ['exists:tags,id'],
-            ], [], [
-                'eventTitle' => 'title',
-                'eventStatus' => 'status',
-                'eventStartDatetime' => 'start datetime',
-                'eventEndDatetime' => 'end datetime',
-            ]);
-
-            $startDatetime = $validated['eventStartDatetime'] ? Carbon::parse($validated['eventStartDatetime']) : null;
-            $endDatetime = $validated['eventEndDatetime'] ? Carbon::parse($validated['eventEndDatetime']) : null;
-
-            DB::transaction(function () use ($validated, $startDatetime, $endDatetime) {
-                $event = Event::create([
-                    'user_id' => auth()->id(),
-                    'title' => $validated['eventTitle'],
-                    'status' => $validated['eventStatus'] ? EventStatus::from($validated['eventStatus']) : null,
-                    'start_datetime' => $startDatetime,
-                    'end_datetime' => $endDatetime,
-                ]);
-
-                if (!empty($validated['eventTagIds'])) {
-                    $event->tags()->attach($validated['eventTagIds']);
-                }
-            });
-
-            $this->resetForm();
-            $this->dispatch('notify', message: 'Event created successfully', type: 'success');
-            $this->dispatch('item-created');
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            throw $e;
-        } catch (\Exception $e) {
-            \Log::error('Failed to create event', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'user_id' => auth()->id(),
-            ]);
-
-            $this->dispatch('notify', message: 'Failed to create event. Please try again.', type: 'error');
-        }
-    }
-
-    public function createProject(): void
-    {
-        $this->authorize('create', Project::class);
-
-        try {
-            $validated = $this->validate([
-                'projectName' => ['required', 'string', 'max:255'],
-                'projectStartDate' => ['nullable', 'date'],
-                'projectEndDate' => ['nullable', 'date', 'after_or_equal:projectStartDate'],
-                'projectTagIds' => ['nullable', 'array'],
-                'projectTagIds.*' => ['exists:tags,id'],
-            ], [], [
-                'projectName' => 'name',
-                'projectStartDate' => 'start date',
-                'projectEndDate' => 'end date',
-            ]);
-
-            DB::transaction(function () use ($validated) {
-                $project = Project::create([
-                    'user_id' => auth()->id(),
-                    'name' => $validated['projectName'],
-                    'start_date' => $validated['projectStartDate'] ?? null,
-                    'end_date' => $validated['projectEndDate'] ?? null,
-                ]);
-
-                if (!empty($validated['projectTagIds'])) {
-                    $project->tags()->attach($validated['projectTagIds']);
-                }
-            });
-
-            $this->resetForm();
-            $this->dispatch('notify', message: 'Project created successfully', type: 'success');
-            $this->dispatch('item-created');
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            throw $e;
-        } catch (\Exception $e) {
-            \Log::error('Failed to create project', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'user_id' => auth()->id(),
-            ]);
-
-            $this->dispatch('notify', message: 'Failed to create project. Please try again.', type: 'error');
-        }
-    }
-
     #[Computed]
     public function availableProjects(): Collection
     {
@@ -360,29 +125,6 @@ new class extends Component
             }
         };
     },
-    syncToLivewire() {
-        // Directly set properties on $wire object to avoid multiple requests
-        $wire.taskTitle = this.formData.task.title;
-        $wire.taskStatus = this.formData.task.status;
-        $wire.taskPriority = this.formData.task.priority;
-        $wire.taskComplexity = this.formData.task.complexity;
-        $wire.taskDuration = this.formData.task.duration;
-        $wire.taskStartDatetime = this.formData.task.startDatetime;
-        $wire.taskEndDatetime = this.formData.task.endDatetime;
-        $wire.taskProjectId = this.formData.task.projectId;
-        $wire.taskTagIds = this.formData.task.tagIds;
-
-        $wire.eventTitle = this.formData.event.title;
-        $wire.eventStatus = this.formData.event.status;
-        $wire.eventStartDatetime = this.formData.event.startDatetime;
-        $wire.eventEndDatetime = this.formData.event.endDatetime;
-        $wire.eventTagIds = this.formData.event.tagIds;
-
-        $wire.projectName = this.formData.project.name;
-        $wire.projectStartDate = this.formData.project.startDate;
-        $wire.projectEndDate = this.formData.project.endDate;
-        $wire.projectTagIds = this.formData.project.tagIds;
-    },
     submitTask() {
         const tempId = Date.now() + Math.random();
 
@@ -395,11 +137,14 @@ new class extends Component
             },
         }));
 
-        this.syncToLivewire();
         this.closeModal();
 
-        $wire.createTask().catch(() => {
-            // Clear the optimistic placeholder on failure; validation errors surface via Livewire
+        const payload = { ...this.formData.task };
+
+        const promise = $wire.$parent.$call('createTask', payload);
+
+        promise.catch(() => {
+            // Clear the optimistic placeholder on failure
             window.dispatchEvent(new CustomEvent('optimistic-item-create-failed', {
                 detail: { id: tempId },
             }));
@@ -416,10 +161,13 @@ new class extends Component
             },
         }));
 
-        this.syncToLivewire();
         this.closeModal();
 
-        $wire.createEvent().catch(() => {
+        const payload = { ...this.formData.event };
+
+        const promise = $wire.$parent.$call('createEvent', payload);
+
+        promise.catch(() => {
             window.dispatchEvent(new CustomEvent('optimistic-item-create-failed', {
                 detail: { id: tempId },
             }));
@@ -436,10 +184,13 @@ new class extends Component
             },
         }));
 
-        this.syncToLivewire();
         this.closeModal();
 
-        $wire.createProject().catch(() => {
+        const payload = { ...this.formData.project };
+
+        const promise = $wire.$parent.$call('createProject', payload);
+
+        promise.catch(() => {
             window.dispatchEvent(new CustomEvent('optimistic-item-create-failed', {
                 detail: { id: tempId },
             }));

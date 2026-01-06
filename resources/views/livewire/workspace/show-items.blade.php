@@ -1,12 +1,16 @@
 <?php
 
 use App\Enums\EventStatus;
+use App\Enums\TaskComplexity;
+use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Models\Event;
 use App\Models\Project;
+use App\Models\Tag;
 use App\Models\Task;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
@@ -129,11 +133,9 @@ new class extends Component
 
     #[On('task-updated')]
     #[On('task-deleted')]
-    #[On('item-created')]
     public function refreshItemsFromTaskDetail(): void
     {
-        // Trigger a re-render so the list reflects changes made in other components
-        // like the task detail modal or the create-item component.
+        // Trigger a re-render so the list reflects changes made in the task detail modal.
         // No additional logic is needed; computed queries will be re-run.
     }
 
@@ -226,6 +228,175 @@ new class extends Component
     {
         $this->clearFilters();
         $this->clearSorting();
+    }
+
+    public function createTask(array $data): void
+    {
+        $this->authorize('create', Task::class);
+
+        try {
+            $validated = validator($data, [
+                'title' => ['required', 'string', 'max:255'],
+                'status' => ['nullable', 'string', 'in:to_do,doing,done'],
+                'priority' => ['nullable', 'string', 'in:low,medium,high,urgent'],
+                'complexity' => ['nullable', 'string', 'in:simple,moderate,complex'],
+                'duration' => ['nullable', 'integer', 'min:1'],
+                'startDatetime' => ['nullable', 'date'],
+                'endDatetime' => ['nullable', 'date', 'after_or_equal:startDatetime'],
+                'projectId' => ['nullable', 'exists:projects,id'],
+                'tagIds' => ['nullable', 'array'],
+                'tagIds.*' => ['integer', 'exists:tags,id'],
+            ], [], [
+                'title' => 'title',
+                'status' => 'status',
+                'priority' => 'priority',
+                'complexity' => 'complexity',
+                'duration' => 'duration',
+                'startDatetime' => 'start datetime',
+                'endDatetime' => 'end datetime',
+                'projectId' => 'project',
+            ])->validate();
+
+            $startDatetime = ! empty($validated['startDatetime'])
+                ? Carbon::parse($validated['startDatetime'])
+                : null;
+
+            $endDatetime = ! empty($validated['endDatetime'])
+                ? Carbon::parse($validated['endDatetime'])
+                : null;
+
+            DB::transaction(function () use ($validated, $startDatetime, $endDatetime) {
+                $task = Task::create([
+                    'user_id' => auth()->id(),
+                    'title' => $validated['title'],
+                    'status' => $validated['status'] ? TaskStatus::from($validated['status']) : null,
+                    'priority' => $validated['priority'] ? TaskPriority::from($validated['priority']) : null,
+                    'complexity' => $validated['complexity'] ? TaskComplexity::from($validated['complexity']) : null,
+                    'duration' => $validated['duration'] ?? null,
+                    'start_datetime' => $startDatetime,
+                    'end_datetime' => $endDatetime,
+                    'project_id' => $validated['projectId'] ?? null,
+                ]);
+
+                if (! empty($validated['tagIds'])) {
+                    $task->tags()->attach($validated['tagIds']);
+                }
+            });
+
+            $this->dispatch('notify', message: 'Task created successfully', type: 'success');
+            $this->dispatch('item-created');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            \Log::error('Failed to create task', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => auth()->id(),
+            ]);
+
+            $this->dispatch('notify', message: 'Failed to create task. Please try again.', type: 'error');
+        }
+    }
+
+    public function createEvent(array $data): void
+    {
+        $this->authorize('create', Event::class);
+
+        try {
+            $validated = validator($data, [
+                'title' => ['required', 'string', 'max:255'],
+                'status' => ['nullable', 'string', 'in:scheduled,cancelled,completed,tentative,ongoing'],
+                'startDatetime' => ['nullable', 'date'],
+                'endDatetime' => ['nullable', 'date', 'after:startDatetime'],
+                'tagIds' => ['nullable', 'array'],
+                'tagIds.*' => ['integer', 'exists:tags,id'],
+            ], [], [
+                'title' => 'title',
+                'status' => 'status',
+                'startDatetime' => 'start datetime',
+                'endDatetime' => 'end datetime',
+            ])->validate();
+
+            $startDatetime = ! empty($validated['startDatetime'])
+                ? Carbon::parse($validated['startDatetime'])
+                : null;
+
+            $endDatetime = ! empty($validated['endDatetime'])
+                ? Carbon::parse($validated['endDatetime'])
+                : null;
+
+            DB::transaction(function () use ($validated, $startDatetime, $endDatetime) {
+                $event = Event::create([
+                    'user_id' => auth()->id(),
+                    'title' => $validated['title'],
+                    'status' => $validated['status'] ? EventStatus::from($validated['status']) : null,
+                    'start_datetime' => $startDatetime,
+                    'end_datetime' => $endDatetime,
+                ]);
+
+                if (! empty($validated['tagIds'])) {
+                    $event->tags()->attach($validated['tagIds']);
+                }
+            });
+
+            $this->dispatch('notify', message: 'Event created successfully', type: 'success');
+            $this->dispatch('item-created');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            \Log::error('Failed to create event', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => auth()->id(),
+            ]);
+
+            $this->dispatch('notify', message: 'Failed to create event. Please try again.', type: 'error');
+        }
+    }
+
+    public function createProject(array $data): void
+    {
+        $this->authorize('create', Project::class);
+
+        try {
+            $validated = validator($data, [
+                'name' => ['required', 'string', 'max:255'],
+                'startDate' => ['nullable', 'date'],
+                'endDate' => ['nullable', 'date', 'after_or_equal:startDate'],
+                'tagIds' => ['nullable', 'array'],
+                'tagIds.*' => ['integer', 'exists:tags,id'],
+            ], [], [
+                'name' => 'name',
+                'startDate' => 'start date',
+                'endDate' => 'end date',
+            ])->validate();
+
+            DB::transaction(function () use ($validated) {
+                $project = Project::create([
+                    'user_id' => auth()->id(),
+                    'name' => $validated['name'],
+                    'start_date' => $validated['startDate'] ?? null,
+                    'end_date' => $validated['endDate'] ?? null,
+                ]);
+
+                if (! empty($validated['tagIds'])) {
+                    $project->tags()->attach($validated['tagIds']);
+                }
+            });
+
+            $this->dispatch('notify', message: 'Project created successfully', type: 'success');
+            $this->dispatch('item-created');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            \Log::error('Failed to create project', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => auth()->id(),
+            ]);
+
+            $this->dispatch('notify', message: 'Failed to create project. Please try again.', type: 'error');
+        }
     }
 
     #[Computed]
