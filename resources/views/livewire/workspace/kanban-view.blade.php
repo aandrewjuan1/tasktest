@@ -131,27 +131,30 @@ new class extends Component
 
 <div
     x-data="{
-        optimisticCreated: [],
         deleted: [],
+        moving: [],
     }"
-    x-on:optimistic-item-created.window="
-        optimisticCreated.push({
-            id: $event.detail.id,
-            type: $event.detail.type,
-            label: $event.detail.label,
-        })
-    "
-    x-on:optimistic-item-create-failed.window="
-        optimisticCreated = optimisticCreated.filter(item => item.id !== $event.detail.id)
-    "
-    x-on:item-created.window="
-        optimisticCreated = []
-    "
     x-on:optimistic-item-deleted.window="
         deleted.push({
             id: $event.detail.itemId,
             type: $event.detail.itemType,
         })
+    "
+    x-on:update-item-status.window="
+        if ($event.detail?.itemId) {
+            moving.push({
+                id: $event.detail.itemId,
+                type: $event.detail.itemType || null,
+                toStatus: $event.detail.newStatus || null,
+            });
+        }
+    "
+    x-on:item-updated.window="
+        if ($event.detail?.id) {
+            moving = moving.filter(m => m.id !== $event.detail.id);
+        } else {
+            moving = [];
+        }
     "
 >
     <!-- View Navigation -->
@@ -169,25 +172,6 @@ new class extends Component
         mb
     />
 
-    <!-- Loading overlay for status updates -->
-    <div
-        x-data="{ isUpdating: false }"
-        x-on:update-item-status.window="isUpdating = true"
-        x-on:item-updated.window="setTimeout(() => { isUpdating = false; }, 300)"
-        x-show="isUpdating"
-        x-transition
-        class="fixed inset-0 bg-black/10 dark:bg-black/20 z-40 flex items-center justify-center pointer-events-none"
-        style="display: none;"
-    >
-        <div class="bg-white dark:bg-zinc-800 rounded-lg p-4 shadow-lg flex items-center gap-2">
-            <svg class="animate-spin h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">Updating status...</span>
-        </div>
-    </div>
-
     <div wire:loading.class="opacity-50"
          wire:target="goToTodayDate,previousDay,nextDay"
          wire:key="kanban-container">
@@ -201,7 +185,7 @@ new class extends Component
                  'doing' => 'In Progress',
                  'done' => 'Done',
              } }} column"
-             x-data="{ draggingOver: false, isUpdating: false }"
+             x-data="{ draggingOver: false }"
              @dragover.prevent="draggingOver = true"
              @dragleave="draggingOver = false"
              @drop.prevent="
@@ -219,15 +203,12 @@ new class extends Component
                      return;
                  }
 
-                 isUpdating = true;
+                 // Send update to Livewire (server-side status change)
                  $dispatch('update-item-status', {
                      itemId: parsedItemId,
                      itemType: itemType,
                      newStatus: '{{ $status }}'
                  });
-
-                 // Reset updating state after a delay
-                 setTimeout(() => { isUpdating = false; }, 1000);
              "
              :class="{ 'ring-2 ring-blue-500': draggingOver }"
         >
@@ -243,22 +224,6 @@ new class extends Component
             </h3>
 
             <div class="space-y-3" aria-live="polite">
-                <!-- Optimistic created placeholders (show in To Do column only) -->
-                @if($status === 'to_do')
-                    <template x-for="item in optimisticCreated" :key="item.id">
-                        <div class="bg-white dark:bg-zinc-800 rounded-lg border border-dashed border-zinc-200 dark:border-zinc-700 p-4 animate-pulse">
-                            <div class="flex items-center gap-2 mb-2">
-                                <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
-                                    <span x-text="item.type === 'task' ? 'Task' : (item.type === 'event' ? 'Event' : 'Project')"></span>
-                                    <span class="ml-1">(creating…)</span>
-                                </span>
-                            </div>
-                            <div class="h-4 bg-zinc-100 dark:bg-zinc-700 rounded w-2/3 mb-2"></div>
-                            <p class="text-xs text-zinc-500 dark:text-zinc-400" x-text="item.label"></p>
-                        </div>
-                    </template>
-                @endif
-
                 @foreach(collect($this->itemsByStatus[$status] ?? []) as $item)
                     <div
                         wire:key="item-{{ $item->item_type }}-{{ $item->id }}"
@@ -270,12 +235,16 @@ new class extends Component
                             $event.dataTransfer.effectAllowed = 'move';
                             $event.dataTransfer.setData('itemId', {{ $item->id }});
                             $event.dataTransfer.setData('itemType', '{{ $item->item_type }}');
+                            $event.dataTransfer.setData('label', '{{ $item->title ?? $item->name }}');
                             $el.classList.add('opacity-50', 'ring-2', 'ring-blue-500');
                         "
                         @dragend="
                             $el.classList.remove('opacity-50', 'ring-2', 'ring-blue-500');
                         "
-                        x-show="!deleted.some(d => d.id == {{ $item->id }} && d.type === '{{ $item->item_type }}')"
+                        x-show="
+                            !deleted.some(d => d.id == {{ $item->id }} && d.type === '{{ $item->item_type }}')
+                            && !moving.some(m => m.id == {{ $item->id }})
+                        "
                         x-transition.opacity
                         class="cursor-move relative transition-all"
                     >
@@ -286,21 +255,6 @@ new class extends Component
                         @elseif($item->item_type === 'project')
                             <x-workspace.project-card :project="$item" />
                         @endif
-                        <!-- Loading indicator -->
-                        <div
-                            x-data="{ isUpdating: false }"
-                            x-on:update-item-status.window="if ($event.detail.itemId === {{ $item->id }}) { isUpdating = true; }"
-                            x-on:item-updated.window="setTimeout(() => { isUpdating = false; }, 300)"
-                            x-show="isUpdating"
-                            x-transition
-                            class="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-zinc-900/50 rounded"
-                            style="display: none;"
-                        >
-                            <svg class="animate-spin h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                        </div>
                     </div>
                 @endforeach
 

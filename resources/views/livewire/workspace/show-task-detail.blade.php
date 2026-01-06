@@ -224,15 +224,16 @@ new class extends Component
                              },
                              save() {
                                  if (this.currentValue !== this.originalValue) {
+                                     const previous = this.originalValue;
+                                     this.originalValue = this.currentValue; // optimistic apply
+                                     this.editing = false;
+
                                      $wire.updateField('title', this.currentValue)
-                                         .then(() => {
-                                             this.originalValue = this.currentValue;
-                                             this.editing = false;
-                                         })
                                          .catch(() => {
-                                             this.currentValue = this.originalValue;
-                                             $wire.title = this.originalValue;
-                                             this.editing = false;
+                                             // rollback on failure
+                                             this.originalValue = previous;
+                                             this.currentValue = previous;
+                                             $wire.title = previous;
                                              window.dispatchEvent(new CustomEvent('notify', {
                                                  detail: {
                                                      message: 'Failed to update title. Please try again.',
@@ -312,15 +313,15 @@ new class extends Component
                          },
                          save() {
                              if (this.currentValue !== this.originalValue) {
+                                const previous = this.originalValue;
+                                this.originalValue = this.currentValue; // optimistic apply
+                                this.editing = false;
+
                                 $wire.updateField('description', this.currentValue)
-                                    .then(() => {
-                                        this.originalValue = this.currentValue;
-                                        this.editing = false;
-                                    })
                                     .catch(() => {
-                                        this.currentValue = this.originalValue;
-                                        $wire.description = this.originalValue;
-                                        this.editing = false;
+                                        this.originalValue = previous;
+                                        this.currentValue = previous;
+                                        $wire.description = previous;
                                         window.dispatchEvent(new CustomEvent('notify', {
                                             detail: {
                                                 message: 'Failed to update description. Please try again.',
@@ -516,14 +517,15 @@ new class extends Component
                                      this.mouseLeaveTimer = null;
                                  }
                                  if (this.currentValue !== this.originalValue) {
+                                    const previous = this.originalValue;
+                                    this.originalValue = this.currentValue; // optimistic
+                                    this.editing = false;
+
                                     $wire.updateField('startDatetime', this.currentValue)
-                                        .then(() => {
-                                            this.originalValue = this.currentValue;
-                                        })
                                         .catch(() => {
-                                            this.currentValue = this.originalValue;
-                                            $wire.startDatetime = this.originalValue;
-                                            this.editing = false;
+                                            this.originalValue = previous;
+                                            this.currentValue = previous;
+                                            $wire.startDatetime = previous;
                                             window.dispatchEvent(new CustomEvent('notify', {
                                                 detail: {
                                                     message: 'Failed to update start date & time. Please try again.',
@@ -620,14 +622,15 @@ new class extends Component
                                      this.mouseLeaveTimer = null;
                                  }
                                  if (this.currentValue !== this.originalValue) {
+                                    const previous = this.originalValue;
+                                    this.originalValue = this.currentValue; // optimistic
+                                    this.editing = false;
+
                                     $wire.updateField('endDatetime', this.currentValue)
-                                        .then(() => {
-                                            this.originalValue = this.currentValue;
-                                        })
                                         .catch(() => {
-                                            this.currentValue = this.originalValue;
-                                            $wire.endDatetime = this.originalValue;
-                                            this.editing = false;
+                                            this.originalValue = previous;
+                                            this.currentValue = previous;
+                                            $wire.endDatetime = previous;
                                             window.dispatchEvent(new CustomEvent('notify', {
                                                 detail: {
                                                     message: 'Failed to update due date & time. Please try again.',

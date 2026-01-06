@@ -52,8 +52,8 @@ new class extends Component {
 
         $this->name = $this->project->name;
         $this->description = $this->project->description ?? '';
-        $this->startDate = $this->project->start_date?->format('Y-m-d') ?? '';
-        $this->endDate = $this->project->end_date?->format('Y-m-d') ?? '';
+        $this->startDate = (string) ($this->project->start_date ?? '');
+        $this->endDate = (string) ($this->project->end_date ?? '');
     }
 
     public function updateField(string $field, mixed $value): void
@@ -196,22 +196,22 @@ new class extends Component {
                              },
                              save() {
                                  if (this.currentValue !== this.originalValue) {
-                                     $wire.updateField('name', this.currentValue)
-                                         .then(() => {
-                                             this.originalValue = this.currentValue;
-                                             this.editing = false;
-                                         })
-                                         .catch(() => {
-                                             this.currentValue = this.originalValue;
-                                             $wire.name = this.originalValue;
-                                             this.editing = false;
-                                             window.dispatchEvent(new CustomEvent('notify', {
-                                                 detail: {
-                                                     message: 'Failed to update name. Please try again.',
-                                                     type: 'error',
-                                                 },
-                                             }));
-                                         });
+                                    const previous = this.originalValue;
+                                    this.originalValue = this.currentValue; // optimistic
+                                    this.editing = false;
+
+                                    $wire.updateField('name', this.currentValue)
+                                        .catch(() => {
+                                            this.originalValue = previous;
+                                            this.currentValue = previous;
+                                            $wire.name = previous;
+                                            window.dispatchEvent(new CustomEvent('notify', {
+                                                detail: {
+                                                    message: 'Failed to update name. Please try again.',
+                                                    type: 'error',
+                                                },
+                                            }));
+                                        });
                                  } else {
                                      this.editing = false;
                                  }
@@ -284,22 +284,22 @@ new class extends Component {
                          },
                          save() {
                              if (this.currentValue !== this.originalValue) {
-                                 $wire.updateField('description', this.currentValue)
-                                     .then(() => {
-                                         this.originalValue = this.currentValue;
-                                         this.editing = false;
-                                     })
-                                     .catch(() => {
-                                         this.currentValue = this.originalValue;
-                                         $wire.description = this.originalValue;
-                                         this.editing = false;
-                                         window.dispatchEvent(new CustomEvent('notify', {
-                                             detail: {
-                                                 message: 'Failed to update description. Please try again.',
-                                                 type: 'error',
-                                             },
-                                         }));
-                                     });
+                                const previous = this.originalValue;
+                                this.originalValue = this.currentValue; // optimistic
+                                this.editing = false;
+
+                                $wire.updateField('description', this.currentValue)
+                                    .catch(() => {
+                                        this.originalValue = previous;
+                                        this.currentValue = previous;
+                                        $wire.description = previous;
+                                        window.dispatchEvent(new CustomEvent('notify', {
+                                            detail: {
+                                                message: 'Failed to update description. Please try again.',
+                                                type: 'error',
+                                            },
+                                        }));
+                                    });
                              } else {
                                  this.editing = false;
                              }
@@ -365,8 +365,8 @@ new class extends Component {
                     <div
                          x-data="{
                              editing: false,
-                             originalValue: @js($project->start_date?->format('Y-m-d') ?? ''),
-                             currentValue: @js($project->start_date?->format('Y-m-d') ?? ''),
+                             originalValue: @js(optional($project->start_date)->toDateString()),
+                             currentValue: @js(optional($project->start_date)->toDateString()),
                              mouseLeaveTimer: null,
                              startEditing() {
                                  this.editing = true;
@@ -401,21 +401,22 @@ new class extends Component {
                                      this.mouseLeaveTimer = null;
                                  }
                                  if (this.currentValue !== this.originalValue) {
-                                     $wire.updateField('startDate', this.currentValue)
-                                         .then(() => {
-                                             this.originalValue = this.currentValue;
-                                         })
-                                         .catch(() => {
-                                             this.currentValue = this.originalValue;
-                                             $wire.startDate = this.originalValue;
-                                             this.editing = false;
-                                             window.dispatchEvent(new CustomEvent('notify', {
-                                                 detail: {
-                                                     message: 'Failed to update start date. Please try again.',
-                                                     type: 'error',
-                                                 },
-                                             }));
-                                         });
+                                    const previous = this.originalValue;
+                                    this.originalValue = this.currentValue; // optimistic
+                                    this.editing = false;
+
+                                    $wire.updateField('startDate', this.currentValue)
+                                        .catch(() => {
+                                            this.originalValue = previous;
+                                            this.currentValue = previous;
+                                            $wire.startDate = previous;
+                                            window.dispatchEvent(new CustomEvent('notify', {
+                                                detail: {
+                                                    message: 'Failed to update start date. Please try again.',
+                                                    type: 'error',
+                                                },
+                                            }));
+                                        });
                                  } else {
                                      this.editing = false;
                                  }
@@ -462,8 +463,8 @@ new class extends Component {
                     <div
                          x-data="{
                              editing: false,
-                             originalValue: @js($project->end_date?->format('Y-m-d') ?? ''),
-                             currentValue: @js($project->end_date?->format('Y-m-d') ?? ''),
+                             originalValue: @js(optional($project->end_date)->toDateString()),
+                             currentValue: @js(optional($project->end_date)->toDateString()),
                              mouseLeaveTimer: null,
                              startEditing() {
                                  this.editing = true;
@@ -498,21 +499,22 @@ new class extends Component {
                                      this.mouseLeaveTimer = null;
                                  }
                                  if (this.currentValue !== this.originalValue) {
-                                     $wire.updateField('endDate', this.currentValue)
-                                         .then(() => {
-                                             this.originalValue = this.currentValue;
-                                         })
-                                         .catch(() => {
-                                             this.currentValue = this.originalValue;
-                                             $wire.endDate = this.originalValue;
-                                             this.editing = false;
-                                             window.dispatchEvent(new CustomEvent('notify', {
-                                                 detail: {
-                                                     message: 'Failed to update end date. Please try again.',
-                                                     type: 'error',
-                                                 },
-                                             }));
-                                         });
+                                    const previous = this.originalValue;
+                                    this.originalValue = this.currentValue; // optimistic
+                                    this.editing = false;
+
+                                    $wire.updateField('endDate', this.currentValue)
+                                        .catch(() => {
+                                            this.originalValue = previous;
+                                            this.currentValue = previous;
+                                            $wire.endDate = previous;
+                                            window.dispatchEvent(new CustomEvent('notify', {
+                                                detail: {
+                                                    message: 'Failed to update end date. Please try again.',
+                                                    type: 'error',
+                                                },
+                                            }));
+                                        });
                                  } else {
                                      this.editing = false;
                                  }

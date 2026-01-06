@@ -132,27 +132,29 @@ new class extends Component
 <div
     class="space-y-4"
     x-data="{
-        optimisticCreated: [],
         deleted: [],
+        moving: [],
     }"
-    x-on:optimistic-item-created.window="
-        optimisticCreated.push({
-            id: $event.detail.id,
-            type: $event.detail.type,
-            label: $event.detail.label,
-        })
-    "
-    x-on:optimistic-item-create-failed.window="
-        optimisticCreated = optimisticCreated.filter(item => item.id !== $event.detail.id)
-    "
-    x-on:item-created.window="
-        optimisticCreated = []
-    "
     x-on:optimistic-item-deleted.window="
         deleted.push({
             id: $event.detail.itemId,
             type: $event.detail.itemType,
         })
+    "
+    x-on:update-item-status.window="
+        if ($event.detail?.itemId) {
+            moving.push({
+                id: $event.detail.itemId,
+                type: $event.detail.itemType || null,
+            });
+        }
+    "
+    x-on:item-updated.window="
+        if ($event.detail?.id) {
+            moving = moving.filter(m => m.id !== $event.detail.id);
+        } else {
+            moving = [];
+        }
     "
 >
     <!-- View Navigation -->
@@ -181,24 +183,13 @@ new class extends Component
                 </svg>
             </button>
 
-            <!-- Optimistic created placeholders -->
-            <template x-for="item in optimisticCreated" :key="item.id">
-                <div class="bg-white dark:bg-zinc-800 rounded-lg border border-dashed border-zinc-200 dark:border-zinc-700 p-4 animate-pulse">
-                    <div class="flex items-center gap-2 mb-2">
-                        <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
-                            <span x-text="item.type === 'task' ? 'Task' : (item.type === 'event' ? 'Event' : 'Project')"></span>
-                            <span class="ml-1">(creating…)</span>
-                        </span>
-                    </div>
-                    <div class="h-4 bg-zinc-100 dark:bg-zinc-700 rounded w-1/2 mb-2"></div>
-                    <p class="text-xs text-zinc-500 dark:text-zinc-400" x-text="item.label"></p>
-                </div>
-            </template>
-
             @forelse($this->sortedItems as $item)
                 <div
                     wire:key="list-item-{{ $item->item_type }}-{{ $item->id }}"
-                    x-show="!deleted.some(d => d.id === {{ $item->id }} && d.type === '{{ $item->item_type }}')"
+                    x-show="
+                        !deleted.some(d => d.id === {{ $item->id }} && d.type === '{{ $item->item_type }}') &&
+                        !moving.some(m => m.id === {{ $item->id }})
+                    "
                     x-transition.opacity
                 >
                     @if($item->item_type === 'task')
