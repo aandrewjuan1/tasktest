@@ -1,13 +1,6 @@
 <?php
 
-use App\Enums\EventStatus;
-use App\Enums\TaskPriority;
-use App\Enums\TaskStatus;
-use App\Models\Project;
-use Carbon\Carbon;
 use Illuminate\Support\Collection;
-use Livewire\Attributes\Computed;
-use Livewire\Attributes\On;
 use Livewire\Attributes\Reactive;
 use Livewire\Volt\Component;
 
@@ -17,7 +10,7 @@ new class extends Component
     public Collection $items;
 
     #[Reactive]
-    public ?Carbon $currentDate = null;
+    public $currentDate = null;
 
     #[Reactive]
     public ?string $filterType = null;
@@ -42,7 +35,7 @@ new class extends Component
 
     public function mount(
         Collection $items,
-        ?Carbon $currentDate = null,
+        $currentDate = null,
         ?string $filterType = null,
         ?string $filterPriority = null,
         ?string $filterStatus = null,
@@ -61,72 +54,6 @@ new class extends Component
         $this->hasActiveFilters = $hasActiveFilters;
         $this->viewMode = $viewMode;
     }
-
-    #[Computed]
-    public function sortedItems(): Collection
-    {
-        // Items are already filtered and sorted by parent component
-        return $this->items;
-    }
-
-    #[Computed]
-    public function filterDescription(): string
-    {
-        $parts = [];
-
-        if ($this->filterType && $this->filterType !== 'all') {
-            $typeLabel = match($this->filterType) {
-                'task' => 'tasks',
-                'event' => 'events',
-                'project' => 'projects',
-                default => $this->filterType,
-            };
-            $parts[] = "Showing {$typeLabel} only";
-        }
-
-        if ($this->filterPriority && $this->filterPriority !== 'all') {
-            $priorityLabel = ucfirst($this->filterPriority);
-            $parts[] = "Priority: {$priorityLabel}";
-        }
-
-        if ($this->filterStatus && $this->filterStatus !== 'all') {
-            $statusLabel = match($this->filterStatus) {
-                'to_do' => 'To Do',
-                'doing' => 'In Progress',
-                'done' => 'Done',
-                'scheduled' => 'Scheduled',
-                'completed' => 'Completed',
-                'cancelled' => 'Cancelled',
-                'tentative' => 'Tentative',
-                default => ucfirst($this->filterStatus),
-            };
-            $parts[] = "Status: {$statusLabel}";
-        }
-
-        return implode(' • ', $parts);
-    }
-
-    #[Computed]
-    public function sortDescription(): ?string
-    {
-        if (!$this->sortBy) {
-            return null;
-        }
-
-        $sortLabel = match($this->sortBy) {
-            'priority' => 'Priority',
-            'created_at' => 'Date Created',
-            'start_datetime' => 'Start Date',
-            'end_datetime' => 'End Date',
-            'title' => 'Title/Name',
-            'status' => 'Status',
-            default => ucfirst(str_replace('_', ' ', $this->sortBy)),
-        };
-
-        $direction = $this->sortDirection === 'asc' ? '↑' : '↓';
-
-        return "Sorted by: {$sortLabel} {$direction}";
-    }
 }; ?>
 
 <div
@@ -142,18 +69,16 @@ new class extends Component
     "
 >
     <!-- View Navigation -->
-    <x-workspace.view-navigation
-        :view-mode="$viewMode"
-        :current-date="$currentDate"
-        :filter-type="$filterType"
-        :filter-priority="$filterPriority"
-        :filter-status="$filterStatus"
-        :sort-by="$sortBy"
-        :sort-direction="$sortDirection"
-        :has-active-filters="$hasActiveFilters"
-        :filter-description="$this->filterDescription"
-        :sort-description="$this->sortDescription"
-    />
+            <x-workspace.view-navigation
+                :view-mode="$viewMode"
+                :current-date="$currentDate"
+                :filter-type="$filterType"
+                :filter-priority="$filterPriority"
+                :filter-status="$filterStatus"
+                :sort-by="$sortBy"
+                :sort-direction="$sortDirection"
+                :has-active-filters="$hasActiveFilters"
+            />
 
     <div wire:loading.class="opacity-50" wire:target="goToTodayDate,previousDay,nextDay">
         <div class="space-y-4">
@@ -167,7 +92,7 @@ new class extends Component
                 </svg>
             </button>
 
-            @forelse($this->sortedItems as $item)
+            @forelse($items as $item)
                 <div
                     wire:key="list-item-{{ $item->item_type }}-{{ $item->id }}"
                     x-show="!deleted.some(d => d.id === {{ $item->id }} && d.type === '{{ $item->item_type }}')"

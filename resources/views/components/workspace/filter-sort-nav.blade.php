@@ -5,8 +5,6 @@
     'sortBy' => null,
     'sortDirection' => 'asc',
     'hasActiveFilters' => false,
-    'filterDescription' => '',
-    'sortDescription' => null,
 ])
 
 <div {{ $attributes->merge(['class' => 'flex items-center gap-2']) }}>
@@ -111,31 +109,12 @@
         </flux:dropdown>
     </div>
 
-    <!-- Active Filters and Sort Display -->
-    @if($filterDescription || $sortDescription || $hasActiveFilters || $sortBy)
-        <div class="flex items-center gap-2 px-3 py-1 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-400">
-            @if($filterDescription)
-                <span class="font-medium">{{ $filterDescription }}</span>
-            @endif
-            @if($sortDescription)
-                @if($filterDescription)
-                    <span class="text-zinc-400 dark:text-zinc-500">•</span>
-                @endif
-                <span class="font-medium">{{ $sortDescription }}</span>
-            @endif
-            <!-- Clear All Button -->
-            @if($hasActiveFilters || $sortBy)
-                <flux:tooltip content="Clear all filters and sorts">
-                    <flux:button
-                        variant="ghost"
-                        size="sm"
-                        icon="x-mark"
-                        wire:click="$dispatch('clear-all-filters-sorts')"
-                        aria-label="Clear all filters and sorts"
-                        class="ml-1"
-                    />
-                </flux:tooltip>
-            @endif
-        </div>
-    @endif
+    <x-workspace.filter-sort-description
+        :filter-type="$filterType"
+        :filter-priority="$filterPriority"
+        :filter-status="$filterStatus"
+        :sort-by="$sortBy"
+        :sort-direction="$sortDirection"
+        :has-active-filters="$hasActiveFilters"
+    />
 </div>

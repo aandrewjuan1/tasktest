@@ -8,8 +8,6 @@
     'sortBy' => null,
     'sortDirection' => 'asc',
     'hasActiveFilters' => false,
-    'filterDescription' => '',
-    'sortDescription' => null,
     'mb' => false, // For kanban view which needs mb-4
     'noWrapper' => false, // For weekly view which is already inside a container
 ])
@@ -179,8 +177,6 @@
             :sort-by="$sortBy"
             :sort-direction="$sortDirection"
             :has-active-filters="$hasActiveFilters"
-            :filter-description="$filterDescription"
-            :sort-description="$sortDescription"
         />
     </div>
 @if(!$noWrapper)

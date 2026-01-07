@@ -385,50 +385,18 @@ new class extends Component
                     </x-inline-create-dropdown>
 
                     <!-- Task Start Date & Time -->
-                    <x-inline-create-dropdown dropdown-class="w-64 p-4">
-                        <x-slot:trigger>
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <span class="text-sm font-medium">Start Date & Time</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.task.startDatetime || 'Not set'"></span>
-                        </x-slot:trigger>
-
-                        <x-slot:options>
-                            <div class="space-y-3 px-3 pb-3 pt-1">
-                                <flux:input x-model="formData.task.startDatetime" type="datetime-local" />
-                                <button
-                                    @click="select(() => formData.task.startDatetime = null)"
-                                    class="w-full px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
-                                >
-                                    Clear
-                                </button>
-                            </div>
-                        </x-slot:options>
-                    </x-inline-create-dropdown>
+                    <x-workspace.inline-date-picker
+                        label="Start Date &amp; Time"
+                        model="formData.task.startDatetime"
+                        type="datetime-local"
+                    />
 
                     <!-- Task End Date & Time -->
-                    <x-inline-create-dropdown dropdown-class="w-64 p-4">
-                        <x-slot:trigger>
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <span class="text-sm font-medium">End Date & Time</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.task.endDatetime || 'Not set'"></span>
-                        </x-slot:trigger>
-
-                        <x-slot:options>
-                            <div class="space-y-3 px-3 pb-3 pt-1">
-                                <flux:input x-model="formData.task.endDatetime" type="datetime-local" />
-                                <button
-                                    @click="select(() => formData.task.endDatetime = null)"
-                                    class="w-full px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
-                                >
-                                    Clear
-                                </button>
-                            </div>
-                        </x-slot:options>
-                    </x-inline-create-dropdown>
+                    <x-workspace.inline-date-picker
+                        label="End Date &amp; Time"
+                        model="formData.task.endDatetime"
+                        type="datetime-local"
+                    />
 
                     <!-- Task Project -->
                     <x-inline-create-dropdown dropdown-class="w-48 max-h-60 overflow-y-auto">
@@ -462,32 +430,7 @@ new class extends Component
                     </x-inline-create-dropdown>
 
                     <!-- Task Tags -->
-                    <x-inline-create-dropdown dropdown-class="w-64 max-h-60 overflow-y-auto">
-                        <x-slot:trigger>
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                            </svg>
-                            <span class="text-sm font-medium">Tags</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.task.tagIds.length > 0 ? formData.task.tagIds.length + ' selected' : 'None'"></span>
-                        </x-slot:trigger>
-
-                        <x-slot:options>
-                            @foreach($this->availableTags as $tag)
-                                <label wire:key="task-tag-{{ $tag->id }}" class="flex items-center px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        :checked="isTagSelected({{ $tag->id }}, 'task')"
-                                        @change="select(() => toggleTag({{ $tag->id }}, 'task'), false)"
-                                        class="rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
-                                    />
-                                    <span class="ml-2 text-sm">{{ $tag->name }}</span>
-                                </label>
-                            @endforeach
-                            @if($this->availableTags->isEmpty())
-                                <div class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400">No tags available</div>
-                            @endif
-                        </x-slot:options>
-                    </x-inline-create-dropdown>
+                    <x-workspace.inline-tag-multiselect type="task" />
                     </div>
                 </template>
                 <template x-if="activeTab === 'event'">
@@ -542,155 +485,41 @@ new class extends Component
                     </x-inline-create-dropdown>
 
                     <!-- Event Start Date & Time -->
-                    <x-inline-create-dropdown dropdown-class="w-64 p-4">
-                        <x-slot:trigger>
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <span class="text-sm font-medium">Start Date & Time</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.event.startDatetime || 'Not set'"></span>
-                        </x-slot:trigger>
-
-                        <x-slot:options>
-                            <div class="space-y-3 px-3 pb-3 pt-1">
-                                <flux:input x-model="formData.event.startDatetime" type="datetime-local" />
-                                <button
-                                    @click="select(() => formData.event.startDatetime = null)"
-                                    class="w-full px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
-                                >
-                                    Clear
-                                </button>
-                            </div>
-                        </x-slot:options>
-                    </x-inline-create-dropdown>
+                    <x-workspace.inline-date-picker
+                        label="Start Date &amp; Time"
+                        model="formData.event.startDatetime"
+                        type="datetime-local"
+                    />
 
                     <!-- Event End Date & Time -->
-                    <x-inline-create-dropdown dropdown-class="w-64 p-4">
-                        <x-slot:trigger>
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <span class="text-sm font-medium">End Date & Time</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.event.endDatetime || 'Not set'"></span>
-                        </x-slot:trigger>
-
-                        <x-slot:options>
-                            <div class="space-y-3 px-3 pb-3 pt-1">
-                                <flux:input x-model="formData.event.endDatetime" type="datetime-local" />
-                                <button
-                                    @click="select(() => formData.event.endDatetime = null)"
-                                    class="w-full px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
-                                >
-                                    Clear
-                                </button>
-                            </div>
-                        </x-slot:options>
-                    </x-inline-create-dropdown>
+                    <x-workspace.inline-date-picker
+                        label="End Date &amp; Time"
+                        model="formData.event.endDatetime"
+                        type="datetime-local"
+                    />
 
                     <!-- Event Tags -->
-                    <x-inline-create-dropdown dropdown-class="w-64 max-h-60 overflow-y-auto">
-                        <x-slot:trigger>
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                            </svg>
-                            <span class="text-sm font-medium">Tags</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.event.tagIds.length > 0 ? formData.event.tagIds.length + ' selected' : 'None'"></span>
-                        </x-slot:trigger>
-
-                        <x-slot:options>
-                            @foreach($this->availableTags as $tag)
-                                <label wire:key="event-tag-{{ $tag->id }}" class="flex items-center px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        :checked="isTagSelected({{ $tag->id }}, 'event')"
-                                        @change="select(() => toggleTag({{ $tag->id }}, 'event'), false)"
-                                        class="rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
-                                    />
-                                    <span class="ml-2 text-sm">{{ $tag->name }}</span>
-                                </label>
-                            @endforeach
-                            @if($this->availableTags->isEmpty())
-                                <div class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400">No tags available</div>
-                            @endif
-                        </x-slot:options>
-                    </x-inline-create-dropdown>
+                    <x-workspace.inline-tag-multiselect type="event" />
                     </div>
                 </template>
                 <template x-if="activeTab === 'project'">
                     <div class="contents">
                         <!-- Project Start Date -->
-                    <x-inline-create-dropdown dropdown-class="w-64 p-4">
-                        <x-slot:trigger>
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <span class="text-sm font-medium">Start Date</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.project.startDate || 'Not set'"></span>
-                        </x-slot:trigger>
-
-                        <x-slot:options>
-                            <div class="space-y-3 px-3 pb-3 pt-1">
-                                <flux:input x-model="formData.project.startDate" type="date" />
-                                <button
-                                    @click="select(() => formData.project.startDate = null)"
-                                    class="w-full px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
-                                >
-                                    Clear
-                                </button>
-                            </div>
-                        </x-slot:options>
-                    </x-inline-create-dropdown>
+                    <x-workspace.inline-date-picker
+                        label="Start Date"
+                        model="formData.project.startDate"
+                        type="date"
+                    />
 
                         <!-- Project End Date -->
-                    <x-inline-create-dropdown dropdown-class="w-64 p-4">
-                        <x-slot:trigger>
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <span class="text-sm font-medium">End Date</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.project.endDate || 'Not set'"></span>
-                        </x-slot:trigger>
-
-                        <x-slot:options>
-                            <div class="space-y-3 px-3 pb-3 pt-1">
-                                <flux:input x-model="formData.project.endDate" type="date" />
-                                <button
-                                    @click="select(() => formData.project.endDate = null)"
-                                    class="w-full px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
-                                >
-                                    Clear
-                                </button>
-                            </div>
-                        </x-slot:options>
-                    </x-inline-create-dropdown>
+                    <x-workspace.inline-date-picker
+                        label="End Date"
+                        model="formData.project.endDate"
+                        type="date"
+                    />
 
                         <!-- Project Tags -->
-                    <x-inline-create-dropdown dropdown-class="w-64 max-h-60 overflow-y-auto">
-                        <x-slot:trigger>
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                            </svg>
-                            <span class="text-sm font-medium">Tags</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.project.tagIds.length > 0 ? formData.project.tagIds.length + ' selected' : 'None'"></span>
-                        </x-slot:trigger>
-
-                        <x-slot:options>
-                            @foreach($this->availableTags as $tag)
-                                <label wire:key="project-tag-{{ $tag->id }}" class="flex items-center px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        :checked="isTagSelected({{ $tag->id }}, 'project')"
-                                        @change="select(() => toggleTag({{ $tag->id }}, 'project'), false)"
-                                        class="rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
-                                    />
-                                    <span class="ml-2 text-sm">{{ $tag->name }}</span>
-                                </label>
-                            @endforeach
-                            @if($this->availableTags->isEmpty())
-                                <div class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400">No tags available</div>
-                            @endif
-                        </x-slot:options>
-                    </x-inline-create-dropdown>
+                    <x-workspace.inline-tag-multiselect type="project" />
                     </div>
                 </template>
             </div>

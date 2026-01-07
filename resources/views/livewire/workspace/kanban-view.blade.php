@@ -1,13 +1,6 @@
 <?php
 
-use App\Enums\EventStatus;
-use App\Enums\TaskPriority;
-use App\Enums\TaskStatus;
-use App\Models\Project;
-use Carbon\Carbon;
 use Illuminate\Support\Collection;
-use Livewire\Attributes\Computed;
-use Livewire\Attributes\On;
 use Livewire\Attributes\Reactive;
 use Livewire\Volt\Component;
 
@@ -20,7 +13,7 @@ new class extends Component
     public array $itemsByStatus;
 
     #[Reactive]
-    public ?Carbon $currentDate = null;
+    public $currentDate = null;
 
     #[Reactive]
     public ?string $filterType = null;
@@ -46,7 +39,7 @@ new class extends Component
     public function mount(
         Collection $items,
         array $itemsByStatus,
-        ?Carbon $currentDate = null,
+        $currentDate = null,
         ?string $filterType = null,
         ?string $filterPriority = null,
         ?string $filterStatus = null,
@@ -65,66 +58,6 @@ new class extends Component
         $this->sortDirection = $sortDirection;
         $this->hasActiveFilters = $hasActiveFilters;
         $this->viewMode = $viewMode;
-    }
-
-    #[Computed]
-    public function filterDescription(): string
-    {
-        $parts = [];
-
-        if ($this->filterType && $this->filterType !== 'all') {
-            $typeLabel = match($this->filterType) {
-                'task' => 'tasks',
-                'event' => 'events',
-                'project' => 'projects',
-                default => $this->filterType,
-            };
-            $parts[] = "Showing {$typeLabel} only";
-        }
-
-        if ($this->filterPriority && $this->filterPriority !== 'all') {
-            $priorityLabel = ucfirst($this->filterPriority);
-            $parts[] = "Priority: {$priorityLabel}";
-        }
-
-        if ($this->filterStatus && $this->filterStatus !== 'all') {
-            $statusLabel = match($this->filterStatus) {
-                'to_do' => 'To Do',
-                'doing' => 'In Progress',
-                'ongoing' => 'In Progress',
-                'done' => 'Done',
-                'scheduled' => 'Scheduled',
-                'completed' => 'Completed',
-                'cancelled' => 'Cancelled',
-                'tentative' => 'Tentative',
-                default => ucfirst($this->filterStatus),
-            };
-            $parts[] = "Status: {$statusLabel}";
-        }
-
-        return implode(' • ', $parts);
-    }
-
-    #[Computed]
-    public function sortDescription(): ?string
-    {
-        if (!$this->sortBy) {
-            return null;
-        }
-
-        $sortLabel = match($this->sortBy) {
-            'priority' => 'Priority',
-            'created_at' => 'Date Created',
-            'start_datetime' => 'Start Date',
-            'end_datetime' => 'End Date',
-            'title' => 'Title/Name',
-            'status' => 'Status',
-            default => ucfirst(str_replace('_', ' ', $this->sortBy)),
-        };
-
-        $direction = $this->sortDirection === 'asc' ? '↑' : '↓';
-
-        return "Sorted by: {$sortLabel} {$direction}";
     }
 
 }; ?>
@@ -167,8 +100,6 @@ new class extends Component
         :sort-by="$sortBy"
         :sort-direction="$sortDirection"
         :has-active-filters="$hasActiveFilters"
-        :filter-description="$this->filterDescription"
-        :sort-description="$this->sortDescription"
         mb
     />
 
