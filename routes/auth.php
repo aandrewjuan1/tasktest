@@ -65,7 +65,7 @@ Route::get('authenticate', function (AuthKitAuthenticationRequest $request) {
     session()->put('workos_refresh_token', $authResponse->refresh_token);
     session()->regenerate();
 
-    return to_route('dashboard');
+    return to_route('workspace.index');
 })->middleware(['guest']);
 
 Route::post('logout', function (AuthKitLogoutRequest $request) {
