@@ -62,34 +62,7 @@ new class extends Component
 
 }; ?>
 
-<div
-    x-data="{
-        deleted: [],
-        moving: [],
-    }"
-    x-on:optimistic-item-deleted.window="
-        deleted.push({
-            id: $event.detail.itemId,
-            type: $event.detail.itemType,
-        })
-    "
-    x-on:update-item-status.window="
-        if ($event.detail?.itemId) {
-            moving.push({
-                id: $event.detail.itemId,
-                type: $event.detail.itemType || null,
-                toStatus: $event.detail.newStatus || null,
-            });
-        }
-    "
-    x-on:item-updated.window="
-        if ($event.detail?.id) {
-            moving = moving.filter(m => m.id !== $event.detail.id);
-        } else {
-            moving = [];
-        }
-    "
->
+<div>
     <!-- View Navigation -->
     <x-workspace.view-navigation
         :view-mode="$viewMode"
@@ -171,10 +144,6 @@ new class extends Component
                         "
                         @dragend="
                             $el.classList.remove('opacity-50', 'ring-2', 'ring-blue-500');
-                        "
-                        x-show="
-                            !deleted.some(d => d.id == {{ $item->id }} && d.type === '{{ $item->item_type }}')
-                            && !moving.some(m => m.id == {{ $item->id }})
                         "
                         x-transition.opacity
                         class="cursor-move relative transition-all"

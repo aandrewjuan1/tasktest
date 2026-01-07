@@ -56,18 +56,7 @@ new class extends Component
     }
 }; ?>
 
-<div
-    class="space-y-4"
-    x-data="{
-        deleted: [],
-    }"
-    x-on:optimistic-item-deleted.window="
-        deleted.push({
-            id: $event.detail.itemId,
-            type: $event.detail.itemType,
-        })
-    "
->
+<div class="space-y-4">
     <!-- View Navigation -->
             <x-workspace.view-navigation
                 :view-mode="$viewMode"
@@ -95,7 +84,6 @@ new class extends Component
             @forelse($items as $item)
                 <div
                     wire:key="list-item-{{ $item->item_type }}-{{ $item->id }}"
-                    x-show="!deleted.some(d => d.id === {{ $item->id }} && d.type === '{{ $item->item_type }}')"
                 >
                     @if($item->item_type === 'task')
                         <x-workspace.task-card :task="$item" />

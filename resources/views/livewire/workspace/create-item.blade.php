@@ -126,75 +126,25 @@ new class extends Component
         };
     },
     submitTask() {
-        const tempId = Date.now() + Math.random();
-
-        // Optimistically show a lightweight placeholder in the list view
-        window.dispatchEvent(new CustomEvent('optimistic-item-created', {
-            detail: {
-                id: tempId,
-                type: 'task',
-                label: this.formData.task.title || 'New task',
-            },
-        }));
-
         this.closeModal();
 
         const payload = { ...this.formData.task };
 
-        const promise = $wire.$parent.$call('createTask', payload);
-
-        promise.catch(() => {
-            // Clear the optimistic placeholder on failure
-            window.dispatchEvent(new CustomEvent('optimistic-item-create-failed', {
-                detail: { id: tempId },
-            }));
-        });
+        $wire.$parent.$call('createTask', payload);
     },
     submitEvent() {
-        const tempId = Date.now() + Math.random();
-
-        window.dispatchEvent(new CustomEvent('optimistic-item-created', {
-            detail: {
-                id: tempId,
-                type: 'event',
-                label: this.formData.event.title || 'New event',
-            },
-        }));
-
         this.closeModal();
 
         const payload = { ...this.formData.event };
 
-        const promise = $wire.$parent.$call('createEvent', payload);
-
-        promise.catch(() => {
-            window.dispatchEvent(new CustomEvent('optimistic-item-create-failed', {
-                detail: { id: tempId },
-            }));
-        });
+        $wire.$parent.$call('createEvent', payload);
     },
     submitProject() {
-        const tempId = Date.now() + Math.random();
-
-        window.dispatchEvent(new CustomEvent('optimistic-item-created', {
-            detail: {
-                id: tempId,
-                type: 'project',
-                label: this.formData.project.name || 'New project',
-            },
-        }));
-
         this.closeModal();
 
         const payload = { ...this.formData.project };
 
-        const promise = $wire.$parent.$call('createProject', payload);
-
-        promise.catch(() => {
-            window.dispatchEvent(new CustomEvent('optimistic-item-create-failed', {
-                detail: { id: tempId },
-            }));
-        });
+        $wire.$parent.$call('createProject', payload);
     },
     toggleTag(tagId, type) {
         const tagIds = this.formData[type].tagIds;

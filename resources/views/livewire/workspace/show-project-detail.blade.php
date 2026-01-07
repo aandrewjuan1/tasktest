@@ -108,8 +108,6 @@ new class extends Component {
                              },
                              save() {
                                  if (this.currentValue !== this.originalValue) {
-                                    const previous = this.originalValue;
-                                    this.originalValue = this.currentValue; // optimistic
                                     this.editing = false;
 
                                     $wire.$dispatchTo('workspace.show-items', 'update-project-field', {
@@ -189,8 +187,6 @@ new class extends Component {
                          },
                          save() {
                              if (this.currentValue !== this.originalValue) {
-                                const previous = this.originalValue;
-                                this.originalValue = this.currentValue; // optimistic
                                 this.editing = false;
 
                                 $wire.$dispatchTo('workspace.show-items', 'update-project-field', {
@@ -299,8 +295,6 @@ new class extends Component {
                                      this.mouseLeaveTimer = null;
                                  }
                                  if (this.currentValue !== this.originalValue) {
-                                    const previous = this.originalValue;
-                                    this.originalValue = this.currentValue; // optimistic
                                     this.editing = false;
 
                                     $wire.$dispatchTo('workspace.show-items', 'update-project-field', {
@@ -390,8 +384,6 @@ new class extends Component {
                                      this.mouseLeaveTimer = null;
                                  }
                                  if (this.currentValue !== this.originalValue) {
-                                    const previous = this.originalValue;
-                                    this.originalValue = this.currentValue; // optimistic
                                     this.editing = false;
 
                                     $wire.$dispatchTo('workspace.show-items', 'update-project-field', {
@@ -557,10 +549,6 @@ new class extends Component {
                 @click="
                     const projectId = {{ $project?->id ?? 'null' }};
                     if (projectId) {
-                        $dispatch('optimistic-item-deleted', {
-                            itemId: projectId,
-                            itemType: 'project',
-                        });
                         $wire.showDeleteConfirm = false;
                         $wire.isOpen = false;
                         $wire.$dispatchTo('workspace.show-items', 'delete-project', {

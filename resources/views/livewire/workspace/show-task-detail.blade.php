@@ -88,9 +88,6 @@ new class extends Component
         $this->showDeleteConfirm = true;
     }
 
-    // Modal closes optimistically via Alpine when delete button is clicked
-    // No need for Livewire listener that would cause a second request
-
     #[Computed]
     public function projects(): Collection
     {
@@ -119,11 +116,8 @@ new class extends Component
                              },
                              save() {
                                  if (this.currentValue !== this.originalValue) {
-                                     const previous = this.originalValue;
-                                     this.originalValue = this.currentValue; // optimistic apply
                                      this.editing = false;
 
-                                     // Single parent request; no rollback hook (optimistic UI)
                                      $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
                                          taskId: {{ $task->id }},
                                          field: 'title',
@@ -201,8 +195,6 @@ new class extends Component
                          },
                          save() {
                              if (this.currentValue !== this.originalValue) {
-                                const previous = this.originalValue;
-                                this.originalValue = this.currentValue; // optimistic apply
                                 this.editing = false;
 
                                 $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
@@ -387,8 +379,6 @@ new class extends Component
                                      this.mouseLeaveTimer = null;
                                  }
                                  if (this.currentValue !== this.originalValue) {
-                                    const previous = this.originalValue;
-                                    this.originalValue = this.currentValue; // optimistic
                                     this.editing = false;
 
                                     $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
@@ -485,8 +475,6 @@ new class extends Component
                                      this.mouseLeaveTimer = null;
                                  }
                                  if (this.currentValue !== this.originalValue) {
-                                    const previous = this.originalValue;
-                                    this.originalValue = this.currentValue; // optimistic
                                     this.editing = false;
 
                                     $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
@@ -664,10 +652,6 @@ new class extends Component
                 @click="
                     const taskId = {{ $task?->id ?? 'null' }};
                     if (taskId) {
-                        $dispatch('optimistic-item-deleted', {
-                            itemId: taskId,
-                            itemType: 'task',
-                        });
                         $wire.showDeleteConfirm = false;
                         $wire.isOpen = false;
                         $wire.$dispatchTo('workspace.show-items', 'delete-task', {

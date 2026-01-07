@@ -148,8 +148,6 @@ new class extends Component
                 $task->delete();
             });
 
-            // No need to dispatch 'task-deleted' - modal closes optimistically via Alpine
-            // Livewire will automatically re-render after this method completes
             $this->dispatch('notify', message: 'Task deleted successfully', type: 'success');
         } catch (\Exception $e) {
             \Log::error('Failed to delete task from parent', [

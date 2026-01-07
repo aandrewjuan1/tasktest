@@ -48,7 +48,6 @@
         select(value) {
             this.selectedValue = value;
             @if($useParent && $itemId)
-                // Fire-and-forget to parent; close optimistically
                 $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
                     taskId: {{ $itemId }},
                     field: '{{ $field }}',
