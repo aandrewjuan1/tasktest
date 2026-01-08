@@ -552,11 +552,11 @@ new class extends Component
                     case 'description':
                         $updateData['description'] = $value ?: null;
                         break;
-                    case 'startDate':
-                        $updateData['start_date'] = $value ?: null;
+                    case 'startDatetime':
+                        $updateData['start_datetime'] = $value ? Carbon::parse($value) : null;
                         break;
-                    case 'endDate':
-                        $updateData['end_date'] = $value ?: null;
+                    case 'endDatetime':
+                        $updateData['end_datetime'] = $value ? Carbon::parse($value) : null;
                         break;
                 }
 
@@ -669,22 +669,30 @@ new class extends Component
         try {
             $validated = validator($data, [
                 'name' => ['required', 'string', 'max:255'],
-                'startDate' => ['nullable', 'date'],
-                'endDate' => ['nullable', 'date', 'after_or_equal:startDate'],
+                'startDatetime' => ['nullable', 'date'],
+                'endDatetime' => ['nullable', 'date', 'after_or_equal:startDatetime'],
                 'tagIds' => ['nullable', 'array'],
                 'tagIds.*' => ['integer', 'exists:tags,id'],
             ], [], [
                 'name' => 'name',
-                'startDate' => 'start date',
-                'endDate' => 'end date',
+                'startDatetime' => 'start datetime',
+                'endDatetime' => 'end datetime',
             ])->validate();
 
-            DB::transaction(function () use ($validated) {
+            $startDatetime = ! empty($validated['startDatetime'])
+                ? Carbon::parse($validated['startDatetime'])
+                : null;
+
+            $endDatetime = ! empty($validated['endDatetime'])
+                ? Carbon::parse($validated['endDatetime'])
+                : null;
+
+            DB::transaction(function () use ($validated, $startDatetime, $endDatetime) {
                 $project = Project::create([
                     'user_id' => auth()->id(),
                     'name' => $validated['name'],
-                    'start_date' => $validated['startDate'] ?? null,
-                    'end_date' => $validated['endDate'] ?? null,
+                    'start_datetime' => $startDatetime,
+                    'end_datetime' => $endDatetime,
                 ]);
 
                 if (! empty($validated['tagIds'])) {
@@ -755,14 +763,14 @@ new class extends Component
                 }
             } elseif ($itemType === 'project') {
                 if ($newStart) {
-                    $model->start_date = Carbon::parse($newStart)->toDateString();
+                    $model->start_datetime = Carbon::parse($newStart);
                 } else {
-                    $model->start_date = null;
+                    $model->start_datetime = null;
                 }
                 if ($newEnd) {
-                    $model->end_date = Carbon::parse($newEnd)->toDateString();
+                    $model->end_datetime = Carbon::parse($newEnd);
                 } else {
-                    $model->end_date = null;
+                    $model->end_datetime = null;
                 }
             }
 
@@ -855,8 +863,8 @@ new class extends Component
         return match ($field) {
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'startDate' => ['nullable', 'date'],
-            'endDate' => ['nullable', 'date', 'after_or_equal:startDate'],
+            'startDatetime' => ['nullable', 'date'],
+            'endDatetime' => ['nullable', 'date', 'after_or_equal:startDatetime'],
             default => [],
         };
     }

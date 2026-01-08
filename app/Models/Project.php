@@ -21,24 +21,24 @@ class Project extends Model
         'user_id',
         'name',
         'description',
-        'start_date',
-        'end_date',
+        'start_datetime',
+        'end_datetime',
     ];
 
     protected function casts(): array
     {
         return [
-            'start_date' => 'date',
-            'end_date' => 'date',
+            'start_datetime' => 'datetime',
+            'end_datetime' => 'datetime',
         ];
     }
 
     protected static function booted(): void
     {
         static::creating(function (Project $project) {
-            // Set default start_date to current date if not provided
-            if (is_null($project->start_date)) {
-                $project->start_date = \Illuminate\Support\Carbon::today();
+            // Set default start_datetime to current datetime if not provided
+            if (is_null($project->start_datetime)) {
+                $project->start_datetime = now();
             }
         });
     }
@@ -160,7 +160,7 @@ class Project extends Model
 
     public function scopeDateFilter($query, ?Carbon $date): Builder
     {
-        if (!$date) {
+        if (! $date) {
             return $query;
         }
 
@@ -168,13 +168,13 @@ class Project extends Model
 
         return $query->where(function ($q) use ($targetDate) {
             $q->where(function ($dateQ) use ($targetDate) {
-                $dateQ->whereNotNull('start_date')
+                $dateQ->whereNotNull('start_datetime')
                     ->where(function ($subQ) use ($targetDate) {
-                        $subQ->whereDate('start_date', $targetDate)
-                            ->orWhereDate('end_date', $targetDate)
+                        $subQ->whereDate('start_datetime', $targetDate)
+                            ->orWhereDate('end_datetime', $targetDate)
                             ->orWhere(function ($spanQ) use ($targetDate) {
-                                $spanQ->whereDate('start_date', '<=', $targetDate)
-                                    ->whereDate('end_date', '>=', $targetDate);
+                                $spanQ->whereDate('start_datetime', '<=', $targetDate)
+                                    ->whereDate('end_datetime', '>=', $targetDate);
                             });
                     });
             });
@@ -186,14 +186,14 @@ class Project extends Model
         return $query->orderBy('created_at', $direction);
     }
 
-    public function scopeSortByStartDate($query, string $direction = 'asc'): Builder
+    public function scopeSortByStartDatetime($query, string $direction = 'asc'): Builder
     {
-        return $query->orderBy('start_date', $direction);
+        return $query->orderBy('start_datetime', $direction);
     }
 
-    public function scopeSortByEndDate($query, string $direction = 'asc'): Builder
+    public function scopeSortByEndDatetime($query, string $direction = 'asc'): Builder
     {
-        return $query->orderBy('end_date', $direction);
+        return $query->orderBy('end_datetime', $direction);
     }
 
     public function scopeSortByName($query, string $direction = 'asc'): Builder
@@ -203,14 +203,14 @@ class Project extends Model
 
     public function scopeOrderByField($query, ?string $field, string $direction = 'asc'): Builder
     {
-        if (!$field) {
+        if (! $field) {
             return $query->orderBy('created_at', 'desc');
         }
 
         return match ($field) {
             'created_at' => $query->orderBy('created_at', $direction),
-            'start_datetime' => $query->orderBy('start_date', $direction), // Map to start_date for projects
-            'end_datetime' => $query->orderBy('end_date', $direction), // Map to end_date for projects
+            'start_datetime' => $query->orderBy('start_datetime', $direction),
+            'end_datetime' => $query->orderBy('end_datetime', $direction),
             'title' => $query->orderBy('name', $direction), // Map to name for projects
             'status' => $query->orderBy('created_at', 'desc'), // Projects don't have status
             'priority' => $query->orderBy('created_at', 'desc'), // Projects don't have priority

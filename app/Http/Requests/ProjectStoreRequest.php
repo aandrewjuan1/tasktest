@@ -30,6 +30,3 @@ class ProjectStoreRequest extends FormRequest
         ];
     }
 }
-
-
-

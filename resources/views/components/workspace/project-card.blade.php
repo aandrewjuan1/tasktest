@@ -25,18 +25,18 @@
         </p>
     @endif
 
-    @if($project->start_date || $project->end_date)
+    @if($project->start_datetime || $project->end_datetime)
         <div class="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400 mb-3">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
             <span>
-                @if($project->start_date && $project->end_date)
-                    {{ $project->start_date->format('M j') }} - {{ $project->end_date->format('M j, Y') }}
-                @elseif($project->start_date)
-                    From {{ $project->start_date->format('M j, Y') }}
+                @if($project->start_datetime && $project->end_datetime)
+                    {{ $project->start_datetime->format('M j, g:i A') }} - {{ $project->end_datetime->format('M j, Y g:i A') }}
+                @elseif($project->start_datetime)
+                    From {{ $project->start_datetime->format('M j, Y g:i A') }}
                 @else
-                    Until {{ $project->end_date->format('M j, Y') }}
+                    Until {{ $project->end_datetime->format('M j, Y g:i A') }}
                 @endif
             </span>
         </div>

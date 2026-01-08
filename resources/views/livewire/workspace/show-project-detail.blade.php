@@ -15,8 +15,8 @@ new class extends Component {
     // Edit fields
     public string $name = '';
     public string $description = '';
-    public string $startDate = '';
-    public string $endDate = '';
+    public string $startDatetime = '';
+    public string $endDatetime = '';
 
     #[On('view-project-detail')]
     public function openModal(int $id): void
@@ -51,8 +51,8 @@ new class extends Component {
 
         $this->name = $this->project->name;
         $this->description = $this->project->description ?? '';
-        $this->startDate = (string) ($this->project->start_date ?? '');
-        $this->endDate = (string) ($this->project->end_date ?? '');
+        $this->startDatetime = $this->project->start_datetime ? $this->project->start_datetime->format('Y-m-d\TH:i') : '';
+        $this->endDatetime = $this->project->end_datetime ? $this->project->end_datetime->format('Y-m-d\TH:i') : '';
     }
 
     public function updateField(string $field, mixed $value): void
@@ -255,23 +255,23 @@ new class extends Component {
 
                 <!-- Project Details Grid -->
                 <div class="grid grid-cols-2 gap-4">
-                    <!-- Start Date -->
+                    <!-- Start Date & Time -->
                     <div
                          x-data="{
                              editing: false,
-                             originalValue: @js(optional($project->start_date)->toDateString()),
-                             currentValue: @js(optional($project->start_date)->toDateString()),
+                             originalValue: @js($project->start_datetime ? $project->start_datetime->format('Y-m-d\TH:i') : ''),
+                             currentValue: @js($project->start_datetime ? $project->start_datetime->format('Y-m-d\TH:i') : ''),
                              mouseLeaveTimer: null,
                              startEditing() {
                                  this.editing = true;
                                  this.currentValue = this.originalValue;
-                                 $wire.startDate = this.originalValue;
+                                 $wire.startDatetime = this.originalValue;
                                  $nextTick(() => $refs.input?.focus());
                              },
                              cancelEditing() {
                                  this.editing = false;
                                  this.currentValue = this.originalValue;
-                                 $wire.startDate = this.originalValue;
+                                 $wire.startDatetime = this.originalValue;
                                  if (this.mouseLeaveTimer) {
                                      clearTimeout(this.mouseLeaveTimer);
                                      this.mouseLeaveTimer = null;
@@ -299,7 +299,7 @@ new class extends Component {
 
                                     $wire.$dispatchTo('workspace.show-items', 'update-project-field', {
                                         projectId: {{ $project->id }},
-                                        field: 'startDate',
+                                        field: 'startDatetime',
                                         value: this.currentValue,
                                     });
                                  } else {
@@ -311,7 +311,7 @@ new class extends Component {
                          @mouseleave="handleMouseLeave()"
                     >
                         <div class="flex items-center gap-2 mb-2">
-                            <flux:heading size="sm">Start Date</flux:heading>
+                            <flux:heading size="sm">Start Date & Time</flux:heading>
                             <button
                                 x-show="!editing"
                                 @click="startEditing()"
@@ -327,40 +327,40 @@ new class extends Component {
                             <flux:input
                                 x-ref="input"
                                 x-model="currentValue"
-                                x-on:input="$wire.startDate = currentValue"
-                                wire:model.live="startDate"
+                                x-on:input="$wire.startDatetime = currentValue"
+                                wire:model.live="startDatetime"
                                 @keydown.enter="saveIfChanged()"
                                 @keydown.escape="cancelEditing()"
-                                type="date"
+                                type="datetime-local"
                             />
-                            @error('startDate')
+                            @error('startDatetime')
                                 <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
                             @enderror
                         </div>
                         <div x-show="!editing">
                             <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
-                                {{ $project->start_date?->format('M j, Y') ?? 'Not set' }}
+                                {{ $project->start_datetime?->format('M j, Y g:i A') ?? 'Not set' }}
                             </p>
                         </div>
                     </div>
 
-                    <!-- End Date -->
+                    <!-- End Date & Time -->
                     <div
                          x-data="{
                              editing: false,
-                             originalValue: @js(optional($project->end_date)->toDateString()),
-                             currentValue: @js(optional($project->end_date)->toDateString()),
+                             originalValue: @js($project->end_datetime ? $project->end_datetime->format('Y-m-d\TH:i') : ''),
+                             currentValue: @js($project->end_datetime ? $project->end_datetime->format('Y-m-d\TH:i') : ''),
                              mouseLeaveTimer: null,
                              startEditing() {
                                  this.editing = true;
                                  this.currentValue = this.originalValue;
-                                 $wire.endDate = this.originalValue;
+                                 $wire.endDatetime = this.originalValue;
                                  $nextTick(() => $refs.input?.focus());
                              },
                              cancelEditing() {
                                  this.editing = false;
                                  this.currentValue = this.originalValue;
-                                 $wire.endDate = this.originalValue;
+                                 $wire.endDatetime = this.originalValue;
                                  if (this.mouseLeaveTimer) {
                                      clearTimeout(this.mouseLeaveTimer);
                                      this.mouseLeaveTimer = null;
@@ -388,7 +388,7 @@ new class extends Component {
 
                                     $wire.$dispatchTo('workspace.show-items', 'update-project-field', {
                                         projectId: {{ $project->id }},
-                                        field: 'endDate',
+                                        field: 'endDatetime',
                                         value: this.currentValue,
                                     });
                                  } else {
@@ -400,7 +400,7 @@ new class extends Component {
                          @mouseleave="handleMouseLeave()"
                     >
                         <div class="flex items-center gap-2 mb-2">
-                            <flux:heading size="sm">End Date</flux:heading>
+                            <flux:heading size="sm">End Date & Time</flux:heading>
                             <button
                                 x-show="!editing"
                                 @click="startEditing()"
@@ -416,19 +416,19 @@ new class extends Component {
                             <flux:input
                                 x-ref="input"
                                 x-model="currentValue"
-                                x-on:input="$wire.endDate = currentValue"
-                                wire:model.live="endDate"
+                                x-on:input="$wire.endDatetime = currentValue"
+                                wire:model.live="endDatetime"
                                 @keydown.enter="saveIfChanged()"
                                 @keydown.escape="cancelEditing()"
-                                type="date"
+                                type="datetime-local"
                             />
-                            @error('endDate')
+                            @error('endDatetime')
                                 <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
                             @enderror
                         </div>
                         <div x-show="!editing">
                             <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
-                                {{ $project->end_date?->format('M j, Y') ?? 'Not set' }}
+                                {{ $project->end_datetime?->format('M j, Y g:i A') ?? 'Not set' }}
                             </p>
                         </div>
                     </div>

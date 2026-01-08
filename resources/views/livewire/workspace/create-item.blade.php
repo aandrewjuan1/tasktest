@@ -110,8 +110,8 @@ new class extends Component
         },
         project: {
             name: '',
-            startDate: '{{ Carbon::today()->toDateString() }}',
-            endDate: null,
+            startDatetime: '{{ Carbon::now()->format('Y-m-d\TH:i') }}',
+            endDatetime: null,
             tagIds: []
         }
     },
@@ -169,8 +169,8 @@ new class extends Component
             },
             project: {
                 name: '',
-                startDate: '{{ Carbon::today()->toDateString() }}',
-                endDate: null,
+                startDatetime: '{{ Carbon::now()->format('Y-m-d\TH:i') }}',
+                endDatetime: null,
                 tagIds: []
             }
         };
@@ -530,18 +530,18 @@ new class extends Component
                 </template>
                 <template x-if="activeTab === 'project'">
                     <div class="contents">
-                        <!-- Project Start Date -->
+                        <!-- Project Start Date & Time -->
                     <x-workspace.inline-date-picker
-                        label="Start Date"
-                        model="formData.project.startDate"
-                        type="date"
+                        label="Start Date & Time"
+                        model="formData.project.startDatetime"
+                        type="datetime-local"
                     />
 
-                        <!-- Project End Date -->
+                        <!-- Project End Date & Time -->
                     <x-workspace.inline-date-picker
-                        label="End Date"
-                        model="formData.project.endDate"
-                        type="date"
+                        label="End Date & Time"
+                        model="formData.project.endDatetime"
+                        type="datetime-local"
                     />
 
                         <!-- Project Tags -->
