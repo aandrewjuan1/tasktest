@@ -329,53 +329,6 @@ new class extends Component
                     <div wire:key="day-column-{{ $dateKey }}" class="relative border-r border-zinc-200 dark:border-zinc-700 {{ $isToday ? 'bg-blue-50 dark:bg-blue-950/20' : '' }}"
                          role="gridcell"
                          aria-label="{{ $day->format('l, F j') }}"
-                         x-data="{ draggingOver: false, isUpdating: false }"
-                         @dragover.prevent="draggingOver = true"
-                         @dragleave="draggingOver = false"
-                         @drop.prevent="
-                             draggingOver = false;
-                             const itemId = $event.dataTransfer.getData('itemId');
-                             const itemType = $event.dataTransfer.getData('itemType');
-                             const duration = parseInt($event.dataTransfer.getData('duration') || '60');
-
-                             // Validate itemId exists and is valid
-                             if (!itemId || itemId === '' || isNaN(parseInt(itemId))) {
-                                 return;
-                             }
-
-                             const parsedItemId = parseInt(itemId);
-                             if (parsedItemId <= 0) {
-                                 return;
-                             }
-
-                             try {
-                                 const rect = $event.currentTarget.getBoundingClientRect();
-                                 const y = $event.clientY - rect.top;
-                                 const minutesFromStart = (y / {{ $hourHeight }}) * 60;
-                                 const totalMinutes = ({{ $startHour }} * 60) + minutesFromStart;
-                                 const hours = Math.floor(totalMinutes / 60);
-                                 const minutes = Math.floor((totalMinutes % 60) / 30) * 30;
-
-                                 const newStart = '{{ $dateKey }} ' + String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0') + ':00';
-                                 const endDate = new Date('{{ $dateKey }} ' + String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0'));
-                                 endDate.setMinutes(endDate.getMinutes() + duration);
-                                 const newEnd = endDate.toISOString().slice(0, 19).replace('T', ' ');
-
-                                 isUpdating = true;
-                                 $dispatch('update-item-datetime', {
-                                     itemId: parsedItemId,
-                                     itemType: itemType,
-                                     newStart: newStart,
-                                     newEnd: newEnd
-                                 });
-
-                                 setTimeout(() => { isUpdating = false; }, 1000);
-                             } catch (error) {
-                                 console.error('Error updating item datetime:', error);
-                                 isUpdating = false;
-                             }
-                         "
-                         :class="{ 'ring-2 ring-blue-500': draggingOver || isUpdating }"
                     >
                         <!-- Hour Lines -->
                         @for($hour = $startHour; $hour <= $endHour; $hour++)
@@ -401,7 +354,6 @@ new class extends Component
                                 aria-label="{{ $item->title }} from {{ Carbon::parse($item->item_type === 'event' ? $item->start_datetime : ($item->computed_start_datetime ?? $item->start_date))->format('g:i A') }}"
                                 x-data="{
                                     isResizing: false,
-                                    isDragging: false,
                                     initialY: 0,
                                     initialHeight: {{ $item->grid_height }},
                                     initialDuration: {{ $currentDuration }},
@@ -459,23 +411,9 @@ new class extends Component
                                     }
                                 }"
                                 @mousedown="startResize($event)"
-                                draggable="true"
-                                @dragstart="
-                                    if (!isResizing && !$event.target.classList.contains('resize-handle')) {
-                                        isDragging = true;
-                                        $event.dataTransfer.effectAllowed = 'move';
-                                        $event.dataTransfer.setData('itemId', {{ $item->id }});
-                                        $event.dataTransfer.setData('itemType', '{{ $item->item_type }}');
-                                        $event.dataTransfer.setData('duration', {{ $currentDuration }});
-                                    } else {
-                                        $event.preventDefault();
-                                    }
-                                "
-                                @dragend="isDragging = false"
                                 wire:loading.class="opacity-50"
-                                wire:target="handleUpdateItemDateTime,handleUpdateItemDuration"
-                                class="absolute w-full px-1 py-1 text-xs rounded cursor-move overflow-hidden hover:z-20 hover:shadow-lg transition-shadow"
-                                :class="{ 'opacity-50 ring-2 ring-blue-500': isDragging }"
+                                wire:target="handleUpdateItemDuration"
+                                class="absolute w-full px-1 py-1 text-xs rounded cursor-pointer overflow-hidden hover:z-20 hover:shadow-lg transition-shadow"
                                 :style="`top: ${itemTop}px; height: ${isResizing ? currentHeight : {{ $item->grid_height }}}px; background-color: {{ $item->color ?? ($item->item_type === 'event' ? '#8b5cf6' : '#3b82f6') }}; color: white;`"
                                 @click="
                                     if (!isResizing && !$event.target.classList.contains('resize-handle')) {
@@ -502,7 +440,7 @@ new class extends Component
                                     tabindex="0"
                                 ></div>
                                 <!-- Loading indicator -->
-                                <div wire:loading wire:target="handleUpdateItemDateTime,handleUpdateItemDuration" class="absolute inset-0 flex items-center justify-center bg-white/30 dark:bg-black/30 rounded">
+                                <div wire:loading wire:target="handleUpdateItemDuration" class="absolute inset-0 flex items-center justify-center bg-white/30 dark:bg-black/30 rounded">
                                     <svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
