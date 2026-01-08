@@ -21,8 +21,12 @@ class EventFactory extends Factory
     public function definition(): array
     {
         $allDay = fake()->boolean(30); // 30% chance of all-day event
-        // Start datetime is based on creation time (now)
-        $startDateTime = now();
+        // Start datetime is randomly set to be beyond today (anywhere from tomorrow to 3 months in the future)
+        $minStart = now()->addDay()->startOfDay();
+        $maxStart = now()->addMonths(3)->endOfDay();
+        $startDateTime = Carbon::createFromTimestamp(
+            fake()->numberBetween($minStart->timestamp, $maxStart->timestamp)
+        );
         // End datetime is randomly set to be after start datetime
         // For all-day events, end can be up to 7 days later; for timed events, up to 8 hours later
         $minEnd = $startDateTime->copy()->addMinutes(30);

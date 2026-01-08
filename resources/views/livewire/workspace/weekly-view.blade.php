@@ -105,169 +105,63 @@ new class extends Component
         foreach ($this->weekDays as $day) {
             $dateKey = $day->format('Y-m-d');
             $itemsByDay[$dateKey] = [
-                'all_day' => collect(),
                 'timed' => collect(),
             ];
         }
 
-        // Process items from parent
+        // Process only tasks for the time grid
         foreach ($this->items as $item) {
-            // Skip items without any dates
-            if ($item->item_type === 'task' && !$item->start_datetime && !$item->end_datetime) {
-                continue;
-            }
-            if ($item->item_type === 'event' && !$item->start_datetime && !$item->end_datetime) {
-                continue;
-            }
-            if ($item->item_type === 'project' && !$item->start_datetime && !$item->end_datetime) {
+            // Only process tasks
+            if ($item->item_type !== 'task') {
                 continue;
             }
 
-            if ($item->item_type === 'task') {
-                // Determine date range for task
-                $startDate = $item->start_datetime ? Carbon::parse($item->start_datetime)->startOfDay() : null;
-                $endDate = $item->end_datetime ? Carbon::parse($item->end_datetime)->startOfDay() : null;
+            // Skip tasks without start_datetime
+            if (! $item->start_datetime) {
+                continue;
+            }
 
-                // If only end_datetime exists, show from week start up to end date
-                if (!$startDate && $endDate) {
-                    $startDate = $this->weekStartDate->copy()->startOfDay();
-                }
-                // If only start_datetime exists, show from start date to end of week
-                if ($startDate && !$endDate) {
-                    $endDate = $this->weekStartDate->copy()->addDays(6)->endOfDay();
-                }
-                // If neither exists, skip (already handled above)
+            $startDateTime = Carbon::parse($item->start_datetime);
+            $startDate = $startDateTime->copy()->startOfDay();
 
-                if ($startDate && $endDate) {
-                    // Add item to all days in the range that fall within the week
-                    foreach ($this->weekDays as $day) {
-                        $dayStart = $day->copy()->startOfDay();
-                        $dayEnd = $day->copy()->endOfDay();
+            // Only show tasks on their start date
+            foreach ($this->weekDays as $day) {
+                $dayStart = $day->copy()->startOfDay();
 
-                        // Check if this day falls within the item's date range
-                        if ($dayStart->lte($endDate) && $dayEnd->gte($startDate)) {
-                            $dateKey = $day->format('Y-m-d');
+                // Check if this day matches the start date
+                if ($dayStart->eq($startDate)) {
+                    $dateKey = $day->format('Y-m-d');
 
-                            // Check if task has a start_datetime with a time component (only on start date)
-                            if ($item->start_datetime && $startDate && $dayStart->eq($startDate)) {
-                                $startDateTime = Carbon::parse($item->start_datetime);
+                    // Only show as timed if it has a time component (not just a date)
+                    if ($startDateTime->format('H:i') !== '00:00') {
+                        // Snap start time down to nearest 30-minute interval
+                        $startMinutes = $startDateTime->minute;
+                        $snappedMinutes = floor($startMinutes / 30) * 30;
+                        $startDateTime->minute($snappedMinutes)->second(0);
 
-                                // Only show as timed if it has a time component (not just a date)
-                                if ($startDateTime->format('H:i') !== '00:00') {
-                                    // Calculate end datetime using duration (default to 60 minutes if null)
-                                    $durationMinutes = $item->duration ?? 60;
-                                    $endDateTime = $startDateTime->copy()->addMinutes($durationMinutes);
+                        // Snap duration up to nearest 30-minute interval
+                        $durationMinutes = $item->duration ?? 60;
+                        $snappedDuration = ceil($durationMinutes / 30) * 30;
+                        $endDateTime = $startDateTime->copy()->addMinutes($snappedDuration);
 
-                                    // Calculate position and height
-                                    $startMinutes = ($startDateTime->hour * 60) + $startDateTime->minute;
-                                    $endMinutes = ($endDateTime->hour * 60) + $endDateTime->minute;
+                        // Calculate position and height
+                        $startMinutes = ($startDateTime->hour * 60) + $startDateTime->minute;
+                        $endMinutes = ($endDateTime->hour * 60) + $endDateTime->minute;
 
-                                    $gridStartMinutes = $this->startHour * 60;
-                                    $gridEndMinutes = $this->endHour * 60;
+                        $gridStartMinutes = $this->startHour * 60;
+                        $gridEndMinutes = $this->endHour * 60;
 
-                                    if ($startMinutes < $gridEndMinutes && $endMinutes > $gridStartMinutes) {
-                                        $topMinutes = max($startMinutes - $gridStartMinutes, 0);
-                                        $durationMinutes = min($endMinutes, $gridEndMinutes) - max($startMinutes, $gridStartMinutes);
+                        if ($startMinutes < $gridEndMinutes && $endMinutes > $gridStartMinutes) {
+                            $topMinutes = max($startMinutes - $gridStartMinutes, 0);
+                            $durationMinutes = min($endMinutes, $gridEndMinutes) - max($startMinutes, $gridStartMinutes);
 
-                                        // Clone the item to avoid mutating the reactive prop
-                                        $itemCopy = clone $item;
-                                        $itemCopy->grid_top = ($topMinutes / 60) * $this->hourHeight;
-                                        $itemCopy->grid_height = ($durationMinutes / 60) * $this->hourHeight;
-                                        $itemCopy->computed_start_datetime = $startDateTime;
+                            // Clone the item to avoid mutating the reactive prop
+                            $itemCopy = clone $item;
+                            $itemCopy->grid_top = ($topMinutes / 60) * $this->hourHeight;
+                            $itemCopy->grid_height = ($durationMinutes / 60) * $this->hourHeight;
+                            $itemCopy->computed_start_datetime = $startDateTime;
 
-                                        $itemsByDay[$dateKey]['timed']->push($itemCopy);
-                                    } else {
-                                        // Time falls outside grid, show as all-day
-                                        $itemsByDay[$dateKey]['all_day']->push($item);
-                                    }
-                                } else {
-                                    // No time component, add to all-day section
-                                    $itemsByDay[$dateKey]['all_day']->push($item);
-                                }
-                            } else {
-                                // Not on start date or no start_datetime, add to all-day section
-                                $itemsByDay[$dateKey]['all_day']->push($item);
-                            }
-                        }
-                    }
-                }
-            } elseif ($item->item_type === 'event') {
-                // Determine date range for event
-                $startDate = $item->start_datetime ? Carbon::parse($item->start_datetime)->startOfDay() : null;
-                $endDate = $item->end_datetime ? Carbon::parse($item->end_datetime)->startOfDay() : null;
-
-                // If only end_datetime exists, show from week start up to end date
-                if (!$startDate && $endDate) {
-                    $startDate = $this->weekStartDate->copy()->startOfDay();
-                }
-                // If only start_datetime exists, show from start date to end of week
-                if ($startDate && !$endDate) {
-                    $endDate = $this->weekStartDate->copy()->addDays(6)->endOfDay();
-                }
-
-                if ($startDate && $endDate) {
-                    // Add item to all days in the range that fall within the week
-                    foreach ($this->weekDays as $day) {
-                        $dayStart = $day->copy()->startOfDay();
-                        $dayEnd = $day->copy()->endOfDay();
-
-                        // Check if this day falls within the item's date range
-                        if ($dayStart->lte($endDate) && $dayEnd->gte($startDate)) {
-                            $dateKey = $day->format('Y-m-d');
-
-                            // Only show timed event on its actual start date
-                            if ($item->start_datetime && $dayStart->eq($startDate)) {
-                                $startTime = Carbon::parse($item->start_datetime);
-                                $endTime = $item->end_datetime ? Carbon::parse($item->end_datetime) : $startTime->copy()->addHour();
-
-                                $startMinutes = ($startTime->hour * 60) + $startTime->minute;
-                                $endMinutes = ($endTime->hour * 60) + $endTime->minute;
-
-                                $gridStartMinutes = $this->startHour * 60;
-                                $gridEndMinutes = $this->endHour * 60;
-
-                                if ($startMinutes < $gridEndMinutes && $endMinutes > $gridStartMinutes) {
-                                    $topMinutes = max($startMinutes - $gridStartMinutes, 0);
-                                    $durationMinutes = min($endMinutes, $gridEndMinutes) - max($startMinutes, $gridStartMinutes);
-
-                                    // Clone the item to avoid mutating the reactive prop
-                                    $itemCopy = clone $item;
-                                    $itemCopy->grid_top = ($topMinutes / 60) * $this->hourHeight;
-                                    $itemCopy->grid_height = ($durationMinutes / 60) * $this->hourHeight;
-
-                                    $itemsByDay[$dateKey]['timed']->push($itemCopy);
-                                }
-                            } else {
-                                // Show as all-day on other days in the range
-                                $itemsByDay[$dateKey]['all_day']->push($item);
-                            }
-                        }
-                    }
-                }
-            } elseif ($item->item_type === 'project') {
-                // Determine date range for project
-                $startDate = $item->start_datetime ? Carbon::parse($item->start_datetime)->startOfDay() : null;
-                $endDate = $item->end_datetime ? Carbon::parse($item->end_datetime)->startOfDay() : null;
-
-                // If only end_datetime exists, show from week start up to end date
-                if (!$startDate && $endDate) {
-                    $startDate = $this->weekStartDate->copy()->startOfDay();
-                }
-                // If only start_datetime exists, show from start date to end of week
-                if ($startDate && !$endDate) {
-                    $endDate = $this->weekStartDate->copy()->addDays(6)->endOfDay();
-                }
-
-                if ($startDate && $endDate) {
-                    // Add item to all days in the range that fall within the week
-                    foreach ($this->weekDays as $day) {
-                        $dayStart = $day->copy()->startOfDay();
-                        $dayEnd = $day->copy()->endOfDay();
-
-                        // Check if this day falls within the item's date range
-                        if ($dayStart->lte($endDate) && $dayEnd->gte($startDate)) {
-                            $dateKey = $day->format('Y-m-d');
-                            $itemsByDay[$dateKey]['all_day']->push($item);
+                            $itemsByDay[$dateKey]['timed']->push($itemCopy);
                         }
                     }
                 }
@@ -283,7 +177,7 @@ new class extends Component
         $parts = [];
 
         if ($this->filterType && $this->filterType !== 'all') {
-            $typeLabel = match($this->filterType) {
+            $typeLabel = match ($this->filterType) {
                 'task' => 'tasks',
                 'event' => 'events',
                 'project' => 'projects',
@@ -298,7 +192,7 @@ new class extends Component
         }
 
         if ($this->filterStatus && $this->filterStatus !== 'all') {
-            $statusLabel = match($this->filterStatus) {
+            $statusLabel = match ($this->filterStatus) {
                 'to_do' => 'To Do',
                 'doing' => 'In Progress',
                 'done' => 'Done',
@@ -317,11 +211,11 @@ new class extends Component
     #[Computed]
     public function sortDescription(): ?string
     {
-        if (!$this->sortBy) {
+        if (! $this->sortBy) {
             return null;
         }
 
-        $sortLabel = match($this->sortBy) {
+        $sortLabel = match ($this->sortBy) {
             'priority' => 'Priority',
             'created_at' => 'Date Created',
             'start_datetime' => 'Start Date',
@@ -334,6 +228,76 @@ new class extends Component
         $direction = $this->sortDirection === 'asc' ? '↑' : '↓';
 
         return "Sorted by: {$sortLabel} {$direction}";
+    }
+
+    #[Computed]
+    public function dueDateIndicators(): array
+    {
+        $indicatorsByDay = [];
+
+        foreach ($this->weekDays as $day) {
+            $dateKey = $day->format('Y-m-d');
+            $indicatorsByDay[$dateKey] = collect();
+        }
+
+        // Process all items to find due dates
+        foreach ($this->items as $item) {
+            // Skip items without end_datetime
+            if (! $item->end_datetime) {
+                continue;
+            }
+
+            $endDateTime = Carbon::parse($item->end_datetime);
+            $endDate = $endDateTime->copy()->startOfDay();
+
+            // Check if the due date falls within the week
+            foreach ($this->weekDays as $day) {
+                $dayStart = $day->copy()->startOfDay();
+                $dayEnd = $day->copy()->endOfDay();
+
+                // Check if this day matches the due date
+                if ($dayStart->lte($endDate) && $dayEnd->gte($endDate)) {
+                    $dateKey = $day->format('Y-m-d');
+
+                    // Only show indicator if end_datetime has a time component
+                    if ($endDateTime->format('H:i') !== '00:00') {
+                        $dueHour = $endDateTime->hour;
+                        $dueMinute = $endDateTime->minute;
+
+                        // Calculate position: 1 hour before due time to due time
+                        // Example: 10pm due time = 9pm to 10pm (1 hour span)
+                        // For 10:30pm, it should span from 9:30pm to 10:30pm
+                        $indicatorStartDateTime = $endDateTime->copy()->subHour();
+                        $indicatorStartHour = $indicatorStartDateTime->hour;
+                        $indicatorStartMinute = $indicatorStartDateTime->minute;
+                        $indicatorStartMinutes = ($indicatorStartHour * 60) + $indicatorStartMinute;
+                        $indicatorEndMinutes = ($dueHour * 60) + $dueMinute;
+
+                        $gridStartMinutes = $this->startHour * 60;
+                        $gridEndMinutes = $this->endHour * 60;
+
+                        // Only show if indicator falls within visible grid
+                        if ($indicatorEndMinutes > $gridStartMinutes && $indicatorStartMinutes < $gridEndMinutes) {
+                            $topMinutes = max($indicatorStartMinutes - $gridStartMinutes, 0);
+                            $heightMinutes = min($indicatorEndMinutes, $gridEndMinutes) - max($indicatorStartMinutes, $gridStartMinutes);
+
+                            $indicator = (object) [
+                                'item_id' => $item->id,
+                                'item_type' => $item->item_type,
+                                'item_name' => $item->title ?? $item->name,
+                                'due_datetime' => $endDateTime,
+                                'grid_top' => ($topMinutes / 60) * $this->hourHeight,
+                                'grid_height' => ($heightMinutes / 60) * $this->hourHeight,
+                            ];
+
+                            $indicatorsByDay[$dateKey]->push($indicator);
+                        }
+                    }
+                }
+            }
+        }
+
+        return $indicatorsByDay;
     }
 }; ?>
 
@@ -373,28 +337,6 @@ new class extends Component
                 @endforeach
             </div>
 
-            <!-- All-Day Section -->
-            <div class="grid grid-cols-8 border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50">
-                <div class="p-2 text-xs font-medium text-zinc-500 dark:text-zinc-400 border-r border-zinc-200 dark:border-zinc-700">
-                    All Day
-                </div>
-                @foreach($this->weekDays as $day)
-                    @php
-                        $dateKey = $day->format('Y-m-d');
-                        $allDayItems = $this->weeklyItems[$dateKey]['all_day'] ?? collect();
-                    @endphp
-                    <div wire:key="all-day-column-{{ $dateKey }}" class="p-1 min-h-[60px] border-r border-zinc-200 dark:border-zinc-700">
-                        @foreach($allDayItems as $item)
-                            <div wire:key="all-day-item-{{ $item->item_type }}-{{ $item->id }}"
-                                 class="mb-1 text-xs p-1 rounded cursor-pointer {{ $item->item_type === 'task' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' : ($item->item_type === 'event' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200') }}"
-                                 wire:click="$dispatch('view-{{ $item->item_type }}-detail', { id: {{ $item->id }} })">
-                                {{ Str::limit($item->title ?? $item->name, 15) }}
-                            </div>
-                        @endforeach
-                    </div>
-                @endforeach
-            </div>
-
             <!-- Time Grid -->
             <div class="grid grid-cols-8 relative">
                 <!-- Time Column -->
@@ -427,18 +369,33 @@ new class extends Component
                             <div class="absolute w-full border-t border-dotted border-zinc-100 dark:border-zinc-800" style="top: {{ (($hour - $startHour) * $hourHeight) + ($hourHeight / 2) }}px;"></div>
                         @endfor
 
-                        <!-- Timed Items -->
+                        <!-- Due Date Indicators -->
+                        @php
+                            $dueIndicators = $this->dueDateIndicators[$dateKey] ?? collect();
+                        @endphp
+                        @foreach($dueIndicators as $indicator)
+                            <div
+                                wire:key="due-indicator-{{ $indicator->item_type }}-{{ $indicator->item_id }}"
+                                class="absolute w-full bg-red-500 dark:bg-red-600 text-white text-xs px-1 py-0.5 opacity-80 z-0"
+                                style="top: {{ $indicator->grid_top }}px; height: {{ $indicator->grid_height }}px;"
+                            >
+                                <div class="font-semibold truncate">{{ $indicator->item_name }}</div>
+                                <div class="text-xs opacity-90">
+                                    Due: {{ $indicator->due_datetime->format('g:i A') }}
+                                </div>
+                            </div>
+                        @endforeach
+
+                        <!-- Timed Items (Tasks Only) -->
                         @foreach($timedItems as $item)
                             @php
-                                $currentDuration = $item->item_type === 'event'
-                                    ? Carbon::parse($item->end_datetime)->diffInMinutes(Carbon::parse($item->start_datetime))
-                                    : ($item->duration ?? 60);
+                                $currentDuration = $item->duration ?? 60;
                             @endphp
                             <div
                                 wire:key="timed-item-{{ $item->item_type }}-{{ $item->id }}"
                                 role="button"
                                 tabindex="0"
-                                aria-label="{{ $item->title }} from {{ Carbon::parse($item->item_type === 'event' ? $item->start_datetime : ($item->computed_start_datetime ?? $item->start_datetime))->format('g:i A') }}"
+                                aria-label="{{ $item->title }} from {{ ($item->computed_start_datetime ?? Carbon::parse($item->start_datetime))->format('g:i A') }}"
                                 x-data="{
                                     isResizing: false,
                                     initialY: 0,
@@ -501,7 +458,7 @@ new class extends Component
                                 wire:loading.class="opacity-50"
                                 wire:target="handleUpdateItemDuration"
                                 class="absolute w-full px-1 py-1 text-xs rounded cursor-pointer overflow-hidden hover:z-20 hover:shadow-lg transition-shadow"
-                                :style="`top: ${itemTop}px; height: ${isResizing ? currentHeight : {{ $item->grid_height }}}px; background-color: {{ $item->color ?? ($item->item_type === 'event' ? '#8b5cf6' : '#3b82f6') }}; color: white;`"
+                                :style="`top: ${itemTop}px; height: ${isResizing ? currentHeight : {{ $item->grid_height }}}px; background-color: {{ $item->color ?? '#3b82f6' }}; color: white;`"
                                 @click="
                                     if (!isResizing && !$event.target.classList.contains('resize-handle')) {
                                         $dispatch('view-{{ $item->item_type }}-detail', { id: {{ $item->id }} });
@@ -510,11 +467,7 @@ new class extends Component
                                 @keydown.enter.prevent="$dispatch('view-{{ $item->item_type }}-detail', { id: {{ $item->id }} })"
                             >
                                 <div class="font-semibold truncate">{{ $item->title }}</div>
-                                @if($item->item_type === 'event')
-                                    <div class="text-xs opacity-90">
-                                        {{ Carbon::parse($item->start_datetime)->format('g:i A') }}
-                                    </div>
-                                @elseif($item->item_type === 'task' && isset($item->computed_start_datetime))
+                                @if(isset($item->computed_start_datetime))
                                     <div class="text-xs opacity-90">
                                         {{ $item->computed_start_datetime->format('g:i A') }}
                                     </div>

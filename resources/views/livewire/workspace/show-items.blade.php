@@ -39,6 +39,7 @@ new class extends Component
     public ?string $filterPriority = null;
     #[Url]
     public ?string $filterStatus = null;
+    public array $filterTagIds = [];
 
     // Sort properties
     #[Url]
@@ -236,6 +237,7 @@ new class extends Component
         $this->filterType = null;
         $this->filterPriority = null;
         $this->filterStatus = null;
+        $this->filterTagIds = [];
         // Livewire will automatically recompute computed properties
     }
 
@@ -720,7 +722,78 @@ new class extends Component
     {
         return ($this->filterType && $this->filterType !== 'all')
             || ($this->filterPriority && $this->filterPriority !== 'all')
-            || ($this->filterStatus && $this->filterStatus !== 'all');
+            || ($this->filterStatus && $this->filterStatus !== 'all')
+            || ! empty($this->filterTagIds);
+    }
+
+    #[Computed]
+    public function availableTags(): Collection
+    {
+        return Tag::orderBy('name')->get();
+    }
+
+    public function createTag(string $name): array
+    {
+        $name = trim($name);
+
+        if ($name === '') {
+            return ['success' => false, 'message' => 'Tag name cannot be empty'];
+        }
+
+        try {
+            $existing = Tag::whereRaw('LOWER(name) = LOWER(?)', [$name])->first();
+
+            if ($existing) {
+                if (! in_array($existing->id, $this->filterTagIds, true)) {
+                    $this->filterTagIds[] = $existing->id;
+                }
+
+                return [
+                    'success' => true,
+                    'tagId' => $existing->id,
+                    'tagName' => $existing->name,
+                    'alreadyExists' => true,
+                ];
+            }
+
+            $tag = Tag::create(['name' => $name]);
+            $this->filterTagIds[] = $tag->id;
+
+            return [
+                'success' => true,
+                'tagId' => $tag->id,
+                'tagName' => $tag->name,
+                'alreadyExists' => false,
+            ];
+        } catch (\Exception $e) {
+            \Log::error('Failed to create tag', [
+                'error' => $e->getMessage(),
+                'name' => $name,
+            ]);
+
+            return ['success' => false, 'message' => 'Failed to create tag'];
+        }
+    }
+
+    public function deleteTag(int $tagId): array
+    {
+        try {
+            $tag = Tag::findOrFail($tagId);
+            $tag->delete();
+
+            $this->filterTagIds = array_values(
+                array_filter($this->filterTagIds, fn ($id) => (int) $id !== $tagId)
+            );
+
+            return ['success' => true];
+        } catch (\Exception $e) {
+            \Log::error('Failed to delete tag', [
+                'error' => $e->getMessage(),
+                'tagId' => $tagId,
+            ]);
+
+            return ['success' => false, 'message' => 'Failed to delete tag'];
+        }
     }
 
     public function updateItemDateTime(int $itemId, string $itemType, string $newStart, ?string $newEnd = null): void
@@ -939,6 +1012,9 @@ new class extends Component
             if ($this->filterStatus) {
                 $query->filterByStatus($this->filterStatus);
             }
+            if (! empty($this->filterTagIds)) {
+                $query->whereHas('tags', fn ($q) => $q->whereIn('tags.id', $this->filterTagIds));
+            }
         } else {
             // If filtering by type and it's not 'task', return empty collection
             return collect();
@@ -987,6 +1063,9 @@ new class extends Component
             if ($this->filterStatus) {
                 $query->filterByStatus($this->filterStatus);
             }
+            if (! empty($this->filterTagIds)) {
+                $query->whereHas('tags', fn ($q) => $q->whereIn('tags.id', $this->filterTagIds));
+            }
         } else {
             // If filtering by type and it's not 'event', return empty collection
             return collect();
@@ -1034,6 +1113,9 @@ new class extends Component
             }
             if ($this->filterStatus) {
                 $query->filterByStatus($this->filterStatus);
+            }
+            if (! empty($this->filterTagIds)) {
+                $query->whereHas('tags', fn ($q) => $q->whereIn('tags.id', $this->filterTagIds));
             }
         } else {
             // If filtering by type and it's not 'project', return empty collection
@@ -1084,6 +1166,9 @@ new class extends Component
                 if ($this->filterStatus) {
                     $taskQuery->filterByStatus($this->filterStatus);
                 }
+            if (! empty($this->filterTagIds)) {
+                $taskQuery->whereHas('tags', fn ($q) => $q->whereIn('tags.id', $this->filterTagIds));
+            }
             } else {
                 $taskQuery->whereRaw('1 = 0'); // Return empty result
             }
@@ -1112,6 +1197,9 @@ new class extends Component
                 if ($this->filterStatus) {
                     $eventQuery->filterByStatus($this->filterStatus);
                 }
+            if (! empty($this->filterTagIds)) {
+                $eventQuery->whereHas('tags', fn ($q) => $q->whereIn('tags.id', $this->filterTagIds));
+            }
             } else {
                 $eventQuery->whereRaw('1 = 0'); // Return empty result
             }
@@ -1140,6 +1228,9 @@ new class extends Component
                 if ($this->filterStatus) {
                     $projectQuery->filterByStatus($this->filterStatus);
                 }
+            if (! empty($this->filterTagIds)) {
+                $projectQuery->whereHas('tags', fn ($q) => $q->whereIn('tags.id', $this->filterTagIds));
+            }
             } else {
                 $projectQuery->whereRaw('1 = 0'); // Return empty result
             }
@@ -1184,9 +1275,157 @@ new class extends Component
     class="space-y-4 px-4"
     wire:loading.class="opacity-50"
     wire:target="switchView,goToTodayDate,previousDay,nextDay,updateCurrentDate"
-    x-data="{}"
+    x-data="{
+        tagDropdown: {
+            showCreateInput: false,
+            newTagName: '',
+            creating: false,
+            deleting: false,
+            async handleCreate() {
+                if (!this.newTagName.trim() || this.creating) return;
+                this.creating = true;
+                const name = this.newTagName.trim();
+                const response = await $wire.createTag(name);
+                this.creating = false;
+                if (response?.success) {
+                    this.newTagName = '';
+                    this.showCreateInput = false;
+                }
+            },
+            async handleDelete(tagId) {
+                if (this.deleting) return;
+                this.deleting = true;
+                const response = await $wire.deleteTag(tagId);
+                this.deleting = false;
+                if (!response?.success) return;
+            }
+        }
+    }"
     x-cloak
 >
+
+    <!-- Tag Filter -->
+    <div class="flex flex-wrap gap-2 items-center">
+        <x-inline-create-dropdown dropdown-class="w-64 max-h-60 overflow-y-auto">
+            <x-slot:trigger>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                <span class="text-sm font-medium">Tags</span>
+                <span class="text-xs text-zinc-500 dark:text-zinc-400">
+                    @if(count($filterTagIds) > 0)
+                        {{ count($filterTagIds) }} selected
+                    @else
+                        None
+                    @endif
+                </span>
+            </x-slot:trigger>
+
+            <x-slot:options>
+                <!-- Add Tag Button -->
+                <button
+                    x-show="!tagDropdown.showCreateInput"
+                    @click.stop="tagDropdown.showCreateInput = true; $nextTick(() => $refs.newTagInput?.focus());"
+                    class="w-full flex items-center gap-2 px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+                    type="button"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>Add Tag</span>
+                </button>
+
+                <!-- Create Tag Input -->
+                <div
+                    x-show="tagDropdown.showCreateInput"
+                    x-cloak
+                    class="px-4 py-2"
+                    @click.stop
+                >
+                    <div class="flex gap-2 items-center">
+                        <input
+                            x-ref="newTagInput"
+                            type="text"
+                            x-model="tagDropdown.newTagName"
+                            @keydown.enter.prevent="tagDropdown.handleCreate()"
+                            @keydown.escape="tagDropdown.showCreateInput = false; tagDropdown.newTagName = ''"
+                            placeholder="Tag name..."
+                            class="flex-1 px-2 py-1 text-sm rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            :disabled="tagDropdown.creating"
+                        />
+                        <button
+                            @click.stop="tagDropdown.handleCreate()"
+                            :disabled="!tagDropdown.newTagName.trim() || tagDropdown.creating"
+                            class="p-1 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            title="Create tag"
+                            type="button"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                        </button>
+                        <button
+                            @click.stop="tagDropdown.showCreateInput = false; tagDropdown.newTagName = ''"
+                            :disabled="tagDropdown.creating"
+                            class="p-1 text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            title="Cancel"
+                            type="button"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Clear Selected -->
+                <button
+                    x-show="{{ count($filterTagIds) }} > 0"
+                    @click.stop="$wire.filterTagIds = []"
+                    class="w-full flex items-center justify-between px-4 py-1.5 text-xs text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                    type="button"
+                >
+                    <span>Clear selected</span>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+
+                <!-- Tags List -->
+                @foreach($this->availableTags as $tag)
+                    <div
+                        wire:key="filter-tag-{{ $tag->id }}"
+                        class="flex items-center px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 group"
+                    >
+                        <label class="flex items-center flex-1 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                class="rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
+                                value="{{ $tag->id }}"
+                                wire:model.live="filterTagIds"
+                            />
+                            <span class="ml-2 text-sm flex-1">{{ $tag->name }}</span>
+                        </label>
+                        <button
+                            @click.stop="tagDropdown.handleDelete({{ $tag->id }})"
+                            :disabled="tagDropdown.deleting"
+                            class="ml-2 p-1 opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-red-600 dark:hover:text-red-400 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Delete tag"
+                            type="button"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                @endforeach
+
+                @if($this->availableTags->isEmpty())
+                    <div class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400">No tags available</div>
+                @endif
+            </x-slot:options>
+        </x-inline-create-dropdown>
+    </div>
 
     <!-- Loading Overlay for View Switching -->
     <div

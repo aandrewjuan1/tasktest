@@ -329,13 +329,6 @@ new class extends Component
                                     {{ $minutes }} minutes
                                 </button>
                             @endforeach
-                            <button
-                                @click="select(null)"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                                :class="selectedValue === null ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
-                            >
-                                Clear
-                            </button>
                         </x-slot:options>
                     </x-inline-edit-dropdown>
 
@@ -388,13 +381,6 @@ new class extends Component
                             >
                                 Urgent
                             </button>
-                            <button
-                                @click="select(null)"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                                :class="selectedValue === null || selectedValue === '' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
-                            >
-                                Clear
-                            </button>
                         </x-slot:options>
                     </x-inline-edit-dropdown>
 
@@ -438,13 +424,6 @@ new class extends Component
                                 :class="selectedValue === 'complex' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                             >
                                 Complex
-                            </button>
-                            <button
-                                @click="select(null)"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                                :class="selectedValue === null || selectedValue === '' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
-                            >
-                                Clear
                             </button>
                         </x-slot:options>
                     </x-inline-edit-dropdown>
@@ -643,22 +622,27 @@ new class extends Component
                 </div>
 
                 <!-- Project -->
-                <x-inline-edit-dropdown
-                    label="Project"
-                    field="projectId"
-                    :item-id="$task->id"
-                    :use-parent="true"
-                    :value="$task->project_id"
-                >
-                    <x-slot:trigger>
-                        <span class="text-sm font-medium">
-                            @if($task->project)
-                                <span class="text-blue-600 dark:text-blue-400">{{ $task->project->name }}</span>
-                            @else
-                                <span class="text-zinc-500 dark:text-zinc-400">Not assigned to a project</span>
-                            @endif
-                        </span>
-                    </x-slot:trigger>
+                <div x-data="{ projects: @js($this->projects->pluck('name', 'id')->toArray()) }">
+                    <x-inline-edit-dropdown
+                        label="Project"
+                        field="projectId"
+                        :item-id="$task->id"
+                        :use-parent="true"
+                        :value="$task->project_id ? (string) $task->project_id : ''"
+                    >
+                        <x-slot:trigger>
+                            <span class="text-sm font-medium">
+                                <span
+                                    x-show="selectedValue && projects[String(selectedValue)]"
+                                    class="text-blue-600 dark:text-blue-400"
+                                    x-text="projects[String(selectedValue)]"
+                                ></span>
+                                <span
+                                    x-show="!selectedValue || !projects[String(selectedValue)]"
+                                    class="text-zinc-500 dark:text-zinc-400"
+                                >Not assigned to a project</span>
+                            </span>
+                        </x-slot:trigger>
 
                     <x-slot:options>
                         <button
@@ -682,7 +666,8 @@ new class extends Component
                             <div class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400">No projects available</div>
                         @endif
                     </x-slot:options>
-                </x-inline-edit-dropdown>
+                    </x-inline-edit-dropdown>
+                </div>
 
                 <!-- Tags -->
                 @if($task->tags->isNotEmpty())
