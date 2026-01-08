@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Enums\EventStatus;
 use App\Models\Event;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -20,8 +21,17 @@ class EventFactory extends Factory
     public function definition(): array
     {
         $allDay = fake()->boolean(30); // 30% chance of all-day event
-        $startDateTime = fake()->dateTimeBetween('now', '+2 months');
-        $endDateTime = fake()->dateTimeBetween($startDateTime, $startDateTime->format('Y-m-d H:i:s').' +4 hours');
+        // Start datetime is based on creation time (now)
+        $startDateTime = now();
+        // End datetime is randomly set to be after start datetime
+        // For all-day events, end can be up to 7 days later; for timed events, up to 8 hours later
+        $minEnd = $startDateTime->copy()->addMinutes(30);
+        $maxEnd = $allDay
+            ? $startDateTime->copy()->addDays(7)
+            : $startDateTime->copy()->addHours(8);
+        $endDateTime = Carbon::createFromTimestamp(
+            fake()->numberBetween($minEnd->timestamp, $maxEnd->timestamp)
+        );
 
         return [
             'user_id' => User::factory(),

@@ -168,14 +168,30 @@ class Project extends Model
 
         return $query->where(function ($q) use ($targetDate) {
             $q->where(function ($dateQ) use ($targetDate) {
-                $dateQ->whereNotNull('start_datetime')
-                    ->where(function ($subQ) use ($targetDate) {
-                        $subQ->whereDate('start_datetime', $targetDate)
-                            ->orWhereDate('end_datetime', $targetDate)
-                            ->orWhere(function ($spanQ) use ($targetDate) {
-                                $spanQ->whereDate('start_datetime', '<=', $targetDate)
-                                    ->whereDate('end_datetime', '>=', $targetDate);
-                            });
+                // Items with both start and end datetime
+                $dateQ->where(function ($bothQ) use ($targetDate) {
+                    $bothQ->whereNotNull('start_datetime')
+                        ->whereNotNull('end_datetime')
+                        ->where(function ($subQ) use ($targetDate) {
+                            $subQ->whereDate('start_datetime', $targetDate)
+                                ->orWhereDate('end_datetime', $targetDate)
+                                ->orWhere(function ($spanQ) use ($targetDate) {
+                                    $spanQ->whereDate('start_datetime', '<=', $targetDate)
+                                        ->whereDate('end_datetime', '>=', $targetDate);
+                                });
+                        });
+                })
+                // Items with only end_datetime (due date) - show on all days up to and including due date
+                    ->orWhere(function ($endOnlyQ) use ($targetDate) {
+                        $endOnlyQ->whereNull('start_datetime')
+                            ->whereNotNull('end_datetime')
+                            ->whereDate('end_datetime', '>=', $targetDate);
+                    })
+                // Items with only start_datetime - show from start date onwards
+                    ->orWhere(function ($startOnlyQ) use ($targetDate) {
+                        $startOnlyQ->whereNotNull('start_datetime')
+                            ->whereNull('end_datetime')
+                            ->whereDate('start_datetime', '<=', $targetDate);
                     });
             });
         });

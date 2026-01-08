@@ -17,14 +17,29 @@
     </x-slot:trigger>
 
     <x-slot:options>
-        <div class="space-y-3 px-3 pb-3 pt-1">
-            <flux:input x-model="{{ $model }}" type="{{ $type }}" />
-            <button
-                @click="select(() => {{ $model }} = null)"
-                class="w-full px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
-            >
-                Clear
-            </button>
+        <div
+            class="space-y-3 px-3 pb-3 pt-1"
+            x-data="{
+                focusAndOpenPicker() {
+                    this.$nextTick(() => {
+                        const input = this.$refs.dateInput?.$el?.querySelector('input') || this.$refs.dateInput;
+                        if (input) {
+                            input.focus();
+                            // Use showPicker() if available (modern browsers)
+                            if (typeof input.showPicker === 'function') {
+                                input.showPicker();
+                            }
+                        }
+                    });
+                }
+            }"
+            x-intersect="focusAndOpenPicker()"
+        >
+            <flux:input
+                x-model="{{ $model }}"
+                type="{{ $type }}"
+                x-ref="dateInput"
+            />
         </div>
     </x-slot:options>
 </x-inline-create-dropdown>

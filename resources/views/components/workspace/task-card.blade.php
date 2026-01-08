@@ -87,21 +87,32 @@
         @endif
     </div>
 
-    <div class="flex items-center gap-4 text-xs text-zinc-600 dark:text-zinc-400 mb-3">
-        @if($task->end_date)
-            <div class="flex items-center gap-1 {{ $task->end_date->isPast() && $task->status?->value !== 'done' ? 'text-red-600 dark:text-red-400 font-semibold' : '' }}">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div class="space-y-2 text-xs text-zinc-600 dark:text-zinc-400 mb-3">
+        @if($task->start_datetime)
+            <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span class="font-medium">Start:</span>
+                <span>{{ $task->start_datetime->format('M j, Y g:i A') }}</span>
+            </div>
+        @endif
+
+        @if($task->end_datetime)
+            <div class="flex items-center gap-2 {{ $task->end_datetime->isPast() && $task->status?->value !== 'done' ? 'text-red-600 dark:text-red-400 font-semibold' : '' }}">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <span>{{ $task->end_date->format('M j, Y') }}</span>
+                <span class="font-medium">Due:</span>
+                <span>{{ $task->end_datetime->format('M j, Y g:i A') }}</span>
             </div>
-        @else
-            <span class="text-zinc-400 dark:text-zinc-500 text-xs">No due date</span>
+        @elseif(!$task->start_datetime)
+            <span class="text-zinc-400 dark:text-zinc-500 text-xs">No dates set</span>
         @endif
 
         @if($task->project)
-            <div class="flex items-center gap-1">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="flex items-center gap-2 pt-1">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                 </svg>
                 <span class="truncate">{{ $task->project->name }}</span>

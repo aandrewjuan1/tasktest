@@ -25,22 +25,29 @@
         </p>
     @endif
 
-    @if($project->start_datetime || $project->end_datetime)
-        <div class="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400 mb-3">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <span>
-                @if($project->start_datetime && $project->end_datetime)
-                    {{ $project->start_datetime->format('M j, g:i A') }} - {{ $project->end_datetime->format('M j, Y g:i A') }}
-                @elseif($project->start_datetime)
-                    From {{ $project->start_datetime->format('M j, Y g:i A') }}
-                @else
-                    Until {{ $project->end_datetime->format('M j, Y g:i A') }}
-                @endif
-            </span>
-        </div>
-    @endif
+    <div class="space-y-2 text-xs text-zinc-600 dark:text-zinc-400 mb-3">
+        @if($project->start_datetime)
+            <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span class="font-medium">Start:</span>
+                <span>{{ $project->start_datetime->format('M j, Y g:i A') }}</span>
+            </div>
+        @endif
+
+        @if($project->end_datetime)
+            <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span class="font-medium">End:</span>
+                <span>{{ $project->end_datetime->format('M j, Y g:i A') }}</span>
+            </div>
+        @elseif(!$project->start_datetime)
+            <span class="text-zinc-400 dark:text-zinc-500 text-xs">No dates set</span>
+        @endif
+    </div>
 
     @php
         $totalTasks = $project->tasks->count();

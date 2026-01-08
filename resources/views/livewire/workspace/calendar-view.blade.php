@@ -176,13 +176,42 @@ new class extends Component
         return $tasksByDate;
     }
 
+    #[Computed]
+    public function tasksByDueDate(): array
+    {
+        $start = $this->currentDate->copy()->startOfMonth()->startOfWeek();
+        $end = $this->currentDate->copy()->endOfMonth()->endOfWeek();
+
+        $tasks = Task::query()
+            ->accessibleBy(auth()->user())
+            ->with(['project', 'tags', 'event'])
+            ->whereNotNull('end_datetime')
+            ->whereBetween('end_datetime', [$start, $end])
+            ->get();
+
+        $tasksByDueDate = [];
+        foreach ($tasks as $task) {
+            if (! $task->end_datetime) {
+                continue;
+            }
+
+            $dateKey = $task->end_datetime->format('Y-m-d');
+            if (! isset($tasksByDueDate[$dateKey])) {
+                $tasksByDueDate[$dateKey] = [];
+            }
+            $tasksByDueDate[$dateKey][] = $task;
+        }
+
+        return $tasksByDueDate;
+    }
+
     public function getItemCountForDate(?Carbon $date): int
     {
         if (! $date) {
             return 0;
         }
         $dateKey = $date->format('Y-m-d');
-        return count($this->events[$dateKey] ?? []);
+        return count($this->tasksByDueDate[$dateKey] ?? []);
     }
 
     public function getUrgencyLevelForDate(?Carbon $date): string

@@ -952,12 +952,21 @@ new class extends Component
         // Apply sorting
         $query->orderByField($this->sortBy, $this->sortDirection);
 
-        return $query->get()->map(function ($task) {
-            $task->item_type = 'task';
-            $task->sort_date = $task->end_datetime ?? $task->created_at;
+        return $query->get()
+            ->filter(function ($task) {
+                // For kanban and weekly views, only show items with at least one date
+                if (in_array($this->viewMode, ['kanban', 'weekly'])) {
+                    return $task->start_datetime || $task->end_datetime;
+                }
+                // For list view, show all items
+                return true;
+            })
+            ->map(function ($task) {
+                $task->item_type = 'task';
+                $task->sort_date = $task->end_datetime ?? $task->created_at;
 
-            return $task;
-        });
+                return $task;
+            });
     }
 
     #[Computed]
@@ -991,12 +1000,21 @@ new class extends Component
         // Apply sorting
         $query->orderByField($this->sortBy, $this->sortDirection);
 
-        return $query->get()->map(function ($event) {
-            $event->item_type = 'event';
-            $event->sort_date = $event->start_datetime;
+        return $query->get()
+            ->filter(function ($event) {
+                // For kanban and weekly views, only show items with at least one date
+                if (in_array($this->viewMode, ['kanban', 'weekly'])) {
+                    return $event->start_datetime || $event->end_datetime;
+                }
+                // For list view, show all items
+                return true;
+            })
+            ->map(function ($event) {
+                $event->item_type = 'event';
+                $event->sort_date = $event->start_datetime;
 
-            return $event;
-        });
+                return $event;
+            });
     }
 
     #[Computed]
@@ -1030,12 +1048,21 @@ new class extends Component
         // Apply sorting
         $query->orderByField($this->sortBy, $this->sortDirection);
 
-        return $query->get()->map(function ($project) {
-            $project->item_type = 'project';
-            $project->sort_date = $project->created_at;
+        return $query->get()
+            ->filter(function ($project) {
+                // For kanban and weekly views, only show items with at least one date
+                if (in_array($this->viewMode, ['kanban', 'weekly'])) {
+                    return $project->start_datetime || $project->end_datetime;
+                }
+                // For list view, show all items
+                return true;
+            })
+            ->map(function ($project) {
+                $project->item_type = 'project';
+                $project->sort_date = $project->created_at;
 
-            return $project;
-        });
+                return $project;
+            });
     }
 
     #[Computed]
@@ -1062,11 +1089,16 @@ new class extends Component
             }
 
             $taskQuery->orderByField($this->sortBy, $this->sortDirection);
-            $tasks = $taskQuery->get()->map(function ($task) {
-                $task->item_type = 'task';
-                $task->sort_date = $task->end_datetime ?? $task->created_at;
-                return $task;
-            });
+            $tasks = $taskQuery->get()
+                ->filter(function ($task) {
+                    // For weekly view, only show items with at least one date
+                    return $task->start_datetime || $task->end_datetime;
+                })
+                ->map(function ($task) {
+                    $task->item_type = 'task';
+                    $task->sort_date = $task->end_datetime ?? $task->created_at;
+                    return $task;
+                });
 
             // Get filtered events (without date filter)
             $eventQuery = Event::query()
@@ -1085,11 +1117,16 @@ new class extends Component
             }
 
             $eventQuery->orderByField($this->sortBy, $this->sortDirection);
-            $events = $eventQuery->get()->map(function ($event) {
-                $event->item_type = 'event';
-                $event->sort_date = $event->start_datetime;
-                return $event;
-            });
+            $events = $eventQuery->get()
+                ->filter(function ($event) {
+                    // For weekly view, only show items with at least one date
+                    return $event->start_datetime || $event->end_datetime;
+                })
+                ->map(function ($event) {
+                    $event->item_type = 'event';
+                    $event->sort_date = $event->start_datetime;
+                    return $event;
+                });
 
             // Get filtered projects (without date filter)
             $projectQuery = Project::query()
@@ -1108,11 +1145,16 @@ new class extends Component
             }
 
             $projectQuery->orderByField($this->sortBy, $this->sortDirection);
-            $projects = $projectQuery->get()->map(function ($project) {
-                $project->item_type = 'project';
-                $project->sort_date = $project->created_at;
-                return $project;
-            });
+            $projects = $projectQuery->get()
+                ->filter(function ($project) {
+                    // For weekly view, only show items with at least one date
+                    return $project->start_datetime || $project->end_datetime;
+                })
+                ->map(function ($project) {
+                    $project->item_type = 'project';
+                    $project->sort_date = $project->created_at;
+                    return $project;
+                });
 
             return collect()->merge($tasks)->merge($events)->merge($projects);
         }

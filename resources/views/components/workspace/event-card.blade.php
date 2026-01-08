@@ -86,21 +86,26 @@
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span>
-                    {{ $event->start_datetime->format('M j, Y g:i A') }}
-                </span>
+                <span class="font-medium">Start:</span>
+                <span>{{ $event->start_datetime->format('M j, Y g:i A') }}</span>
             </div>
         @endif
 
         @if($event->end_datetime)
             <div class="flex items-center gap-2">
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
+                <span class="font-medium">End:</span>
                 <span>{{ $event->end_datetime->format('M j, Y g:i A') }}</span>
             </div>
         @elseif(!$event->end_datetime && $event->start_datetime)
-            <span class="text-zinc-400 dark:text-zinc-500 text-xs">No end time</span>
+            <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span class="text-zinc-400 dark:text-zinc-500">No end time</span>
+            </div>
         @endif
     </div>
 

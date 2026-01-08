@@ -6,6 +6,7 @@ use App\Enums\TaskComplexity;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -20,8 +21,14 @@ class TaskFactory extends Factory
      */
     public function definition(): array
     {
-        $startDatetime = fake()->dateTimeBetween('now', '+1 month');
-        $endDatetime = fake()->dateTimeBetween($startDatetime, '+2 months');
+        // Start datetime is based on creation time (now)
+        $startDatetime = now();
+        // End datetime is randomly set to be after start datetime (anywhere from 1 hour to 3 months later)
+        $minEnd = $startDatetime->copy()->addHour();
+        $maxEnd = $startDatetime->copy()->addMonths(3);
+        $endDatetime = Carbon::createFromTimestamp(
+            fake()->numberBetween($minEnd->timestamp, $maxEnd->timestamp)
+        );
         $status = fake()->randomElement(TaskStatus::cases());
 
         return [

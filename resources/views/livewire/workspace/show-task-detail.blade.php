@@ -339,6 +339,116 @@ new class extends Component
                         </x-slot:options>
                     </x-inline-edit-dropdown>
 
+                    <!-- Priority -->
+                    <x-inline-edit-dropdown
+                        label="Priority"
+                        field="priority"
+                        :item-id="$task->id"
+                        :use-parent="true"
+                        :value="$task->priority?->value ?? ''"
+                    >
+                        <x-slot:trigger>
+                            <span
+                                class="text-sm font-medium"
+                                x-text="{
+                                    low: 'Low',
+                                    medium: 'Medium',
+                                    high: 'High',
+                                    urgent: 'Urgent'
+                                }[selectedValue || ''] || 'Not set'"
+                            ></span>
+                        </x-slot:trigger>
+
+                        <x-slot:options>
+                            <button
+                                @click="select('low')"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                                :class="selectedValue === 'low' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                            >
+                                Low
+                            </button>
+                            <button
+                                @click="select('medium')"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                                :class="selectedValue === 'medium' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                            >
+                                Medium
+                            </button>
+                            <button
+                                @click="select('high')"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                                :class="selectedValue === 'high' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                            >
+                                High
+                            </button>
+                            <button
+                                @click="select('urgent')"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                                :class="selectedValue === 'urgent' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                            >
+                                Urgent
+                            </button>
+                            <button
+                                @click="select(null)"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                                :class="selectedValue === null || selectedValue === '' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                            >
+                                Clear
+                            </button>
+                        </x-slot:options>
+                    </x-inline-edit-dropdown>
+
+                    <!-- Complexity -->
+                    <x-inline-edit-dropdown
+                        label="Complexity"
+                        field="complexity"
+                        :item-id="$task->id"
+                        :use-parent="true"
+                        :value="$task->complexity?->value ?? ''"
+                    >
+                        <x-slot:trigger>
+                            <span
+                                class="text-sm font-medium"
+                                x-text="{
+                                    simple: 'Simple',
+                                    moderate: 'Moderate',
+                                    complex: 'Complex'
+                                }[selectedValue || ''] || 'Not set'"
+                            ></span>
+                        </x-slot:trigger>
+
+                        <x-slot:options>
+                            <button
+                                @click="select('simple')"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                                :class="selectedValue === 'simple' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                            >
+                                Simple
+                            </button>
+                            <button
+                                @click="select('moderate')"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                                :class="selectedValue === 'moderate' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                            >
+                                Moderate
+                            </button>
+                            <button
+                                @click="select('complex')"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                                :class="selectedValue === 'complex' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                            >
+                                Complex
+                            </button>
+                            <button
+                                @click="select(null)"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                                :class="selectedValue === null || selectedValue === '' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                            >
+                                Clear
+                            </button>
+                        </x-slot:options>
+                    </x-inline-edit-dropdown>
+
                     <!-- Start Datetime -->
                     <div
                          x-data="{
