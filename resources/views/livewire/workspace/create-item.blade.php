@@ -20,19 +20,69 @@ new class extends Component
     #[Computed]
     public function availableTags(): Collection
     {
-        $user = auth()->user();
+        // Return all tags so newly created tags appear immediately
+        return Tag::orderBy('name')->get();
+    }
 
-        return Tag::whereHas('tasks', function ($query) use ($user) {
-            $query->accessibleBy($user);
-        })
-            ->orWhereHas('events', function ($query) use ($user) {
-                $query->accessibleBy($user);
-            })
-            ->orWhereHas('projects', function ($query) use ($user) {
-                $query->accessibleBy($user);
-            })
-            ->orderBy('name')
-            ->get();
+    public function createTag(string $name): array
+    {
+        $name = trim($name);
+
+        if (empty($name)) {
+            return ['success' => false, 'message' => 'Tag name cannot be empty'];
+        }
+
+        try {
+            // Check if tag exists case-insensitively
+            $existingTag = Tag::whereRaw('LOWER(name) = LOWER(?)', [$name])->first();
+
+            if ($existingTag) {
+                // Tag already exists, return existing tag
+                return [
+                    'success' => true,
+                    'tagId' => $existingTag->id,
+                    'tagName' => $existingTag->name,
+                    'alreadyExists' => true,
+                ];
+            }
+
+            // Create new tag
+            $tag = Tag::create(['name' => $name]);
+            $this->dispatch('tag-created', tagId: $tag->id, tagName: $tag->name);
+
+            return [
+                'success' => true,
+                'tagId' => $tag->id,
+                'tagName' => $tag->name,
+                'alreadyExists' => false,
+            ];
+        } catch (\Exception $e) {
+            \Log::error('Failed to create tag', [
+                'error' => $e->getMessage(),
+                'name' => $name,
+            ]);
+
+            return ['success' => false, 'message' => 'Failed to create tag'];
+        }
+    }
+
+    public function deleteTag(int $tagId): array
+    {
+        try {
+            $tag = Tag::findOrFail($tagId);
+            $tag->delete();
+
+            $this->dispatch('tag-deleted', tagId: $tagId);
+
+            return ['success' => true];
+        } catch (\Exception $e) {
+            \Log::error('Failed to delete tag', [
+                'error' => $e->getMessage(),
+                'tagId' => $tagId,
+            ]);
+
+            return ['success' => false, 'message' => 'Failed to delete tag'];
+        }
     }
 }; ?>
 
@@ -169,7 +219,10 @@ new class extends Component
 }"
      @open-create-modal.window="openModal()"
      @close-create-modal.window="closeModal()"
-     @item-created.window="resetFormData()">
+     @item-created.window="resetFormData()"
+     @select-tag.window="toggleTag($event.detail.tagId, $event.detail.type)"
+     @remove-tag.window="(function() { const tagIds = formData[$event.detail.type].tagIds; const index = tagIds.indexOf($event.detail.tagId); if (index > -1) tagIds.splice(index, 1); })()"
+     @clear-tags.window="(function() { formData[$event.detail.type].tagIds = []; })()">
 
     <!-- Form Container -->
     <div
