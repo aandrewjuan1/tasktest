@@ -180,7 +180,8 @@ new class extends Component
             <!-- Top Section: Title Input Field -->
             <div class="space-y-3">
                 <!-- Tabs -->
-                <div class="flex gap-2">
+                <div class="flex gap-2 items-center justify-between">
+                    <div class="flex gap-2">
                     <button
                         @click.stop="switchTab('task')"
                         :class="activeTab === 'task' ? 'bg-blue-500 text-white' : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400'"
@@ -202,6 +203,17 @@ new class extends Component
                     >
                         Project
                     </button>
+                    </div>
+                    <!-- Collapse Button -->
+                    <button
+                        @click.stop="closeModal()"
+                        class="p-1.5 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
+                        aria-label="Collapse"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
                 </div>
 
                 <!-- Input Field and Submit Button -->
@@ -209,14 +221,17 @@ new class extends Component
                     <input
                         type="text"
                         x-model="inputValue"
-                        @keydown.enter.prevent="activeTab === 'task' ? submitTask() : (activeTab === 'event' ? submitEvent() : submitProject())"
+                        required
+                        @keydown.enter.prevent="!inputValue.trim() || (activeTab === 'task' ? submitTask() : (activeTab === 'event' ? submitEvent() : submitProject()))"
                         @click.stop
                         :placeholder="activeTab === 'task' ? 'Enter task title...' : (activeTab === 'event' ? 'Enter event title...' : 'Enter project name...')"
                         class="flex-1 px-6 py-4 rounded-full border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     />
                     <button
-                        @click.stop="activeTab === 'task' ? submitTask() : (activeTab === 'event' ? submitEvent() : submitProject())"
-                        class="px-6 py-4 rounded-full bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-medium transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+                        @click.stop="!inputValue.trim() || (activeTab === 'task' ? submitTask() : (activeTab === 'event' ? submitEvent() : submitProject()))"
+                        :disabled="!inputValue.trim()"
+                        :class="!inputValue.trim() ? 'opacity-50 cursor-not-allowed' : ''"
+                        class="px-6 py-4 rounded-full bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-medium transition-colors flex items-center justify-center gap-2 whitespace-nowrap disabled:bg-zinc-400 dark:disabled:bg-zinc-600 disabled:hover:bg-zinc-400 dark:disabled:hover:bg-zinc-600"
                     >
                         <span x-text="activeTab === 'task' ? 'Create Task' : (activeTab === 'event' ? 'Create Event' : 'Create Project')"></span>
                     </button>
