@@ -79,7 +79,20 @@ new class extends Component
     <div wire:loading.class="opacity-50"
          wire:target="goToTodayDate,previousDay,nextDay"
          wire:key="kanban-container">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4" aria-label="Kanban board">
+        <div class="space-y-4">
+            <!-- Create New Item CTA -->
+            <button
+                wire:click="$dispatch('open-create-modal')"
+                class="w-full bg-white dark:bg-zinc-800 rounded-lg border-2 border-dashed border-zinc-300 dark:border-zinc-600 hover:border-blue-400 dark:hover:border-blue-500 p-8 transition-all hover:bg-zinc-50 dark:hover:bg-zinc-700/50 flex items-center justify-center group cursor-pointer"
+                draggable="false"
+                aria-label="Create new item"
+            >
+                <svg class="w-8 h-8 text-zinc-400 dark:text-zinc-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+            </button>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4" aria-label="Kanban board">
     @foreach(['to_do', 'doing', 'done'] as $status)
         <div wire:key="kanban-column-{{ $status }}" class="bg-zinc-100 dark:bg-zinc-900 rounded-lg p-4"
              draggable="false"
@@ -158,20 +171,6 @@ new class extends Component
                     </div>
                 @endforeach
 
-                @if($status === 'to_do')
-                    <!-- Create New Item CTA -->
-                    <button
-                        wire:click="$dispatch('open-create-modal')"
-                        class="w-full bg-white dark:bg-zinc-800 rounded-lg border-2 border-dashed border-zinc-300 dark:border-zinc-600 hover:border-blue-400 dark:hover:border-blue-500 p-6 transition-all hover:bg-zinc-50 dark:hover:bg-zinc-700/50 flex items-center justify-center group cursor-pointer"
-                        draggable="false"
-                        aria-label="Create new item"
-                    >
-                        <svg class="w-6 h-6 text-zinc-400 dark:text-zinc-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                        </svg>
-                    </button>
-                @endif
-
                 @if(collect($this->itemsByStatus[$status] ?? [])->isEmpty() && $status !== 'to_do')
                     <div class="text-center py-8 text-zinc-500 dark:text-zinc-400 text-sm select-none" draggable="false" aria-label="Empty column">
                         No items
@@ -180,6 +179,7 @@ new class extends Component
             </div>
         </div>
     @endforeach
+            </div>
         </div>
     </div>
 </div>
