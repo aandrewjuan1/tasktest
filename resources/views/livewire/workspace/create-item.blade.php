@@ -157,7 +157,15 @@ new class extends Component
     },
     isTagSelected(tagId, type) {
         return this.formData[type].tagIds.includes(tagId);
-    }
+    },
+    getSelectedProjectName() {
+        if (!this.formData.task.projectId) {
+            return 'None';
+        }
+        const project = this.availableProjects.find(p => p.id == this.formData.task.projectId);
+        return project ? project.name : 'None';
+    },
+    availableProjects: {{ json_encode($this->availableProjects->map(fn($p) => ['id' => $p->id, 'name' => $p->name])->values()) }}
 }"
      @open-create-modal.window="openModal()"
      @close-create-modal.window="closeModal()"
@@ -351,14 +359,14 @@ new class extends Component
 
                     <!-- Task Start Date & Time -->
                     <x-workspace.inline-date-picker
-                        label="Start Date &amp; Time"
+                        label="Start Date & Time"
                         model="formData.task.startDatetime"
                         type="datetime-local"
                     />
 
                     <!-- Task End Date & Time -->
                     <x-workspace.inline-date-picker
-                        label="End Date &amp; Time"
+                        label="End Date & Time"
                         model="formData.task.endDatetime"
                         type="datetime-local"
                     />
@@ -370,7 +378,7 @@ new class extends Component
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                             </svg>
                             <span class="text-sm font-medium">Project</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.task.projectId ? 'Selected' : 'None'"></span>
+                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="getSelectedProjectName()"></span>
                         </x-slot:trigger>
 
                         <x-slot:options>
@@ -451,14 +459,14 @@ new class extends Component
 
                     <!-- Event Start Date & Time -->
                     <x-workspace.inline-date-picker
-                        label="Start Date &amp; Time"
+                        label="Start Date & Time"
                         model="formData.event.startDatetime"
                         type="datetime-local"
                     />
 
                     <!-- Event End Date & Time -->
                     <x-workspace.inline-date-picker
-                        label="End Date &amp; Time"
+                        label="End Date & Time"
                         model="formData.event.endDatetime"
                         type="datetime-local"
                     />
