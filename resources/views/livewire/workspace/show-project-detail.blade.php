@@ -90,11 +90,16 @@ new class extends Component {
 }; ?>
 
 <div wire:key="project-detail-modal">
-    <flux:modal wire:model="isOpen" class="min-w-[700px]" variant="flyout" closeable="false">
-        <div class="space-y-6" wire:key="project-content-{{ $project?->id ?? 'empty' }}">
+    <flux:modal
+        wire:model="isOpen"
+        class="min-w-[700px] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl bg-white/95 dark:bg-zinc-900/95"
+        variant="flyout"
+        closeable="false"
+    >
+        <div class="space-y-6 px-6 py-5" wire:key="project-content-{{ $project?->id ?? 'empty' }}">
             @if($project)
                 <!-- Header -->
-                <div>
+                <div class="border-b border-zinc-200 dark:border-zinc-800 pb-4">
                     <div class="flex-1"
                          x-data="{
                              editing: false,
@@ -127,7 +132,12 @@ new class extends Component {
                          }"
                     >
                         <div x-show="!editing" class="flex items-center gap-2">
-                            <flux:heading size="lg" x-text="originalValue" class="cursor-pointer" @click="startEditing()"></flux:heading>
+                            <flux:heading
+                                size="xl"
+                                x-text="originalValue"
+                                class="cursor-pointer text-zinc-900 dark:text-zinc-50 tracking-tight"
+                                @click="startEditing()"
+                            ></flux:heading>
                             <button
                                 @click="startEditing()"
                                 class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
@@ -171,6 +181,50 @@ new class extends Component {
                             @enderror
                         </div>
                     </div>
+
+                    @php
+                        $progress = $this->progress;
+                    @endphp
+
+                    <!-- Key meta pills -->
+                    <div class="mt-4 flex flex-wrap gap-2 text-xs">
+                        <!-- Progress -->
+                        <div class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h10M4 14h6M4 18h4" />
+                            </svg>
+                            <span class="font-medium">
+                                {{ $progress['percentage'] }}% complete
+                            </span>
+                        </div>
+
+                        <!-- Task count -->
+                        <div class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5h12M9 12h12M9 19h12M4 5h.01M4 12h.01M4 19h.01" />
+                            </svg>
+                            <span class="font-medium">
+                                {{ $progress['completed'] }} / {{ $progress['total'] }} tasks
+                            </span>
+                        </div>
+
+                        <!-- Timeline -->
+                        <div class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M5 11h14M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span class="font-medium">
+                                @if($project->start_datetime)
+                                    {{ $project->start_datetime->format('M j, Y') }}
+                                @else
+                                    No start
+                                @endif
+                                @if($project->end_datetime)
+                                    – {{ $project->end_datetime->format('M j, Y') }}
+                                @endif
+                            </span>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Description -->
@@ -207,7 +261,13 @@ new class extends Component {
                 >
                     <div class="mb-2">
                         <div class="flex items-center gap-2">
-                            <flux:heading size="sm">Description</flux:heading>
+                            <flux:heading size="sm" class="flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
+                                <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 20h9" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 20h.01M5 4h14a2 2 0 012 2v8.5a2 2 0 01-2 2H9.414a2 2 0 00-1.414.586l-2.293 2.293A1 1 0 015 19.086V6a2 2 0 012-2z" />
+                                </svg>
+                                Description
+                            </flux:heading>
                             <button
                                 x-show="!editing"
                                 @click="startEditing()"
@@ -253,10 +313,20 @@ new class extends Component {
                     </div>
                 </div>
 
-                <!-- Project Details Grid -->
-                <div class="grid grid-cols-2 gap-4">
-                    <!-- Start Date & Time -->
-                    <div
+                <!-- Project Details -->
+                <div class="mt-2 rounded-2xl bg-zinc-50 dark:bg-zinc-900/40 px-4 py-4 space-y-4">
+                    <div class="flex items-center gap-2 mb-1">
+                        <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                        </svg>
+                        <flux:heading size="xs" class="uppercase tracking-wide text-[0.7rem] text-zinc-500 dark:text-zinc-400">
+                            Project Details
+                        </flux:heading>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <!-- Start Date & Time -->
+                        <div
                          x-data="{
                              editing: false,
                              originalValue: @js($project->start_datetime ? $project->start_datetime->format('Y-m-d\TH:i') : ''),
@@ -311,7 +381,12 @@ new class extends Component {
                          @mouseleave="handleMouseLeave()"
                     >
                         <div class="flex items-center gap-2 mb-2">
-                            <flux:heading size="sm">Start Date & Time</flux:heading>
+                            <flux:heading size="sm" class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M5 11h14M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 00-2 2z" />
+                                </svg>
+                                Start Date & Time
+                            </flux:heading>
                             <button
                                 x-show="!editing"
                                 @click="startEditing()"
@@ -338,7 +413,7 @@ new class extends Component {
                             @enderror
                         </div>
                         <div x-show="!editing">
-                            <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
+                            <p class="text-sm text-zinc-700 dark:text-zinc-300 mt-2 font-medium">
                                 {{ $project->start_datetime?->format('M j, Y g:i A') ?? 'Not set' }}
                             </p>
                         </div>
@@ -400,7 +475,12 @@ new class extends Component {
                          @mouseleave="handleMouseLeave()"
                     >
                         <div class="flex items-center gap-2 mb-2">
-                            <flux:heading size="sm">End Date & Time</flux:heading>
+                            <flux:heading size="sm" class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M5 11h14M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 00-2 2z" />
+                                </svg>
+                                End Date & Time
+                            </flux:heading>
                             <button
                                 x-show="!editing"
                                 @click="startEditing()"
@@ -427,7 +507,7 @@ new class extends Component {
                             @enderror
                         </div>
                         <div x-show="!editing">
-                            <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
+                            <p class="text-sm text-zinc-700 dark:text-zinc-300 mt-2 font-medium">
                                 {{ $project->end_datetime?->format('M j, Y g:i A') ?? 'Not set' }}
                             </p>
                         </div>
@@ -435,11 +515,13 @@ new class extends Component {
                 </div>
 
                 <!-- Progress -->
-                @php
-                    $progress = $this->progress;
-                @endphp
-                <div>
-                    <flux:heading size="sm">Progress</flux:heading>
+                <div class="mt-4">
+                    <flux:heading size="sm" class="flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
+                        <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h10M4 14h6M4 18h4" />
+                        </svg>
+                        Progress
+                    </flux:heading>
                     <div class="mt-2">
                         <div class="flex items-center justify-between text-sm text-zinc-600 dark:text-zinc-400 mb-2">
                             <span>{{ $progress['completed'] }} of {{ $progress['total'] }} tasks completed</span>
@@ -453,8 +535,13 @@ new class extends Component {
 
                 <!-- Associated Tasks -->
                 @if($project->tasks->isNotEmpty())
-                    <div>
-                        <flux:heading size="sm">Associated Tasks</flux:heading>
+                    <div class="mt-6">
+                        <flux:heading size="sm" class="flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
+                            <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5h12M9 12h12M9 19h12M4 5h.01M4 12h.01M4 19h.01" />
+                            </svg>
+                            Associated Tasks
+                        </flux:heading>
                         <div class="mt-2 space-y-2">
                             @foreach($project->tasks as $task)
                                 <div class="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
@@ -483,8 +570,13 @@ new class extends Component {
 
                 <!-- Tags -->
                 @if($project->tags->isNotEmpty())
-                    <div>
-                        <flux:heading size="sm">Tags</flux:heading>
+                    <div class="mt-6 border-t border-zinc-200 dark:border-zinc-800 pt-4">
+                        <flux:heading size="sm" class="flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
+                            <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M3 5a2 2 0 012-2h4l2 2h6a2 2 0 012 2v2.586a1 1 0 01-.293.707l-7.414 7.414a2 2 0 01-2.828 0L3.293 9.707A1 1 0 013 9V5z" />
+                            </svg>
+                            Tags
+                        </flux:heading>
                         <div class="flex flex-wrap gap-2 mt-2">
                             @foreach($project->tags as $tag)
                                 <span class="inline-flex items-center px-3 py-1 text-sm rounded bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300">
@@ -497,8 +589,13 @@ new class extends Component {
 
                 <!-- Reminders -->
                 @if($project->reminders->isNotEmpty())
-                    <div>
-                        <flux:heading size="sm">Reminders</flux:heading>
+                    <div class="mt-4">
+                        <flux:heading size="sm" class="flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
+                            <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                            </svg>
+                            Reminders
+                        </flux:heading>
                         <div class="mt-2 space-y-2">
                             @foreach($project->reminders as $reminder)
                                 <div class="text-sm text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
@@ -513,29 +610,39 @@ new class extends Component {
                 @endif
 
                 <!-- Collaboration Placeholder -->
-                <div class="border-t border-zinc-200 dark:border-zinc-700 pt-4">
-                    <flux:heading size="sm">Collaboration</flux:heading>
+                <div class="border-t border-zinc-200 dark:border-zinc-700 pt-4 mt-4">
+                    <flux:heading size="sm" class="flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
+                        <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-5-3.87M9 20H4v-2a4 4 0 015-3.87M12 12a4 4 0 100-8 4 4 0 000 8zm6 8H6" />
+                        </svg>
+                        Collaboration
+                    </flux:heading>
                     <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">
                         Collaboration features coming soon...
                     </p>
                 </div>
 
                 <!-- Delete Button -->
-                <div class="flex justify-end mt-6 mb-4" x-data="{}">
-                    <flux:button
-                        variant="danger"
-                        @click="$wire.showDeleteConfirm = true"
-                    >
-                        Delete Project
-                    </flux:button>
+                <div class="mt-6 mb-4 pt-4 border-t border-red-100/60 dark:border-red-900/40">
+                    <div class="flex justify-end" x-data="{}">
+                        <flux:button
+                            variant="danger"
+                            @click="$wire.showDeleteConfirm = true"
+                        >
+                            Delete Project
+                        </flux:button>
+                    </div>
                 </div>
             @endif
         </div>
     </flux:modal>
 
     <!-- Delete Confirmation Modal -->
-    <flux:modal wire:model="showDeleteConfirm" class="max-w-md">
-        <flux:heading size="lg" class="mb-4">Delete Project</flux:heading>
+    <flux:modal
+        wire:model="showDeleteConfirm"
+        class="max-w-md my-10 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl bg-white/95 dark:bg-zinc-900/95"
+    >
+        <flux:heading size="lg" class="mb-2 text-red-600 dark:text-red-400">Delete Project</flux:heading>
         <p class="text-sm text-zinc-600 dark:text-zinc-400 mb-6">
             Are you sure you want to delete "<strong>{{ $project?->name }}</strong>"? This action cannot be undone.
         </p>
