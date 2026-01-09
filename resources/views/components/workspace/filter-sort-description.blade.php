@@ -14,7 +14,6 @@
         $typeLabel = match ($filterType) {
             'task' => 'tasks',
             'event' => 'events',
-            'project' => 'projects',
             default => $filterType,
         };
 

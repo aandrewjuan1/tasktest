@@ -27,7 +27,6 @@
                     <flux:menu.radio wire:click="$dispatch('set-filter-type', [null])" :checked="!$filterType || $filterType === 'all'">All</flux:menu.radio>
                     <flux:menu.radio wire:click="$dispatch('set-filter-type', ['task'])" :checked="$filterType === 'task'">Task</flux:menu.radio>
                     <flux:menu.radio wire:click="$dispatch('set-filter-type', ['event'])" :checked="$filterType === 'event'">Event</flux:menu.radio>
-                    <flux:menu.radio wire:click="$dispatch('set-filter-type', ['project'])" :checked="$filterType === 'project'">Project</flux:menu.radio>
                 </flux:menu.radio.group>
                 <flux:menu.separator />
                 <flux:menu.heading>Priority</flux:menu.heading>

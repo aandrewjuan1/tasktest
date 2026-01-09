@@ -180,7 +180,6 @@ new class extends Component
             $typeLabel = match ($this->filterType) {
                 'task' => 'tasks',
                 'event' => 'events',
-                'project' => 'projects',
                 default => $this->filterType,
             };
             $parts[] = "Showing {$typeLabel} only";

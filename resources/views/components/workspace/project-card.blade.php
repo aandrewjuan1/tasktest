@@ -1,22 +1,17 @@
 @props(['project'])
 
 <div
-    class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 cursor-pointer hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-600 transition-all"
-    wire:click="$dispatch('view-project-detail', { id: {{ $project->id }} })"
-    role="button"
-    tabindex="0"
-    aria-label="View project details: {{ $project->name }}"
+    class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 transition-all"
 >
-    <div class="flex items-center gap-2 mb-3">
-        <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+    <div class="flex items-start justify-between gap-3 mb-3">
+        <div class="flex items-start gap-2 flex-1 min-w-0">
+            <h3 class="font-semibold text-zinc-900 dark:text-zinc-100 text-base sm:text-lg leading-snug line-clamp-2">
+                {{ $project->name }}
+            </h3>
+        </div>
+        <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 flex-shrink-0">
             Project
         </span>
-    </div>
-
-    <div class="flex items-start justify-between gap-3 mb-3">
-        <h3 class="font-semibold text-zinc-900 dark:text-zinc-100 line-clamp-2 flex-1">
-            {{ $project->name }}
-        </h3>
     </div>
 
     @if($project->description)
@@ -78,6 +73,33 @@
                 <span class="inline-flex items-center px-2 py-0.5 text-xs rounded bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400">
                     +{{ $project->tags->count() - 3 }} more
                 </span>
+            @endif
+        </div>
+    @endif
+
+    @if($project->tasks->isNotEmpty())
+        <div class="mt-2 space-y-1">
+            @foreach($project->tasks->take(3) as $task)
+                <div class="flex items-center justify-between rounded bg-zinc-50 dark:bg-zinc-900 px-2 py-1.5">
+                    <p class="text-xs font-medium text-zinc-800 dark:text-zinc-100 truncate">
+                        {{ $task->title }}
+                    </p>
+                    @if($task->status)
+                        <span class="inline-flex items-center px-2 py-0.5 text-[0.7rem] font-medium rounded {{ $task->status->badgeColor() }}">
+                            {{ match($task->status->value) {
+                                'to_do' => 'To Do',
+                                'doing' => 'In Progress',
+                                'done' => 'Done',
+                            } }}
+                        </span>
+                    @endif
+                </div>
+            @endforeach
+
+            @if($project->tasks->count() > 3)
+                <p class="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
+                    +{{ $project->tasks->count() - 3 }} more tasks
+                </p>
             @endif
         </div>
     @endif

@@ -100,11 +100,11 @@ new class extends Component
 <div wire:key="task-detail-modal">
     <flux:modal
         wire:model="isOpen"
-        class="min-w-[700px] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl bg-white/95 dark:bg-zinc-900/95"
+        class="w-full max-w-lg sm:max-w-2xl mx-4 sm:mx-0 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl bg-white/95 dark:bg-zinc-900/95"
         variant="flyout"
         closeable="false"
     >
-        <div class="space-y-6 px-6 py-5" wire:key="task-content-{{ $task?->id ?? 'empty' }}">
+        <div class="space-y-6 px-4 py-4 sm:px-6 sm:py-5" wire:key="task-content-{{ $task?->id ?? 'empty' }}">
             @if($task)
                 <!-- Header -->
                 <div class="border-b border-zinc-200 dark:border-zinc-800 pb-4">
@@ -191,19 +191,38 @@ new class extends Component
                     </div>
 
                     <!-- Key meta pills -->
-                    <div class="mt-4 flex flex-wrap gap-2 text-xs">
+                    <div
+                        class="mt-4 flex flex-wrap gap-2 text-xs"
+                        x-data="{
+                            status: @js($task->status?->value ?? 'to_do'),
+                            priority: @js($task->priority?->value ?? ''),
+                            complexity: @js($task->complexity?->value ?? ''),
+                            duration: @js($task->duration ?? ''),
+                            init() {
+                                window.addEventListener('task-detail-field-updated', (event) => {
+                                    const { field, value } = event.detail || {};
+                                    if (!field) return;
+
+                                    if (['status', 'priority', 'complexity', 'duration'].includes(field)) {
+                                        this[field] = value ?? '';
+                                    }
+                                });
+                            }
+                        }"
+                    >
                         <!-- Status -->
                         <div class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
                             </svg>
-                            <span class="font-medium">
-                                {{ [
-                                    'to_do' => 'To Do',
-                                    'doing' => 'In Progress',
-                                    'done' => 'Done',
-                                ][$task->status?->value ?? 'to_do'] }}
-                            </span>
+                            <span
+                                class="font-medium"
+                                x-text="{
+                                    to_do: 'To Do',
+                                    doing: 'In Progress',
+                                    done: 'Done',
+                                }[status || 'to_do']"
+                            ></span>
                         </div>
 
                         <!-- Priority -->
@@ -211,15 +230,15 @@ new class extends Component
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
-                            <span class="font-medium">
-                                {{ match($task->priority?->value ?? '') {
-                                    'low' => 'Low',
-                                    'medium' => 'Medium',
-                                    'high' => 'High',
-                                    'urgent' => 'Urgent',
-                                    default => 'No priority',
-                                } }}
-                            </span>
+                            <span
+                                class="font-medium"
+                                x-text="{
+                                    low: 'Low',
+                                    medium: 'Medium',
+                                    high: 'High',
+                                    urgent: 'Urgent'
+                                }[priority || ''] || 'No priority'"
+                            ></span>
                         </div>
 
                         <!-- Complexity -->
@@ -227,14 +246,14 @@ new class extends Component
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                             </svg>
-                            <span class="font-medium">
-                                {{ match($task->complexity?->value ?? '') {
-                                    'simple' => 'Simple',
-                                    'moderate' => 'Moderate',
-                                    'complex' => 'Complex',
-                                    default => 'No complexity',
-                                } }}
-                            </span>
+                            <span
+                                class="font-medium"
+                                x-text="{
+                                    simple: 'Simple',
+                                    moderate: 'Moderate',
+                                    complex: 'Complex'
+                                }[complexity || ''] || 'No complexity'"
+                            ></span>
                         </div>
 
                         <!-- Duration -->
@@ -242,13 +261,10 @@ new class extends Component
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            <span class="font-medium">
-                                @if($task->duration)
-                                    {{ $task->duration }} min
-                                @else
-                                    No duration
-                                @endif
-                            </span>
+                            <span
+                                class="font-medium"
+                                x-text="duration ? (duration + ' min') : 'No duration'"
+                            ></span>
                         </div>
                     </div>
                 </div>
@@ -350,7 +366,7 @@ new class extends Component
                         </flux:heading>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <!-- Status -->
                     <x-inline-edit-dropdown
                         label="Status"
@@ -721,7 +737,53 @@ new class extends Component
                 </div>
 
                 <!-- Project -->
-                <div x-data="{ projects: @js($this->projects->pluck('name', 'id')->toArray()) }" class="mt-6">
+                @php
+                    $projectsData = $this->projects->map(function ($project) {
+                        $totalTasks = $project->tasks->count();
+                        $completedTasks = $project->tasks->where('status', \App\Enums\TaskStatus::Done)->count();
+                        $progress = $totalTasks > 0 ? round(($completedTasks / $totalTasks) * 100) : 0;
+
+                        return [
+                            'id' => (string) $project->id,
+                            'name' => $project->name,
+                            'description' => $project->description,
+                            'start_datetime' => $project->start_datetime?->format('M j, Y'),
+                            'end_datetime' => $project->end_datetime?->format('M j, Y'),
+                            'totalTasks' => $totalTasks,
+                            'completedTasks' => $completedTasks,
+                            'progress' => $progress,
+                        ];
+                    })->keyBy('id');
+
+                    $currentProjectData = $task->project ? [
+                        'id' => (string) $task->project->id,
+                        'name' => $task->project->name,
+                        'description' => $task->project->description,
+                        'start_datetime' => $task->project->start_datetime?->format('M j, Y'),
+                        'end_datetime' => $task->project->end_datetime?->format('M j, Y'),
+                        'totalTasks' => $task->project->tasks->count(),
+                        'completedTasks' => $task->project->tasks->where('status', \App\Enums\TaskStatus::Done)->count(),
+                        'progress' => $task->project->tasks->count() > 0 ? round(($task->project->tasks->where('status', \App\Enums\TaskStatus::Done)->count() / $task->project->tasks->count()) * 100) : 0,
+                    ] : null;
+                @endphp
+                <div
+                    x-data="{
+                        projects: @js($projectsData),
+                        projectNames: @js($this->projects->mapWithKeys(fn($p) => [(string)$p->id => $p->name])->toArray()),
+                        selectedProjectId: @js($task->project_id ? (string) $task->project_id : ''),
+                        currentProject: @js($currentProjectData),
+                        init() {
+                            window.addEventListener('task-detail-field-updated', (event) => {
+                                const { field, value } = event.detail || {};
+                                if (field === 'projectId') {
+                                    this.selectedProjectId = value ?? '';
+                                    this.currentProject = value && this.projects[String(value)] ? this.projects[String(value)] : null;
+                                }
+                            });
+                        }
+                    }"
+                    class="mt-6 space-y-3"
+                >
                     <x-inline-edit-dropdown
                         label="Project"
                         field="projectId"
@@ -735,12 +797,12 @@ new class extends Component
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                                 </svg>
                                 <span
-                                    x-show="selectedValue && projects[String(selectedValue)]"
+                                    x-show="selectedValue && projectNames[String(selectedValue)]"
                                     class="text-blue-600 dark:text-blue-400"
-                                    x-text="projects[String(selectedValue)]"
+                                    x-text="projectNames[String(selectedValue)]"
                                 ></span>
                                 <span
-                                    x-show="!selectedValue || !projects[String(selectedValue)]"
+                                    x-show="!selectedValue || !projectNames[String(selectedValue)]"
                                     class="text-zinc-500 dark:text-zinc-400"
                                 >Not assigned to a project</span>
                             </span>
@@ -769,6 +831,52 @@ new class extends Component
                         @endif
                     </x-slot:options>
                     </x-inline-edit-dropdown>
+
+                    <div
+                        x-show="currentProject"
+                        x-transition:enter="transition ease-out duration-300"
+                        x-transition:enter-start="opacity-0 transform scale-95"
+                        x-transition:enter-end="opacity-100 transform scale-100"
+                        x-transition:leave="transition ease-in duration-200"
+                        x-transition:leave-start="opacity-100 transform scale-100"
+                        x-transition:leave-end="opacity-0 transform scale-95"
+                        class="mt-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/60 px-4 py-3 space-y-1"
+                    >
+                        <div class="flex items-center justify-between gap-2">
+                            <div>
+                                <p class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                                    Project
+                                </p>
+                                <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100" x-text="currentProject?.name"></p>
+                            </div>
+                            <div
+                                x-show="currentProject?.start_datetime || currentProject?.end_datetime"
+                                class="text-xs text-right text-zinc-500 dark:text-zinc-400"
+                            >
+                                <div x-show="currentProject?.start_datetime" x-text="'Starts ' + currentProject.start_datetime"></div>
+                                <div x-show="currentProject?.end_datetime" x-text="'Ends ' + currentProject.end_datetime"></div>
+                            </div>
+                        </div>
+
+                        <p
+                            x-show="currentProject?.description"
+                            class="text-xs text-zinc-600 dark:text-zinc-400 mt-1 line-clamp-2"
+                            x-text="currentProject?.description"
+                        ></p>
+
+                        <div x-show="currentProject?.totalTasks > 0" class="mt-2">
+                            <div class="flex items-center justify-between text-[0.7rem] text-zinc-600 dark:text-zinc-400 mb-1">
+                                <span x-text="currentProject?.completedTasks + ' of ' + currentProject?.totalTasks + ' tasks completed'"></span>
+                                <span class="font-semibold" x-text="currentProject?.progress + '%'"></span>
+                            </div>
+                            <div class="w-full bg-zinc-200 dark:bg-zinc-700 rounded-full h-1.5">
+                                <div
+                                    class="bg-blue-600 dark:bg-blue-500 h-1.5 rounded-full transition-all duration-300"
+                                    :style="'width: ' + (currentProject?.progress || 0) + '%'"
+                                ></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Tags -->

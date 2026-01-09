@@ -3,8 +3,6 @@
 namespace App\Models;
 
 use App\Enums\CollaborationPermission;
-use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -144,93 +142,5 @@ class Project extends Model
             $q->where('user_id', $user->id)
                 ->orWhereHas('collaborations', fn ($q) => $q->where('user_id', $user->id));
         });
-    }
-
-    public function scopeFilterByPriority($query, ?string $priority): Builder
-    {
-        // Projects don't have priority, so this is a no-op for interface consistency
-        return $query;
-    }
-
-    public function scopeFilterByStatus($query, ?string $status): Builder
-    {
-        // Projects don't have status, so this is a no-op for interface consistency
-        return $query;
-    }
-
-    public function scopeDateFilter($query, ?Carbon $date): Builder
-    {
-        if (! $date) {
-            return $query;
-        }
-
-        $targetDate = $date->format('Y-m-d');
-
-        return $query->where(function ($q) use ($targetDate) {
-            $q->where(function ($dateQ) use ($targetDate) {
-                // Items with both start and end datetime
-                $dateQ->where(function ($bothQ) use ($targetDate) {
-                    $bothQ->whereNotNull('start_datetime')
-                        ->whereNotNull('end_datetime')
-                        ->where(function ($subQ) use ($targetDate) {
-                            $subQ->whereDate('start_datetime', $targetDate)
-                                ->orWhereDate('end_datetime', $targetDate)
-                                ->orWhere(function ($spanQ) use ($targetDate) {
-                                    $spanQ->whereDate('start_datetime', '<=', $targetDate)
-                                        ->whereDate('end_datetime', '>=', $targetDate);
-                                });
-                        });
-                })
-                // Items with only end_datetime (due date) - show on all days up to and including due date
-                    ->orWhere(function ($endOnlyQ) use ($targetDate) {
-                        $endOnlyQ->whereNull('start_datetime')
-                            ->whereNotNull('end_datetime')
-                            ->whereDate('end_datetime', '>=', $targetDate);
-                    })
-                // Items with only start_datetime - show from start date onwards
-                    ->orWhere(function ($startOnlyQ) use ($targetDate) {
-                        $startOnlyQ->whereNotNull('start_datetime')
-                            ->whereNull('end_datetime')
-                            ->whereDate('start_datetime', '<=', $targetDate);
-                    });
-            });
-        });
-    }
-
-    public function scopeSortByCreatedAt($query, string $direction = 'desc'): Builder
-    {
-        return $query->orderBy('created_at', $direction);
-    }
-
-    public function scopeSortByStartDatetime($query, string $direction = 'asc'): Builder
-    {
-        return $query->orderBy('start_datetime', $direction);
-    }
-
-    public function scopeSortByEndDatetime($query, string $direction = 'asc'): Builder
-    {
-        return $query->orderBy('end_datetime', $direction);
-    }
-
-    public function scopeSortByName($query, string $direction = 'asc'): Builder
-    {
-        return $query->orderBy('name', $direction);
-    }
-
-    public function scopeOrderByField($query, ?string $field, string $direction = 'asc'): Builder
-    {
-        if (! $field) {
-            return $query->orderBy('created_at', 'desc');
-        }
-
-        return match ($field) {
-            'created_at' => $query->orderBy('created_at', $direction),
-            'start_datetime' => $query->orderBy('start_datetime', $direction),
-            'end_datetime' => $query->orderBy('end_datetime', $direction),
-            'title' => $query->orderBy('name', $direction), // Map to name for projects
-            'status' => $query->orderBy('created_at', 'desc'), // Projects don't have status
-            'priority' => $query->orderBy('created_at', 'desc'), // Projects don't have priority
-            default => $query->orderBy('created_at', 'desc'),
-        };
     }
 }

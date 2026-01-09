@@ -294,13 +294,17 @@ new class extends Component
                         :class="!inputValue.trim() ? 'opacity-50 cursor-not-allowed' : ''"
                         class="px-6 py-4 rounded-full bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-medium transition-colors flex items-center justify-center gap-2 whitespace-nowrap disabled:bg-zinc-400 dark:disabled:bg-zinc-600 disabled:hover:bg-zinc-400 dark:disabled:hover:bg-zinc-600"
                     >
-                        <span x-text="activeTab === 'task' ? 'Create Task' : (activeTab === 'event' ? 'Create Event' : 'Create Project')"></span>
+                        <span class="sm:hidden">+</span>
+                        <span
+                            class="hidden sm:inline"
+                            x-text="activeTab === 'task' ? 'Create Task' : (activeTab === 'event' ? 'Create Event' : 'Create Project')"
+                        ></span>
                     </button>
                 </div>
             </div>
 
             <!-- Bottom Section: Property Buttons -->
-            <div class="flex flex-wrap gap-2" @click.stop>
+            <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap" @click.stop>
                 <template x-if="activeTab === 'task'">
                     <div class="contents">
                     <!-- Task Priority -->

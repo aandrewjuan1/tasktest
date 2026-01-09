@@ -30,13 +30,6 @@ new class extends Component {
         $this->event = null;
     }
 
-    public function viewFullDetails(): void
-    {
-        if ($this->event) {
-            $this->dispatch('view-event-detail', id: $this->event->id);
-            $this->closePopover();
-        }
-    }
 }; ?>
 
 <div>
@@ -123,19 +116,12 @@ new class extends Component {
             </div>
 
             <!-- Actions -->
-            <div class="flex gap-2 pt-3 border-t border-zinc-200 dark:border-zinc-700">
-                <flux:button
-                    variant="primary"
-                    size="sm"
-                    wire:click="viewFullDetails"
-                    class="flex-1"
-                >
-                    View Details
-                </flux:button>
+            <div class="flex justify-end pt-3 border-t border-zinc-200 dark:border-zinc-700">
                 <flux:button
                     variant="ghost"
                     size="sm"
                     wire:click="closePopover"
+                    class="flex-1"
                 >
                     Close
                 </flux:button>

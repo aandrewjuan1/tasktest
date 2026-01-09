@@ -165,8 +165,6 @@ new class extends Component
                             <x-workspace.task-card :task="$item" />
                         @elseif($item->item_type === 'event')
                             <x-workspace.event-card :event="$item" />
-                        @elseif($item->item_type === 'project')
-                            <x-workspace.project-card :project="$item" />
                         @endif
                     </div>
                 @endforeach

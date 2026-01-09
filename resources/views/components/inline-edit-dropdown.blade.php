@@ -53,6 +53,16 @@
                     field: '{{ $field }}',
                     value: value,
                 });
+
+                // Notify any listeners in the task detail modal so header
+                // pills and other UI can stay in sync with this dropdown.
+                window.dispatchEvent(new CustomEvent('task-detail-field-updated', {
+                    detail: {
+                        field: '{{ $field }}',
+                        value: value,
+                    }
+                }));
+
                 this.closeDropdown();
             @else
                 $wire.updateField('{{ $field }}', value).then(() => {

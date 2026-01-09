@@ -33,6 +33,14 @@ new class extends Component
     #[Reactive]
     public string $viewMode = 'list';
 
+    public function getSortedItemsProperty(): Collection
+    {
+        return $this->items->sortBy(function ($item) {
+            // Events get priority 0, tasks get priority 1
+            return $item->item_type === 'event' ? 0 : 1;
+        })->values();
+    }
+
     public function mount(
         Collection $items,
         $currentDate = null,
@@ -81,7 +89,7 @@ new class extends Component
                 </svg>
             </button>
 
-            @forelse($items as $item)
+            @forelse($this->sortedItems as $item)
                 <div
                     wire:key="list-item-{{ $item->item_type }}-{{ $item->id }}"
                 >
@@ -89,8 +97,6 @@ new class extends Component
                         <x-workspace.task-card :task="$item" />
                     @elseif($item->item_type === 'event')
                         <x-workspace.event-card :event="$item" />
-                    @elseif($item->item_type === 'project')
-                        <x-workspace.project-card :project="$item" />
                     @endif
                 </div>
             @empty

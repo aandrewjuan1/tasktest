@@ -38,10 +38,8 @@ class extends Component {
         </div>
     </div>
 
-    <!-- Detail View Modals -->
+    <!-- Detail View Modal -->
     <livewire:workspace.show-task-detail wire:key="workspace-task-detail" />
-    <livewire:workspace.show-event-detail wire:key="workspace-event-detail" />
-    <livewire:workspace.show-project-detail wire:key="workspace-project-detail" />
 
     <!-- Calendar Event Popover -->
     <livewire:workspace.calendar-event-popover />

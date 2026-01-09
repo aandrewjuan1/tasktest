@@ -1001,7 +1001,7 @@ new class extends Component
 
         $query = Task::query()
             ->accessibleBy($user)
-            ->with(['project', 'tags', 'event']);
+            ->with(['project.tasks', 'tags', 'event']);
 
         // Apply filters
         if ($this->filterType === 'task' || !$this->filterType || $this->filterType === 'all') {
@@ -1097,57 +1097,6 @@ new class extends Component
     }
 
     #[Computed]
-    public function filteredProjects(): Collection
-    {
-        $user = auth()->user();
-
-        $query = Project::query()
-            ->accessibleBy($user)
-            ->with(['tags', 'tasks']);
-
-        // Apply filters
-        if ($this->filterType === 'project' || !$this->filterType || $this->filterType === 'all') {
-            // Only apply filters if we're showing projects or all items
-            if ($this->filterPriority) {
-                $query->filterByPriority($this->filterPriority);
-            }
-            if ($this->filterStatus) {
-                $query->filterByStatus($this->filterStatus);
-            }
-            if (! empty($this->filterTagIds)) {
-                $query->whereHas('tags', fn ($q) => $q->whereIn('tags.id', $this->filterTagIds));
-            }
-        } else {
-            // If filtering by type and it's not 'project', return empty collection
-            return collect();
-        }
-
-        // Apply date filter for list/kanban views
-        if (in_array($this->viewMode, ['list', 'kanban']) && $this->currentDate) {
-            $query->dateFilter($this->currentDate);
-        }
-
-        // Apply sorting
-        $query->orderByField($this->sortBy, $this->sortDirection);
-
-        return $query->get()
-            ->filter(function ($project) {
-                // For kanban and weekly views, only show items with at least one date
-                if (in_array($this->viewMode, ['kanban', 'weekly'])) {
-                    return $project->start_datetime || $project->end_datetime;
-                }
-                // For list view, show all items
-                return true;
-            })
-            ->map(function ($project) {
-                $project->item_type = 'project';
-                $project->sort_date = $project->created_at;
-
-                return $project;
-            });
-    }
-
-    #[Computed]
     public function filteredItems(): Collection
     {
         // For weekly view, apply filters and sorting but not date filtering (weekly view handles its own date filtering)
@@ -1216,45 +1165,13 @@ new class extends Component
                     return $event;
                 });
 
-            // Get filtered projects (without date filter)
-            $projectQuery = Project::query()
-                ->accessibleBy($user)
-                ->with(['tags', 'tasks']);
-
-            if ($this->filterType === 'project' || !$this->filterType || $this->filterType === 'all') {
-                if ($this->filterPriority) {
-                    $projectQuery->filterByPriority($this->filterPriority);
-                }
-                if ($this->filterStatus) {
-                    $projectQuery->filterByStatus($this->filterStatus);
-                }
-            if (! empty($this->filterTagIds)) {
-                $projectQuery->whereHas('tags', fn ($q) => $q->whereIn('tags.id', $this->filterTagIds));
-            }
-            } else {
-                $projectQuery->whereRaw('1 = 0'); // Return empty result
-            }
-
-            $projectQuery->orderByField($this->sortBy, $this->sortDirection);
-            $projects = $projectQuery->get()
-                ->filter(function ($project) {
-                    // For weekly view, only show items with at least one date
-                    return $project->start_datetime || $project->end_datetime;
-                })
-                ->map(function ($project) {
-                    $project->item_type = 'project';
-                    $project->sort_date = $project->created_at;
-                    return $project;
-                });
-
-            return collect()->merge($tasks)->merge($events)->merge($projects);
+            return collect()->merge($tasks)->merge($events);
         }
 
         // For list/kanban views, merge filtered collections
         return collect()
             ->merge($this->filteredTasks)
-            ->merge($this->filteredEvents)
-            ->merge($this->filteredProjects);
+            ->merge($this->filteredEvents);
     }
 
     #[Computed]
@@ -1269,7 +1186,6 @@ new class extends Component
         ];
     }
 }; ?>
-
 <div
     wire:key="show-items-component"
     class="space-y-4 px-4"
@@ -1303,7 +1219,6 @@ new class extends Component
     }"
     x-cloak
 >
-
     <!-- Loading Overlay for View Switching -->
     <div
         wire:loading
