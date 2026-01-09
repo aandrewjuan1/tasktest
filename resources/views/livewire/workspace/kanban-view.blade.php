@@ -141,7 +141,10 @@ new class extends Component
             </h3>
 
             <div class="space-y-3" aria-live="polite">
-                @foreach(collect($this->itemsByStatus[$status] ?? []) as $item)
+                @foreach(collect($this->itemsByStatus[$status] ?? [])->sortBy(function ($item) {
+                    // Events get priority 0, tasks get priority 1
+                    return $item->item_type === 'event' ? 0 : 1;
+                })->values() as $item)
                     <div
                         wire:key="item-{{ $item->item_type }}-{{ $item->id }}"
                         draggable="true"
@@ -162,9 +165,9 @@ new class extends Component
                         class="cursor-move relative transition-all"
                     >
                         @if($item->item_type === 'task')
-                            <x-workspace.task-card :task="$item" />
+                            <x-workspace.task-kanban-card :task="$item" />
                         @elseif($item->item_type === 'event')
-                            <x-workspace.event-card :event="$item" />
+                            <x-workspace.event-kanban-card :event="$item" />
                         @endif
                     </div>
                 @endforeach

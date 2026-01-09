@@ -1,0 +1,60 @@
+@props(['event'])
+
+<div
+    class="bg-white dark:bg-zinc-800 rounded-lg border border-blue-300 dark:border-blue-600 p-3 cursor-pointer transition-all flex items-center gap-2 sm:gap-3 flex-wrap"
+    wire:click="$dispatch('view-event-detail', { id: {{ $event->id }} })"
+    role="button"
+    tabindex="0"
+    aria-label="View event details: {{ $event->title }}"
+>
+    <h3 class="font-semibold text-zinc-900 dark:text-zinc-100 text-xs sm:text-sm leading-tight truncate flex-1 min-w-0 basis-full sm:basis-auto">
+        {{ $event->title }}
+    </h3>
+
+    @if($event->start_datetime || $event->end_datetime)
+        <div class="flex items-center gap-2 sm:gap-3 text-xs text-zinc-600 dark:text-zinc-400 flex-shrink-0">
+            @if($event->start_datetime)
+                <div class="flex items-center gap-1 sm:gap-1.5">
+                    <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0 text-zinc-400 dark:text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span class="whitespace-nowrap hidden sm:inline">{{ $event->start_datetime->format('M j, g:i A') }}</span>
+                    <span class="whitespace-nowrap sm:hidden">{{ $event->start_datetime->format('M j') }}</span>
+                </div>
+            @endif
+
+            @if($event->end_datetime)
+                <div class="flex items-center gap-1 sm:gap-1.5">
+                    <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0 text-zinc-400 dark:text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span class="whitespace-nowrap hidden sm:inline">{{ $event->end_datetime->format('M j, g:i A') }}</span>
+                    <span class="whitespace-nowrap sm:hidden">{{ $event->end_datetime->format('M j') }}</span>
+                </div>
+            @endif
+        </div>
+    @endif
+
+    <div class="flex items-center gap-2 flex-shrink-0">
+        <span class="inline-flex items-center px-1.5 sm:px-2 py-0.5 text-xs font-medium rounded-md bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
+            Event
+        </span>
+    </div>
+
+    @if($event->tags->isNotEmpty())
+        <div class="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+            @foreach($event->tags->take(2) as $tag)
+                <span
+                    class="inline-flex items-center px-1 sm:px-1.5 py-0.5 text-xs rounded-md bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300"
+                >
+                    {{ $tag->name }}
+                </span>
+            @endforeach
+            @if($event->tags->count() > 2)
+                <span class="inline-flex items-center px-1 sm:px-1.5 py-0.5 text-xs rounded-md bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400">
+                    +{{ $event->tags->count() - 2 }}
+                </span>
+            @endif
+        </div>
+    @endif
+</div>
