@@ -410,16 +410,16 @@ new class extends Component
                         </x-slot:options>
                     </x-inline-create-dropdown>
 
-                    <!-- Task Start Date & Time -->
+                    <!-- Task Start Date -->
                     <x-workspace.inline-date-picker
-                        label="Start Date & Time"
+                        label="Start Date"
                         model="formData.task.startDatetime"
                         type="datetime-local"
                     />
 
-                    <!-- Task End Date & Time -->
+                    <!-- Task Due Date -->
                     <x-workspace.inline-date-picker
-                        label="End Date & Time"
+                        label="Due Date"
                         model="formData.task.endDatetime"
                         type="datetime-local"
                     />
@@ -510,16 +510,16 @@ new class extends Component
                         </x-slot:options>
                     </x-inline-create-dropdown>
 
-                    <!-- Event Start Date & Time -->
+                    <!-- Event Start Date -->
                     <x-workspace.inline-date-picker
-                        label="Start Date & Time"
+                        label="Start Date"
                         model="formData.event.startDatetime"
                         type="datetime-local"
                     />
 
-                    <!-- Event End Date & Time -->
+                    <!-- Event End Date -->
                     <x-workspace.inline-date-picker
-                        label="End Date & Time"
+                        label="End Date"
                         model="formData.event.endDatetime"
                         type="datetime-local"
                     />
@@ -530,16 +530,16 @@ new class extends Component
                 </template>
                 <template x-if="activeTab === 'project'">
                     <div class="contents">
-                        <!-- Project Start Date & Time -->
+                        <!-- Project Start Date -->
                     <x-workspace.inline-date-picker
-                        label="Start Date & Time"
+                        label="Start Date"
                         model="formData.project.startDatetime"
                         type="datetime-local"
                     />
 
-                        <!-- Project End Date & Time -->
+                        <!-- Project End Date -->
                     <x-workspace.inline-date-picker
-                        label="End Date & Time"
+                        label="End Date"
                         model="formData.project.endDatetime"
                         type="datetime-local"
                     />
