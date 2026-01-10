@@ -115,8 +115,13 @@ new class extends Component
             tagIds: []
         }
     },
-    openModal() {
+    openModal(status = null) {
         this.activeTab = 'task';
+        if (status && ['to_do', 'doing', 'done'].includes(status)) {
+            this.formData.task.status = status;
+        } else {
+            this.formData.task.status = 'to_do';
+        }
         this.isOpen = true;
         document.body.style.overflow = 'hidden';
     },
@@ -217,7 +222,7 @@ new class extends Component
     },
     availableProjects: {{ json_encode($this->availableProjects->map(fn($p) => ['id' => $p->id, 'name' => $p->name])->values()) }}
 }"
-     @open-create-modal.window="openModal()"
+     @open-create-modal.window="openModal($event.detail?.status)"
      @close-create-modal.window="closeModal()"
      @item-created.window="resetFormData()"
      @select-tag.window="toggleTag($event.detail.tagId, $event.detail.type)"
