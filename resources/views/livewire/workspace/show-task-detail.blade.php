@@ -100,7 +100,7 @@ new class extends Component
 <div wire:key="task-detail-modal">
     <flux:modal
         wire:model="isOpen"
-        class="w-full max-w-lg sm:max-w-2xl mx-4 sm:mx-0 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl bg-white/95 dark:bg-zinc-900/95"
+        class="w-full max-w-lg sm:max-w-2xl border border-zinc-200 dark:border-zinc-800 shadow-xl bg-white/95 dark:bg-zinc-900/95"
         variant="flyout"
         closeable="false"
     >
@@ -113,6 +113,17 @@ new class extends Component
                              editing: false,
                              originalValue: @js($task->title),
                              currentValue: @js($task->title),
+                             init() {
+                                 // Listen for backend updates
+                                 window.addEventListener('task-detail-field-updated', (event) => {
+                                     const { field, value } = event.detail || {};
+                                     if (field === 'title') {
+                                         this.originalValue = value ?? '';
+                                         this.currentValue = value ?? '';
+                                         $wire.title = value ?? '';
+                                     }
+                                 });
+                             },
                              startEditing() {
                                  this.editing = true;
                                  this.currentValue = this.originalValue;
@@ -121,6 +132,7 @@ new class extends Component
                              },
                              save() {
                                  if (this.currentValue !== this.originalValue) {
+                                     this.originalValue = this.currentValue;
                                      this.editing = false;
 
                                      $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
@@ -128,6 +140,14 @@ new class extends Component
                                          field: 'title',
                                          value: this.currentValue,
                                      });
+
+                                     // Notify listeners so UI stays in sync
+                                     window.dispatchEvent(new CustomEvent('task-detail-field-updated', {
+                                         detail: {
+                                             field: 'title',
+                                             value: this.currentValue,
+                                         }
+                                     }));
                                  } else {
                                      this.editing = false;
                                  }
@@ -169,18 +189,15 @@ new class extends Component
                                         required
                                     />
                                 </div>
-                                <div class="flex items-center gap-2 pt-6">
+                                <div class="flex items-center pt-6">
                                     <button
                                         @click="save()"
-                                        class="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg transition-colors"
+                                        class="p-2 text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg transition-colors"
+                                        type="button"
                                     >
-                                        Done
-                                    </button>
-                                    <button
-                                        @click="cancel()"
-                                        class="px-3 py-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg transition-colors"
-                                    >
-                                        Cancel
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                        </svg>
                                     </button>
                                 </div>
                             </div>
@@ -275,6 +292,17 @@ new class extends Component
                          editing: false,
                          originalValue: @js($task->description ?? ''),
                          currentValue: @js($task->description ?? ''),
+                         init() {
+                             // Listen for backend updates
+                             window.addEventListener('task-detail-field-updated', (event) => {
+                                 const { field, value } = event.detail || {};
+                                 if (field === 'description') {
+                                     this.originalValue = value ?? '';
+                                     this.currentValue = value ?? '';
+                                     $wire.description = value ?? '';
+                                 }
+                             });
+                         },
                          startEditing() {
                              this.editing = true;
                              this.currentValue = this.originalValue;
@@ -283,6 +311,7 @@ new class extends Component
                          },
                          save() {
                              if (this.currentValue !== this.originalValue) {
+                                this.originalValue = this.currentValue;
                                 this.editing = false;
 
                                 $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
@@ -290,6 +319,14 @@ new class extends Component
                                     field: 'description',
                                     value: this.currentValue,
                                 });
+
+                                // Notify listeners so UI stays in sync
+                                window.dispatchEvent(new CustomEvent('task-detail-field-updated', {
+                                    detail: {
+                                        field: 'description',
+                                        value: this.currentValue,
+                                    }
+                                }));
                              } else {
                                  this.editing = false;
                              }
@@ -332,18 +369,15 @@ new class extends Component
                             @keydown.escape="cancel()"
                             rows="4"
                         />
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center">
                             <button
                                 @click="save()"
-                                class="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg transition-colors"
+                                class="p-2 text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg transition-colors"
+                                type="button"
                             >
-                                Done
-                            </button>
-                            <button
-                                @click="cancel()"
-                                class="px-3 py-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg transition-colors"
-                            >
-                                Cancel
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                </svg>
                             </button>
                         </div>
                         @error('description')
@@ -539,6 +573,40 @@ new class extends Component
                              originalValue: @js($task->start_datetime?->format('Y-m-d\TH:i') ?? ''),
                              currentValue: @js($task->start_datetime?->format('Y-m-d\TH:i') ?? ''),
                              mouseLeaveTimer: null,
+                             formatDisplayDate(datetimeString) {
+                                 if (!datetimeString) return 'Not set';
+                                 try {
+                                     const date = new Date(datetimeString);
+                                     if (isNaN(date.getTime())) return 'Not set';
+                                     // Format: MMM D, YYYY at H:MM AM/PM (matching PHP format 'M j, Y \a\t g:i A')
+                                     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                                     const month = months[date.getMonth()];
+                                     const day = date.getDate();
+                                     const year = date.getFullYear();
+                                     let hours = date.getHours();
+                                     const minutes = date.getMinutes().toString().padStart(2, '0');
+                                     const ampm = hours >= 12 ? 'PM' : 'AM';
+                                     hours = hours % 12;
+                                     hours = hours ? hours : 12; // 0 should be 12
+                                     return `${month} ${day}, ${year} at ${hours}:${minutes} ${ampm}`;
+                                 } catch (e) {
+                                     return 'Not set';
+                                 }
+                             },
+                             get displayValue() {
+                                 return this.formatDisplayDate(this.originalValue);
+                             },
+                             init() {
+                                 // Listen for backend updates
+                                 window.addEventListener('task-detail-field-updated', (event) => {
+                                     const { field, value } = event.detail || {};
+                                     if (field === 'startDatetime') {
+                                         this.originalValue = value ?? '';
+                                         this.currentValue = value ?? '';
+                                         $wire.startDatetime = value ?? '';
+                                     }
+                                 });
+                             },
                              startEditing() {
                                  this.editing = true;
                                  this.currentValue = this.originalValue;
@@ -572,6 +640,7 @@ new class extends Component
                                      this.mouseLeaveTimer = null;
                                  }
                                  if (this.currentValue !== this.originalValue) {
+                                    this.originalValue = this.currentValue;
                                     this.editing = false;
 
                                     $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
@@ -579,6 +648,14 @@ new class extends Component
                                         field: 'startDatetime',
                                         value: this.currentValue,
                                     });
+
+                                    // Notify listeners so UI stays in sync
+                                    window.dispatchEvent(new CustomEvent('task-detail-field-updated', {
+                                        detail: {
+                                            field: 'startDatetime',
+                                            value: this.currentValue,
+                                        }
+                                    }));
                                  } else {
                                      this.editing = false;
                                  }
@@ -620,16 +697,7 @@ new class extends Component
                             @enderror
                         </div>
                         <div x-show="!editing">
-                            <p class="text-sm text-zinc-700 dark:text-zinc-300 mt-2 font-medium">
-                                @if($task->start_datetime)
-                                    @php
-                                        $manilaTime = $task->start_datetime->setTimezone('Asia/Manila');
-                                    @endphp
-                                    {{ $manilaTime->format('M j, Y \a\t g:i A') }}
-                                @else
-                                    Not set
-                                @endif
-                            </p>
+                            <p class="text-sm text-zinc-700 dark:text-zinc-300 mt-2 font-medium" x-text="displayValue"></p>
                         </div>
                     </div>
 
@@ -640,6 +708,53 @@ new class extends Component
                              originalValue: @js($task->end_datetime?->format('Y-m-d\TH:i') ?? ''),
                              currentValue: @js($task->end_datetime?->format('Y-m-d\TH:i') ?? ''),
                              mouseLeaveTimer: null,
+                             formatDisplayDate(datetimeString) {
+                                 if (!datetimeString) return 'Not set';
+                                 try {
+                                     const date = new Date(datetimeString);
+                                     if (isNaN(date.getTime())) return 'Not set';
+                                     // Format: MMM D, YYYY at H:MM AM/PM (matching PHP format 'M j, Y \a\t g:i A')
+                                     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                                     const month = months[date.getMonth()];
+                                     const day = date.getDate();
+                                     const year = date.getFullYear();
+                                     let hours = date.getHours();
+                                     const minutes = date.getMinutes().toString().padStart(2, '0');
+                                     const ampm = hours >= 12 ? 'PM' : 'AM';
+                                     hours = hours % 12;
+                                     hours = hours ? hours : 12; // 0 should be 12
+                                     return `${month} ${day}, ${year} at ${hours}:${minutes} ${ampm}`;
+                                 } catch (e) {
+                                     return 'Not set';
+                                 }
+                             },
+                             isPast(datetimeString) {
+                                 if (!datetimeString) return false;
+                                 try {
+                                     const date = new Date(datetimeString);
+                                     if (isNaN(date.getTime())) return false;
+                                     return date < new Date();
+                                 } catch (e) {
+                                     return false;
+                                 }
+                             },
+                             get displayValue() {
+                                 return this.formatDisplayDate(this.originalValue);
+                             },
+                             get isOverdue() {
+                                 return this.isPast(this.originalValue);
+                             },
+                             init() {
+                                 // Listen for backend updates
+                                 window.addEventListener('task-detail-field-updated', (event) => {
+                                     const { field, value } = event.detail || {};
+                                     if (field === 'endDatetime') {
+                                         this.originalValue = value ?? '';
+                                         this.currentValue = value ?? '';
+                                         $wire.endDatetime = value ?? '';
+                                     }
+                                 });
+                             },
                              startEditing() {
                                  this.editing = true;
                                  this.currentValue = this.originalValue;
@@ -673,6 +788,7 @@ new class extends Component
                                      this.mouseLeaveTimer = null;
                                  }
                                  if (this.currentValue !== this.originalValue) {
+                                    this.originalValue = this.currentValue;
                                     this.editing = false;
 
                                     $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
@@ -680,6 +796,14 @@ new class extends Component
                                         field: 'endDatetime',
                                         value: this.currentValue,
                                     });
+
+                                    // Notify listeners so UI stays in sync
+                                    window.dispatchEvent(new CustomEvent('task-detail-field-updated', {
+                                        detail: {
+                                            field: 'endDatetime',
+                                            value: this.currentValue,
+                                        }
+                                    }));
                                  } else {
                                      this.editing = false;
                                  }
@@ -721,16 +845,11 @@ new class extends Component
                             @enderror
                         </div>
                         <div x-show="!editing">
-                            <p class="text-sm mt-2 {{ $task->end_datetime?->isPast() && $task->status->value !== 'done' ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-zinc-700 dark:text-zinc-300 font-medium' }}">
-                                @if($task->end_datetime)
-                                    @php
-                                        $manilaTime = $task->end_datetime->setTimezone('Asia/Manila');
-                                    @endphp
-                                    {{ $manilaTime->format('M j, Y \a\t g:i A') }}
-                                @else
-                                    Not set
-                                @endif
-                            </p>
+                            <p
+                                class="text-sm mt-2 font-medium"
+                                :class="isOverdue && @js($task->status?->value ?? 'to_do') !== 'done' ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-zinc-700 dark:text-zinc-300'"
+                                x-text="displayValue"
+                            ></p>
                         </div>
                     </div>
                     </div>
