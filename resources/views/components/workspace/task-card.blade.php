@@ -9,46 +9,29 @@
 >
     {{-- Header Section --}}
     <div class="mb-4">
-        {{-- First Row: Buttons, Title, and Badges --}}
+        {{-- First Row: Title, Status Buttons, and Badges --}}
         <div class="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-2">
-            @if($task->status)
-                <div class="flex items-center gap-0.5 flex-shrink-0 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-md p-0.5" @click.stop>
-                @php
-                    $currentStatus = $task->status->value;
-                    $availableStatuses = match($currentStatus) {
-                        'to_do' => [
-                            ['status' => 'doing', 'icon' => 'play', 'tooltip' => 'Mark as In Progress'],
-                            ['status' => 'done', 'icon' => 'check', 'tooltip' => 'Mark as Done'],
-                        ],
-                        'doing' => [
-                            ['status' => 'to_do', 'icon' => 'arrow-down-circle', 'tooltip' => 'Mark as To Do'],
-                            ['status' => 'done', 'icon' => 'check', 'tooltip' => 'Mark as Done'],
-                        ],
-                        'done' => [
-                            ['status' => 'to_do', 'icon' => 'arrow-down-circle', 'tooltip' => 'Mark as To Do'],
-                            ['status' => 'doing', 'icon' => 'play', 'tooltip' => 'Mark as In Progress'],
-                        ],
-                        default => [],
-                    };
-                @endphp
-                @foreach($availableStatuses as $statusOption)
-                    <flux:button
-                        variant="ghost"
-                        size="xs"
-                        icon="{{ $statusOption['icon'] }}"
-                        tooltip="{{ $statusOption['tooltip'] }}"
-                        @click="$dispatch('update-item-status', { itemId: {{ $task->id }}, itemType: 'task', newStatus: '{{ $statusOption['status'] }}' })"
-                        class="!p-0.5 !w-5 !h-5 hover:bg-blue-50 dark:hover:bg-blue-900 rounded"
-                    />
-                @endforeach
-                </div>
-            @endif
-
-            <h3 class="font-semibold text-zinc-900 dark:text-zinc-100 text-base sm:text-lg lg:text-xl leading-tight line-clamp-2 flex-1 min-w-0">
-                {{ $task->title }}
+            <h3 class="font-semibold text-zinc-900 dark:text-zinc-100 text-base sm:text-lg lg:text-xl leading-tight flex-1 min-w-0 flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                <span class="line-clamp-2">{{ $task->title }}</span>
+                @if($task->tags->isNotEmpty())
+                    <span class="flex items-center gap-0.5 sm:gap-1 flex-shrink-0" @click.stop>
+                        @foreach($task->tags->take(3) as $tag)
+                            <span
+                                class="inline-flex items-center px-0.5 sm:px-1 py-0 text-[10px] sm:text-xs rounded bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400"
+                            >
+                                {{ $tag->name }}
+                            </span>
+                        @endforeach
+                        @if($task->tags->count() > 3)
+                            <span class="inline-flex items-center px-0.5 sm:px-1 py-0 text-[10px] sm:text-xs rounded bg-zinc-100 text-zinc-500 dark:bg-zinc-700 dark:text-zinc-500">
+                                +{{ $task->tags->count() - 3 }}
+                            </span>
+                        @endif
+                    </span>
+                @endif
             </h3>
 
-            <div class="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+            <div class="flex items-center gap-1.5 sm:gap-2 flex-shrink-0" @click.stop>
                 <span class="inline-flex items-center px-1.5 sm:px-2.5 py-0.5 sm:py-1 text-xs font-medium rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
                     Task
                 </span>
@@ -62,6 +45,39 @@
                             'done' => 'Done',
                         } }}
                     </span>
+                @endif
+
+                @if($task->status)
+                    <div class="flex items-center gap-0.5 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-md p-0.5">
+                    @php
+                        $currentStatus = $task->status->value;
+                        $availableStatuses = match($currentStatus) {
+                            'to_do' => [
+                                ['status' => 'doing', 'icon' => 'play', 'tooltip' => 'Mark as In Progress'],
+                                ['status' => 'done', 'icon' => 'check', 'tooltip' => 'Mark as Done'],
+                            ],
+                            'doing' => [
+                                ['status' => 'to_do', 'icon' => 'arrow-down-circle', 'tooltip' => 'Mark as To Do'],
+                                ['status' => 'done', 'icon' => 'check', 'tooltip' => 'Mark as Done'],
+                            ],
+                            'done' => [
+                                ['status' => 'to_do', 'icon' => 'arrow-down-circle', 'tooltip' => 'Mark as To Do'],
+                                ['status' => 'doing', 'icon' => 'play', 'tooltip' => 'Mark as In Progress'],
+                            ],
+                            default => [],
+                        };
+                    @endphp
+                    @foreach($availableStatuses as $statusOption)
+                        <flux:button
+                            variant="ghost"
+                            size="xs"
+                            icon="{{ $statusOption['icon'] }}"
+                            tooltip="{{ $statusOption['tooltip'] }}"
+                            @click="$dispatch('update-item-status', { itemId: {{ $task->id }}, itemType: 'task', newStatus: '{{ $statusOption['status'] }}' })"
+                            class="!p-0.5 !w-5 !h-5 hover:bg-blue-50 dark:hover:bg-blue-900 rounded"
+                        />
+                    @endforeach
+                    </div>
                 @endif
             </div>
         </div>
@@ -154,21 +170,4 @@
         </div>
     @endif
 
-    {{-- Tags Section --}}
-    @if($task->tags->isNotEmpty())
-        <div class="flex flex-wrap gap-1 sm:gap-1.5 pt-2 sm:pt-3 border-t border-zinc-200 dark:border-zinc-700">
-            @foreach($task->tags->take(3) as $tag)
-                <span
-                    class="inline-flex items-center px-1.5 sm:px-2 py-0.5 text-xs rounded-md bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300"
-                >
-                    {{ $tag->name }}
-                </span>
-            @endforeach
-            @if($task->tags->count() > 3)
-                <span class="inline-flex items-center px-1.5 sm:px-2 py-0.5 text-xs rounded-md bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400">
-                    +{{ $task->tags->count() - 3 }} more
-                </span>
-            @endif
-        </div>
-    @endif
 </div>

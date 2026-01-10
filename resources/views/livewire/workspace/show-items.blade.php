@@ -1034,11 +1034,11 @@ new class extends Component
 
         return $query->get()
             ->filter(function ($task) {
-                // For kanban and weekly views, only show items with at least one date
-                if (in_array($this->viewMode, ['kanban', 'weekly'])) {
+                // For weekly view, only show items with at least one date
+                if ($this->viewMode === 'weekly') {
                     return $task->start_datetime || $task->end_datetime;
                 }
-                // For list view, show all items
+                // For list and kanban views, show all items (including those without dates)
                 return true;
             })
             ->map(function ($task) {
@@ -1085,11 +1085,11 @@ new class extends Component
 
         return $query->get()
             ->filter(function ($event) {
-                // For kanban and weekly views, only show items with at least one date
-                if (in_array($this->viewMode, ['kanban', 'weekly'])) {
+                // For weekly view, only show items with at least one date
+                if ($this->viewMode === 'weekly') {
                     return $event->start_datetime || $event->end_datetime;
                 }
-                // For list view, show all items
+                // For list and kanban views, show all items (including those without dates)
                 return true;
             })
             ->map(function ($event) {

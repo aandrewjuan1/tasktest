@@ -7,57 +7,86 @@
     tabindex="0"
     aria-label="View event details: {{ $event->title }}"
 >
-    {{-- First Row: Buttons and Title --}}
-    <div class="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-        @if($event->status)
-            <div class="flex items-center gap-0.5 flex-shrink-0 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-md p-0.5" @click.stop>
-            @php
-                $currentStatus = $event->status->value;
-                $availableStatuses = match($currentStatus) {
-                    'scheduled' => [
-                        ['status' => 'ongoing', 'icon' => 'play', 'tooltip' => 'Mark as Ongoing'],
-                        ['status' => 'completed', 'icon' => 'check', 'tooltip' => 'Mark as Completed'],
-                        ['status' => 'cancelled', 'icon' => 'archive-box-x-mark', 'tooltip' => 'Mark as Cancelled'],
-                    ],
-                    'ongoing' => [
-                        ['status' => 'scheduled', 'icon' => 'clock', 'tooltip' => 'Mark as Scheduled'],
-                        ['status' => 'completed', 'icon' => 'check', 'tooltip' => 'Mark as Completed'],
-                        ['status' => 'cancelled', 'icon' => 'archive-box-x-mark', 'tooltip' => 'Mark as Cancelled'],
-                    ],
-                    'completed' => [
-                        ['status' => 'scheduled', 'icon' => 'clock', 'tooltip' => 'Mark as Scheduled'],
-                        ['status' => 'ongoing', 'icon' => 'play', 'tooltip' => 'Mark as Ongoing'],
-                        ['status' => 'cancelled', 'icon' => 'archive-box-x-mark', 'tooltip' => 'Mark as Cancelled'],
-                    ],
-                    'cancelled' => [
-                        ['status' => 'scheduled', 'icon' => 'clock', 'tooltip' => 'Mark as Scheduled'],
-                        ['status' => 'ongoing', 'icon' => 'play', 'tooltip' => 'Mark as Ongoing'],
-                        ['status' => 'completed', 'icon' => 'check', 'tooltip' => 'Mark as Completed'],
-                    ],
-                    'tentative' => [
-                        ['status' => 'scheduled', 'icon' => 'clock', 'tooltip' => 'Mark as Scheduled'],
-                        ['status' => 'ongoing', 'icon' => 'play', 'tooltip' => 'Mark as Ongoing'],
-                        ['status' => 'completed', 'icon' => 'check', 'tooltip' => 'Mark as Completed'],
-                    ],
-                    default => [],
-                };
-            @endphp
-            @foreach($availableStatuses as $statusOption)
-                <flux:button
-                    variant="ghost"
-                    size="xs"
-                    icon="{{ $statusOption['icon'] }}"
-                    tooltip="{{ $statusOption['tooltip'] }}"
-                    @click="$dispatch('update-item-status', { itemId: {{ $event->id }}, itemType: 'event', newStatus: '{{ $statusOption['status'] }}' })"
-                    class="!p-0.5 !w-5 !h-5 hover:bg-blue-50 dark:hover:bg-blue-900 rounded"
-                />
-            @endforeach
-            </div>
-        @endif
-
-        <h3 class="font-semibold text-zinc-900 dark:text-zinc-100 text-base sm:text-lg lg:text-xl leading-tight truncate flex-1 min-w-0">
-            {{ $event->title }}
+    {{-- First Row: Title, Tags, Status Buttons, and Badges --}}
+    <div class="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 mb-2 sm:mb-0">
+        <h3 class="font-semibold text-zinc-900 dark:text-zinc-100 text-base sm:text-lg lg:text-xl leading-tight flex-1 min-w-0 flex items-center gap-1.5 sm:gap-2 flex-wrap">
+            <span class="truncate">{{ $event->title }}</span>
+            @if($event->tags->isNotEmpty())
+                <span class="flex items-center gap-0.5 sm:gap-1 flex-shrink-0" @click.stop>
+                    @foreach($event->tags->take(2) as $tag)
+                        <span
+                            class="inline-flex items-center px-0.5 sm:px-1 py-0 text-[10px] sm:text-xs rounded bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400"
+                        >
+                            {{ $tag->name }}
+                        </span>
+                    @endforeach
+                    @if($event->tags->count() > 2)
+                        <span class="inline-flex items-center px-0.5 sm:px-1 py-0 text-[10px] sm:text-xs rounded bg-zinc-100 text-zinc-500 dark:bg-zinc-700 dark:text-zinc-500">
+                            +{{ $event->tags->count() - 2 }}
+                        </span>
+                    @endif
+                </span>
+            @endif
         </h3>
+
+        <div class="flex items-center gap-1.5 sm:gap-2 flex-shrink-0" @click.stop>
+            <span class="inline-flex items-center px-1.5 sm:px-2 py-0.5 text-xs font-medium rounded-md bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
+                Event
+            </span>
+            @if($event->status)
+                <span
+                    class="inline-flex items-center px-1.5 sm:px-2 py-0.5 text-xs font-medium rounded-md {{ $event->status->badgeColor() }}"
+                >
+                    {{ ucfirst($event->status->value) }}
+                </span>
+            @endif
+
+            @if($event->status)
+                <div class="flex items-center gap-0.5 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-md p-0.5">
+                @php
+                    $currentStatus = $event->status->value;
+                    $availableStatuses = match($currentStatus) {
+                        'scheduled' => [
+                            ['status' => 'ongoing', 'icon' => 'play', 'tooltip' => 'Mark as Ongoing'],
+                            ['status' => 'completed', 'icon' => 'check', 'tooltip' => 'Mark as Completed'],
+                            ['status' => 'cancelled', 'icon' => 'archive-box-x-mark', 'tooltip' => 'Mark as Cancelled'],
+                        ],
+                        'ongoing' => [
+                            ['status' => 'scheduled', 'icon' => 'clock', 'tooltip' => 'Mark as Scheduled'],
+                            ['status' => 'completed', 'icon' => 'check', 'tooltip' => 'Mark as Completed'],
+                            ['status' => 'cancelled', 'icon' => 'archive-box-x-mark', 'tooltip' => 'Mark as Cancelled'],
+                        ],
+                        'completed' => [
+                            ['status' => 'scheduled', 'icon' => 'clock', 'tooltip' => 'Mark as Scheduled'],
+                            ['status' => 'ongoing', 'icon' => 'play', 'tooltip' => 'Mark as Ongoing'],
+                            ['status' => 'cancelled', 'icon' => 'archive-box-x-mark', 'tooltip' => 'Mark as Cancelled'],
+                        ],
+                        'cancelled' => [
+                            ['status' => 'scheduled', 'icon' => 'clock', 'tooltip' => 'Mark as Scheduled'],
+                            ['status' => 'ongoing', 'icon' => 'play', 'tooltip' => 'Mark as Ongoing'],
+                            ['status' => 'completed', 'icon' => 'check', 'tooltip' => 'Mark as Completed'],
+                        ],
+                        'tentative' => [
+                            ['status' => 'scheduled', 'icon' => 'clock', 'tooltip' => 'Mark as Scheduled'],
+                            ['status' => 'ongoing', 'icon' => 'play', 'tooltip' => 'Mark as Ongoing'],
+                            ['status' => 'completed', 'icon' => 'check', 'tooltip' => 'Mark as Completed'],
+                        ],
+                        default => [],
+                    };
+                @endphp
+                @foreach($availableStatuses as $statusOption)
+                    <flux:button
+                        variant="ghost"
+                        size="xs"
+                        icon="{{ $statusOption['icon'] }}"
+                        tooltip="{{ $statusOption['tooltip'] }}"
+                        @click="$dispatch('update-item-status', { itemId: {{ $event->id }}, itemType: 'event', newStatus: '{{ $statusOption['status'] }}' })"
+                        class="!p-0.5 !w-5 !h-5 hover:bg-blue-50 dark:hover:bg-blue-900 rounded"
+                    />
+                @endforeach
+                </div>
+            @endif
+        </div>
     </div>
 
     {{-- Second Row on Mobile, Inline on Desktop: Dates, Badges, Tags --}}
@@ -82,36 +111,6 @@
                         <span class="whitespace-nowrap hidden sm:inline">{{ $event->end_datetime->format('M j, g:i A') }}</span>
                         <span class="whitespace-nowrap sm:hidden">{{ $event->end_datetime->format('M j') }}</span>
                     </div>
-                @endif
-            </div>
-        @endif
-
-        <div class="flex items-center gap-1.5 sm:gap-2">
-            <span class="inline-flex items-center px-1.5 sm:px-2 py-0.5 text-xs font-medium rounded-md bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
-                Event
-            </span>
-            @if($event->status)
-                <span
-                    class="inline-flex items-center px-1.5 sm:px-2 py-0.5 text-xs font-medium rounded-md {{ $event->status->badgeColor() }}"
-                >
-                    {{ ucfirst($event->status->value) }}
-                </span>
-            @endif
-        </div>
-
-        @if($event->tags->isNotEmpty())
-            <div class="flex items-center gap-1 sm:gap-1.5">
-                @foreach($event->tags->take(2) as $tag)
-                    <span
-                        class="inline-flex items-center px-1 sm:px-1.5 py-0.5 text-xs rounded-md bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300"
-                    >
-                        {{ $tag->name }}
-                    </span>
-                @endforeach
-                @if($event->tags->count() > 2)
-                    <span class="inline-flex items-center px-1 sm:px-1.5 py-0.5 text-xs rounded-md bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400">
-                        +{{ $event->tags->count() - 2 }}
-                    </span>
                 @endif
             </div>
         @endif
