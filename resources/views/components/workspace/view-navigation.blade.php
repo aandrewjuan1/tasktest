@@ -9,7 +9,7 @@
     'sortDirection' => 'asc',
     'hasActiveFilters' => false,
     'mb' => false, // For kanban view which needs mb-4
-    'noWrapper' => false, // For weekly view which is already inside a container
+    'noWrapper' => false, // For timegrid views which are already inside a container
 ])
 
 @if(!$noWrapper)
@@ -44,12 +44,12 @@
                             </svg>
                         </button>
                     </flux:tooltip>
-                    <flux:tooltip content="Weekly Timegrid View">
+                    <flux:tooltip content="Timegrid View">
                         <button
-                            @click="$wire.$parent.switchView('weekly')"
-                            aria-label="Switch to weekly timegrid view"
-                            aria-pressed="{{ $viewMode === 'weekly' ? 'true' : 'false' }}"
-                            class="px-2 py-1.5 rounded transition-colors {{ $viewMode === 'weekly' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-transparent text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600' }} disabled:opacity-50 disabled:cursor-not-allowed"
+                            @click="$wire.$parent.switchView('daily-timegrid')"
+                            aria-label="Switch to timegrid view"
+                            aria-pressed="{{ in_array($viewMode, ['daily-timegrid', 'weekly-timegrid']) ? 'true' : 'false' }}"
+                            class="px-2 py-1.5 rounded transition-colors {{ in_array($viewMode, ['daily-timegrid', 'weekly-timegrid']) ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-transparent text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600' }} disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -60,9 +60,17 @@
             </div>
 
             <!-- Date/Week Display -->
-            @if($viewMode === 'weekly')
+            @if($viewMode === 'weekly-timegrid' && $weekStartDate)
                 <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
                     {{ $weekStartDate->format('M d') }} - {{ $weekStartDate->copy()->addDays(6)->format('M d, Y') }}
+                </h3>
+            @elseif($viewMode === 'daily-timegrid')
+                <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                    {{ ($currentDate ?? now())->format('M d, Y') }}
+                </h3>
+            @elseif($viewMode === 'weekly')
+                <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                    {{ ($weekStartDate ?? now()->startOfWeek())->format('M d') }} - {{ ($weekStartDate ?? now()->startOfWeek())->copy()->addDays(6)->format('M d, Y') }}
                 </h3>
             @else
                 <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
@@ -71,7 +79,85 @@
             @endif
 
             <!-- Date/Week Navigation -->
-            @if($viewMode === 'weekly')
+            @if($viewMode === 'weekly-timegrid')
+                <div class="flex items-center gap-2" role="group" aria-label="Week navigation">
+                    <flux:button
+                        variant="ghost"
+                        size="sm"
+                        wire:click="goToToday"
+                        wire:loading.attr="disabled"
+                        wire:target="goToToday,previousWeek,nextWeek"
+                        aria-label="Go to current week"
+                    >
+                        <span wire:loading.remove wire:target="goToToday,previousWeek,nextWeek">Today</span>
+                        <span wire:loading wire:target="goToToday,previousWeek,nextWeek">
+                            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </span>
+                    </flux:button>
+                    <flux:button
+                        variant="ghost"
+                        size="sm"
+                        icon="chevron-left"
+                        wire:click="previousWeek"
+                        wire:loading.attr="disabled"
+                        wire:target="goToToday,previousWeek,nextWeek"
+                        aria-label="Previous week"
+                    >
+                    </flux:button>
+                    <flux:button
+                        variant="ghost"
+                        size="sm"
+                        icon="chevron-right"
+                        wire:click="nextWeek"
+                        wire:loading.attr="disabled"
+                        wire:target="goToToday,previousWeek,nextWeek"
+                        aria-label="Next week"
+                    >
+                    </flux:button>
+                </div>
+            @elseif($viewMode === 'daily-timegrid')
+                <div class="flex items-center gap-2" role="group" aria-label="Date navigation">
+                    <flux:button
+                        variant="ghost"
+                        size="sm"
+                        wire:click="goToToday"
+                        wire:loading.attr="disabled"
+                        wire:target="goToToday,previousDay,nextDay"
+                        aria-label="Go to today"
+                    >
+                        <span wire:loading.remove wire:target="goToToday,previousDay,nextDay">Today</span>
+                        <span wire:loading wire:target="goToToday,previousDay,nextDay">
+                            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </span>
+                    </flux:button>
+                    <flux:button
+                        variant="ghost"
+                        size="sm"
+                        icon="chevron-left"
+                        wire:click="previousDay"
+                        wire:loading.attr="disabled"
+                        wire:target="goToToday,previousDay,nextDay"
+                        aria-label="Previous day"
+                    >
+                    </flux:button>
+                    <flux:button
+                        variant="ghost"
+                        size="sm"
+                        icon="chevron-right"
+                        wire:click="nextDay"
+                        wire:loading.attr="disabled"
+                        wire:target="goToToday,previousDay,nextDay"
+                        aria-label="Next day"
+                    >
+                    </flux:button>
+                </div>
+            @elseif($viewMode === 'weekly')
                 <div class="flex items-center gap-2" role="group" aria-label="Week navigation">
                     <flux:button
                         variant="ghost"

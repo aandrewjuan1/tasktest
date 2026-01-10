@@ -15,7 +15,7 @@ new class extends Component
     public ?Carbon $weekStartDate = null;
 
     #[Reactive]
-    public string $viewMode = 'weekly';
+    public string $viewMode = 'weekly-timegrid';
 
     #[Reactive]
     public ?string $filterType = null;
@@ -46,7 +46,7 @@ new class extends Component
     public function mount(
         Collection $items,
         ?Carbon $weekStartDate = null,
-        string $viewMode = 'weekly',
+        string $viewMode = 'weekly-timegrid',
         ?string $filterType = null,
         ?string $filterPriority = null,
         ?string $filterStatus = null,
@@ -65,22 +65,26 @@ new class extends Component
         $this->hasActiveFilters = $hasActiveFilters;
     }
 
+    public function switchToDaily(): void
+    {
+        $this->dispatch('switch-to-daily-timegrid');
+    }
+
     public function previousWeek(): void
     {
         $newWeekStart = $this->weekStartDate->copy()->subWeek();
-        $this->dispatch('switch-to-week-view', weekStart: $newWeekStart->format('Y-m-d'));
+        $this->dispatch('switch-to-weekly-timegrid', weekStart: $newWeekStart->format('Y-m-d'));
     }
 
     public function nextWeek(): void
     {
         $newWeekStart = $this->weekStartDate->copy()->addWeek();
-        $this->dispatch('switch-to-week-view', weekStart: $newWeekStart->format('Y-m-d'));
+        $this->dispatch('switch-to-weekly-timegrid', weekStart: $newWeekStart->format('Y-m-d'));
     }
 
     public function goToToday(): void
     {
-        $newWeekStart = now()->startOfWeek();
-        $this->dispatch('switch-to-week-view', weekStart: $newWeekStart->format('Y-m-d'));
+        $this->dispatch('switch-to-weekly-timegrid', weekStart: now()->startOfWeek()->format('Y-m-d'));
     }
 
     #[Computed]
@@ -98,11 +102,12 @@ new class extends Component
     }
 
     #[Computed]
-    public function weeklyItems(): array
+    public function timegridItems(): array
     {
         $itemsByDay = [];
+        $days = $this->weekDays;
 
-        foreach ($this->weekDays as $day) {
+        foreach ($days as $day) {
             $dateKey = $day->format('Y-m-d');
             $itemsByDay[$dateKey] = [
                 'timed' => collect(),
@@ -125,7 +130,7 @@ new class extends Component
             $startDate = $startDateTime->copy()->startOfDay();
 
             // Only show tasks on their start date
-            foreach ($this->weekDays as $day) {
+            foreach ($days as $day) {
                 $dayStart = $day->copy()->startOfDay();
 
                 // Check if this day matches the start date
@@ -233,8 +238,9 @@ new class extends Component
     public function dueDateIndicators(): array
     {
         $indicatorsByDay = [];
+        $days = $this->weekDays;
 
-        foreach ($this->weekDays as $day) {
+        foreach ($days as $day) {
             $dateKey = $day->format('Y-m-d');
             $indicatorsByDay[$dateKey] = collect();
         }
@@ -249,8 +255,8 @@ new class extends Component
             $endDateTime = Carbon::parse($item->end_datetime);
             $endDate = $endDateTime->copy()->startOfDay();
 
-            // Check if the due date falls within the week
-            foreach ($this->weekDays as $day) {
+            // Check if the due date falls within the active days
+            foreach ($days as $day) {
                 $dayStart = $day->copy()->startOfDay();
                 $dayEnd = $day->copy()->endOfDay();
 
@@ -264,8 +270,6 @@ new class extends Component
                         $dueMinute = $endDateTime->minute;
 
                         // Calculate position: 1 hour before due time to due time
-                        // Example: 10pm due time = 9pm to 10pm (1 hour span)
-                        // For 10:30pm, it should span from 9:30pm to 10:30pm
                         $indicatorStartDateTime = $endDateTime->copy()->subHour();
                         $indicatorStartHour = $indicatorStartDateTime->hour;
                         $indicatorStartMinute = $indicatorStartDateTime->minute;
@@ -316,7 +320,37 @@ new class extends Component
         no-wrapper
     />
 
-    <!-- Weekly Calendar Grid -->
+    <!-- Timegrid Mode Toggle -->
+    <div class="p-4 border-b border-zinc-200 dark:border-zinc-700">
+        <div class="flex items-center justify-center gap-2">
+            <div class="bg-zinc-50 dark:bg-zinc-900/50 rounded-lg border border-zinc-200 dark:border-zinc-700 p-1">
+                <div class="flex gap-1" role="group" aria-label="Timegrid mode selection">
+                    <flux:tooltip content="Day View">
+                        <button
+                            wire:click="switchToDaily"
+                            aria-label="Switch to day view"
+                            aria-pressed="false"
+                            class="px-3 py-1.5 rounded transition-colors bg-transparent text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600"
+                        >
+                            Day
+                        </button>
+                    </flux:tooltip>
+                    <flux:tooltip content="Week View">
+                        <button
+                            aria-label="Week view (current)"
+                            aria-pressed="true"
+                            class="px-3 py-1.5 rounded transition-colors bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+                            disabled
+                        >
+                            Week
+                        </button>
+                    </flux:tooltip>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Weekly Timegrid Calendar Grid -->
     <div class="overflow-x-auto">
         <div class="min-w-[800px]">
             <!-- Day Headers -->
@@ -351,7 +385,7 @@ new class extends Component
                 @foreach($this->weekDays as $day)
                     @php
                         $dateKey = $day->format('Y-m-d');
-                        $timedItems = $this->weeklyItems[$dateKey]['timed'] ?? collect();
+                        $timedItems = $this->timegridItems[$dateKey]['timed'] ?? collect();
                         $isToday = $day->isToday();
                     @endphp
                     <div wire:key="day-column-{{ $dateKey }}" class="relative border-r border-zinc-200 dark:border-zinc-700 {{ $isToday ? 'bg-blue-50 dark:bg-blue-950/20' : '' }}"

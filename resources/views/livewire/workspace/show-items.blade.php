@@ -24,9 +24,9 @@ new class extends Component
 
     // View and display options
     #[Url(except: 'list')]
-    public string $viewMode = 'list'; // list, kanban, weekly_calendar
+    public string $viewMode = 'list'; // list, kanban, daily-timegrid, weekly-timegrid
 
-    // Weekly calendar view properties
+    // Timegrid view properties
     public ?Carbon $weekStartDate = null;
 
     // Date navigation for list and kanban views
@@ -102,17 +102,56 @@ new class extends Component
         // Update the appropriate date property based on current view mode
         if (in_array($this->viewMode, ['list', 'kanban'])) {
             $this->currentDate = $parsedDate;
-        } elseif ($this->viewMode === 'weekly') {
-            // For weekly view, update to the start of the week containing the clicked date
+        } elseif ($this->viewMode === 'weekly-timegrid') {
+            // For weekly timegrid view, update to the start of the week containing the clicked date
             $this->weekStartDate = $parsedDate->copy()->startOfWeek();
+        } elseif ($this->viewMode === 'daily-timegrid') {
+            // For daily timegrid view, update the current date
+            $this->currentDate = $parsedDate;
         }
+    }
+
+    #[On('switch-to-daily-timegrid')]
+    public function switchToDailyTimegrid(?string $date = null): void
+    {
+        $this->viewMode = 'daily-timegrid';
+        if ($date) {
+            $this->currentDate = Carbon::parse($date);
+        } else {
+            $this->currentDate = $this->currentDate ?? now();
+        }
+    }
+
+    #[On('switch-to-weekly-timegrid')]
+    public function switchToWeeklyTimegrid(?string $weekStart = null): void
+    {
+        $this->viewMode = 'weekly-timegrid';
+        if ($weekStart) {
+            $this->weekStartDate = Carbon::parse($weekStart);
+        } else {
+            $this->weekStartDate = $this->weekStartDate ?? now()->startOfWeek();
+        }
+    }
+
+    #[On('switch-to-timegrid-day')]
+    public function switchToTimegridDay(string $date): void
+    {
+        // Legacy support - redirect to daily timegrid
+        $this->switchToDailyTimegrid($date);
+    }
+
+    #[On('switch-to-timegrid-week')]
+    public function switchToTimegridWeek(string $weekStart): void
+    {
+        // Legacy support - redirect to weekly timegrid
+        $this->switchToWeeklyTimegrid($weekStart);
     }
 
     #[On('switch-to-week-view')]
     public function switchToWeekView(string $weekStart): void
     {
-        $this->viewMode = 'weekly';
-        $this->weekStartDate = Carbon::parse($weekStart);
+        // Legacy support - redirect to weekly timegrid
+        $this->switchToWeeklyTimegrid($weekStart);
     }
 
     #[On('update-item-status')]
@@ -1086,8 +1125,8 @@ new class extends Component
 
         return $query->get()
             ->filter(function ($task) {
-                // For weekly view, only show items with at least one date
-                if ($this->viewMode === 'weekly') {
+                // For timegrid views, only show items with at least one date
+                if (in_array($this->viewMode, ['daily-timegrid', 'weekly-timegrid'])) {
                     return $task->start_datetime || $task->end_datetime;
                 }
                 // For list and kanban views, show all items (including those without dates)
@@ -1137,8 +1176,8 @@ new class extends Component
 
         return $query->get()
             ->filter(function ($event) {
-                // For weekly view, only show items with at least one date
-                if ($this->viewMode === 'weekly') {
+                // For timegrid views, only show items with at least one date
+                if (in_array($this->viewMode, ['daily-timegrid', 'weekly-timegrid'])) {
                     return $event->start_datetime || $event->end_datetime;
                 }
                 // For list and kanban views, show all items (including those without dates)
@@ -1155,8 +1194,8 @@ new class extends Component
     #[Computed]
     public function filteredItems(): Collection
     {
-        // For weekly view, apply filters and sorting but not date filtering (weekly view handles its own date filtering)
-        if ($this->viewMode === 'weekly') {
+        // For timegrid views, apply filters and sorting but not date filtering (timegrid views handle their own date filtering)
+        if (in_array($this->viewMode, ['daily-timegrid', 'weekly-timegrid'])) {
             $user = auth()->user();
 
             // Get filtered tasks (without date filter)
@@ -1181,7 +1220,7 @@ new class extends Component
             $taskQuery->orderByField($this->sortBy, $this->sortDirection);
             $tasks = $taskQuery->get()
                 ->filter(function ($task) {
-                    // For weekly view, only show items with at least one date
+                    // For timegrid views, only show items with at least one date
                     return $task->start_datetime || $task->end_datetime;
                 })
                 ->map(function ($task) {
@@ -1212,7 +1251,7 @@ new class extends Component
             $eventQuery->orderByField($this->sortBy, $this->sortDirection);
             $events = $eventQuery->get()
                 ->filter(function ($event) {
-                    // For weekly view, only show items with at least one date
+                    // For timegrid views, only show items with at least one date
                     return $event->start_datetime || $event->end_datetime;
                 })
                 ->map(function ($event) {
@@ -1344,10 +1383,28 @@ new class extends Component
         </div>
     @endif
 
+    <!-- Daily Timegrid View -->
+    @if($viewMode === 'daily-timegrid')
+        <div wire:key="daily-timegrid-view-container-{{ ($currentDate ?? now())->format('Y-m-d') }}">
+            <livewire:workspace.daily-timegrid
+                :items="$this->filteredItems"
+                :current-date="$currentDate"
+                :view-mode="$viewMode"
+                :filter-type="$filterType"
+                :filter-priority="$filterPriority"
+                :filter-status="$filterStatus"
+                :sort-by="$sortBy"
+                :sort-direction="$sortDirection"
+                :has-active-filters="$this->hasActiveFilters"
+                wire:key="daily-timegrid-view-{{ ($currentDate ?? now())->format('Y-m-d') }}"
+            />
+        </div>
+    @endif
+
     <!-- Weekly Timegrid View -->
-    @if($viewMode === 'weekly')
-        <div wire:key="weekly-view-container-{{ $weekStartDate->format('Y-m-d') }}">
-            <livewire:workspace.weekly-view
+    @if($viewMode === 'weekly-timegrid')
+        <div wire:key="weekly-timegrid-view-container-{{ ($weekStartDate ?? now()->startOfWeek())->format('Y-m-d') }}">
+            <livewire:workspace.weekly-timegrid
                 :items="$this->filteredItems"
                 :week-start-date="$weekStartDate"
                 :view-mode="$viewMode"
@@ -1357,7 +1414,7 @@ new class extends Component
                 :sort-by="$sortBy"
                 :sort-direction="$sortDirection"
                 :has-active-filters="$this->hasActiveFilters"
-                wire:key="weekly-view-{{ $weekStartDate->format('Y-m-d') }}"
+                wire:key="weekly-timegrid-view-{{ ($weekStartDate ?? now()->startOfWeek())->format('Y-m-d') }}"
             />
         </div>
     @endif
