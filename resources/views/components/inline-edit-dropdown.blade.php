@@ -1,10 +1,11 @@
 @props([
-    'label' => null,
     'field',
     'value' => null,
-    'fullWidth' => true,
     'useParent' => false,
     'itemId' => null,
+    'dropdownClass' => 'w-48',
+    'triggerClass' => 'flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors',
+    'position' => 'bottom', // 'top' or 'bottom'
 ])
 
 <div
@@ -12,7 +13,18 @@
     x-data="{
         open: false,
         mouseLeaveTimer: null,
-        selectedValue: @js($value),
+        selectedValue: @js($value ? $value : null),
+        init() {
+            @if($useParent && $itemId)
+                // Listen for backend updates
+                window.addEventListener('task-detail-field-updated', (event) => {
+                    const { field, value } = event.detail || {};
+                    if (field === '{{ $field }}') {
+                        this.selectedValue = value ?? '';
+                    }
+                });
+            @endif
+        },
         formatDuration(minutes) {
             if (!minutes) return 'Not set';
             const duration = parseInt(minutes);
@@ -75,16 +87,10 @@
     @mouseleave="handleMouseLeave()"
     @click.outside="closeDropdown()"
 >
-    @if($label)
-        <div class="flex items-center gap-2 mb-2">
-            <flux:heading size="sm">{{ $label }}</flux:heading>
-        </div>
-    @endif
-
     <button
         type="button"
         @click.stop="toggleDropdown()"
-        class="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors {{ $fullWidth ? 'w-full' : '' }}"
+        class="{{ $triggerClass }}"
     >
         {{ $trigger ?? '' }}
     </button>
@@ -93,7 +99,7 @@
         x-show="open"
         x-cloak
         x-transition
-        class="absolute z-50 mt-1 w-full bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1"
+        class="absolute {{ $position === 'top' ? 'bottom-full mb-1' : 'top-full mt-1' }} z-50 {{ $dropdownClass }} bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1"
     >
         {{ $options ?? '' }}
     </div>
