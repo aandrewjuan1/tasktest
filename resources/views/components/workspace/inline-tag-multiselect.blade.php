@@ -1,6 +1,7 @@
 @props([
     'type',
     'label' => 'Tags',
+    'simpleTrigger' => false,
 ])
 
 <div
@@ -54,14 +55,20 @@
 >
     <x-inline-create-dropdown dropdown-class="w-64 max-h-60 overflow-y-auto">
         <x-slot:trigger>
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-            </svg>
-            <span class="text-sm font-medium">{{ $label }}</span>
-            <span
-                class="text-xs text-zinc-500 dark:text-zinc-400"
-                x-text="formData.{{ $type }}.tagIds.length > 0 ? formData.{{ $type }}.tagIds.length + ' selected' : 'None'"
-            ></span>
+            @if($simpleTrigger)
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+            @else
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                <span class="text-sm font-medium">{{ $label }}</span>
+                <span
+                    class="text-xs text-zinc-500 dark:text-zinc-400"
+                    x-text="formData.{{ $type }}.tagIds.length > 0 ? formData.{{ $type }}.tagIds.length + ' selected' : 'None'"
+                ></span>
+            @endif
         </x-slot:trigger>
 
         <x-slot:options>

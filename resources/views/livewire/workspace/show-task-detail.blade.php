@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Project;
+use App\Models\Tag;
 use App\Models\Task;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -76,6 +77,8 @@ new class extends Component
     }
 
     // All task update mutations are handled by the parent `show-items` component.
+    // UI updates are handled through JavaScript events (task-detail-field-updated),
+    // so we don't need to listen to item-updated which would cause an extra request.
 
     public function confirmDelete(): void
     {
@@ -88,6 +91,70 @@ new class extends Component
         return Project::accessibleBy(auth()->user())
             ->orderBy('name')
             ->get();
+    }
+
+    #[Computed]
+    public function availableTags(): Collection
+    {
+        return Tag::orderBy('name')->get();
+    }
+
+    public function createTag(string $name): array
+    {
+        $name = trim($name);
+
+        if (empty($name)) {
+            return ['success' => false, 'message' => 'Tag name cannot be empty'];
+        }
+
+        try {
+            // Check if tag exists case-insensitively
+            $existingTag = Tag::whereRaw('LOWER(name) = LOWER(?)', [$name])->first();
+
+            if ($existingTag) {
+                // Tag already exists, return existing tag
+                return [
+                    'success' => true,
+                    'tagId' => $existingTag->id,
+                    'tagName' => $existingTag->name,
+                    'alreadyExists' => true,
+                ];
+            }
+
+            // Create new tag
+            $tag = Tag::create(['name' => $name]);
+
+            return [
+                'success' => true,
+                'tagId' => $tag->id,
+                'tagName' => $tag->name,
+                'alreadyExists' => false,
+            ];
+        } catch (\Exception $e) {
+            \Log::error('Failed to create tag', [
+                'error' => $e->getMessage(),
+                'name' => $name,
+            ]);
+
+            return ['success' => false, 'message' => 'Failed to create tag'];
+        }
+    }
+
+    public function deleteTag(int $tagId): array
+    {
+        try {
+            $tag = Tag::findOrFail($tagId);
+            $tag->delete();
+
+            return ['success' => true];
+        } catch (\Exception $e) {
+            \Log::error('Failed to delete tag', [
+                'error' => $e->getMessage(),
+                'tagId' => $tagId,
+            ]);
+
+            return ['success' => false, 'message' => 'Failed to delete tag'];
+        }
     }
 }; ?>
 
@@ -107,6 +174,7 @@ new class extends Component
                              editing: false,
                              originalValue: @js($task->title),
                              currentValue: @js($task->title),
+                             errorMessage: null,
                              init() {
                                  // Listen for backend updates
                                  window.addEventListener('task-detail-field-updated', (event) => {
@@ -115,6 +183,7 @@ new class extends Component
                                          this.originalValue = value ?? '';
                                          this.currentValue = value ?? '';
                                          $wire.title = value ?? '';
+                                         this.errorMessage = null;
                                      }
                                  });
                              },
@@ -122,10 +191,19 @@ new class extends Component
                                  this.editing = true;
                                  this.currentValue = this.originalValue;
                                  $wire.title = this.originalValue;
+                                 this.errorMessage = null;
                                  $nextTick(() => $refs.input?.focus());
                              },
                              save() {
+                                 // Validate title is not empty or null
+                                 const trimmedValue = (this.currentValue || '').trim();
+                                 if (!trimmedValue || trimmedValue === '') {
+                                     this.errorMessage = 'Title cannot be empty';
+                                     return;
+                                 }
+
                                  if (this.currentValue !== this.originalValue) {
+                                     this.errorMessage = null;
                                      this.originalValue = this.currentValue;
                                      this.editing = false;
 
@@ -149,6 +227,7 @@ new class extends Component
                              cancel() {
                                  this.currentValue = this.originalValue;
                                  $wire.title = this.originalValue;
+                                 this.errorMessage = null;
                                  this.editing = false;
                              }
                          }"
@@ -195,9 +274,67 @@ new class extends Component
                                     </button>
                                 </div>
                             </div>
+                            <div x-show="errorMessage" class="mt-1">
+                                <p class="text-sm text-red-600 dark:text-red-400" x-text="errorMessage"></p>
+                            </div>
                             @error('title')
                                 <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
                             @enderror
+                        </div>
+                    </div>
+
+                    <!-- Tags (simple, near title) -->
+                    <div
+                        class="mt-3 flex items-center gap-2 flex-wrap"
+                        x-data="{
+                            selectedTagIds: @js($task->tags->pluck('id')->toArray()),
+                            availableTags: @js($this->availableTags->mapWithKeys(fn($tag) => [$tag->id => $tag->name])->toArray()),
+                            get displayedTags() {
+                                return this.selectedTagIds
+                                    .map(id => ({ id: id, name: this.availableTags[id] || '' }))
+                                    .filter(tag => tag.name);
+                            },
+                            init() {
+                                // Listen for tag updates
+                                window.addEventListener('task-detail-field-updated', (event) => {
+                                    const { field, value } = event.detail || {};
+                                    if (field === 'tags') {
+                                        this.selectedTagIds = value ?? [];
+                                    }
+                                });
+
+                                // Listen for new tag creation to update available tags
+                                window.addEventListener('tag-created', (event) => {
+                                    const { tagId, tagName } = event.detail || {};
+                                    if (tagId && tagName) {
+                                        this.availableTags[tagId] = tagName;
+                                    }
+                                });
+                            }
+                        }"
+                    >
+                        <template x-if="displayedTags.length > 0">
+                            <div class="flex flex-wrap gap-1.5 items-center">
+                                <template x-for="tag in displayedTags" :key="tag.id">
+                                    <span class="inline-flex items-center px-2 py-0.5 text-xs rounded bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400">
+                                        <span x-text="tag.name"></span>
+                                    </span>
+                                </template>
+                            </div>
+                        </template>
+                        <span
+                            x-show="displayedTags.length === 0"
+                            class="text-xs text-zinc-500 dark:text-zinc-400"
+                        >Add tags</span>
+                        <div wire:key="edit-tags-{{ $task->id }}">
+                            <x-workspace.inline-edit-tag-multiselect
+                                :item-id="$task->id"
+                                item-type="task"
+                                :selected-tag-ids="$task->tags->pluck('id')->toArray()"
+                                :available-tags="$this->availableTags"
+                                :simple-trigger="true"
+                                trigger-class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+                            />
                         </div>
                     </div>
 
@@ -493,6 +630,39 @@ new class extends Component
                     </div>
                 </div>
 
+                <!-- Dates -->
+                <div class="mt-6 border-t border-zinc-200 dark:border-zinc-800 pt-4">
+                    <div class="flex items-center justify-between gap-2 mb-2">
+                        <flux:heading size="sm" class="flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
+                            <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            Dates
+                        </flux:heading>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <!-- Start Date -->
+                        <x-workspace.inline-edit-date-picker
+                            field="startDatetime"
+                            :item-id="$task->id"
+                            :value="$task->start_datetime?->toIso8601String()"
+                            label="Start Date"
+                            type="datetime-local"
+                            trigger-class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer text-sm font-medium"
+                        />
+
+                        <!-- Due Date -->
+                        <x-workspace.inline-edit-date-picker
+                            field="endDatetime"
+                            :item-id="$task->id"
+                            :value="$task->end_datetime?->toIso8601String()"
+                            label="Due Date"
+                            type="datetime-local"
+                            trigger-class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer text-sm font-medium"
+                        />
+                    </div>
+                </div>
+
                 <!-- Project -->
                 @php
                     $projectsData = $this->projects->map(function ($project) {
@@ -542,7 +712,7 @@ new class extends Component
                             });
                         }
                     }"
-                    class="mt-6 overflow-visible"
+                    class="mt-6 border-t border-zinc-200 dark:border-zinc-800 pt-4 overflow-visible"
                 >
                     <!-- No Project Selected - Simple Add Button -->
                     <div
@@ -688,25 +858,6 @@ new class extends Component
                         </div>
                     </div>
                 </div>
-
-                <!-- Tags -->
-                @if($task->tags->isNotEmpty())
-                    <div class="mt-6 border-t border-zinc-200 dark:border-zinc-800 pt-4">
-                        <flux:heading size="sm" class="flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
-                            <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M3 5a2 2 0 012-2h4l2 2h6a2 2 0 012 2v2.586a1 1 0 01-.293.707l-7.414 7.414a2 2 0 01-2.828 0L3.293 9.707A1 1 0 013 9V5z" />
-                            </svg>
-                            Tags
-                        </flux:heading>
-                        <div class="flex flex-wrap gap-2 mt-2">
-                            @foreach($task->tags as $tag)
-                                <span class="inline-flex items-center px-3 py-1 text-sm rounded bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300">
-                                    {{ $tag->name }}
-                                </span>
-                            @endforeach
-                        </div>
-                    </div>
-                @endif
 
                 <!-- Reminders -->
                 @if($task->reminders->isNotEmpty())

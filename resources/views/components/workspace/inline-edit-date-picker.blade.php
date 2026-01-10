@@ -1,40 +1,47 @@
 @props([
-    'label',
     'field',
     'itemId',
-    'useParent' => false,
-    'type' => 'datetime-local',
     'value' => null,
+    'label',
+    'type' => 'datetime-local',
+    'dropdownClass' => 'w-80 p-4',
+    'triggerClass' => 'inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer text-sm font-medium',
+    'position' => 'bottom',
 ])
 
-<x-inline-edit-pill-dropdown
+@php
+    // Format the initial value for display
+    $displayValue = 'Not set';
+    if ($value) {
+        try {
+            $date = \Carbon\Carbon::parse($value);
+            $displayValue = $date->format('M j, Y g:i A');
+        } catch (\Exception $e) {
+            $displayValue = 'Not set';
+        }
+    }
+    // Format value for JavaScript (ISO 8601 string)
+    $jsValue = $value ? \Carbon\Carbon::parse($value)->toIso8601String() : null;
+@endphp
+
+<x-inline-edit-dropdown
     field="{{ $field }}"
     :item-id="$itemId"
-    :use-parent="$useParent"
-    :value="$value"
-    dropdown-class="w-80 p-4"
+    :use-parent="true"
+    :value="$jsValue"
+    dropdown-class="{{ $dropdownClass }}"
+    trigger-class="{{ $triggerClass }}"
+    position="{{ $position }}"
 >
     <x-slot:trigger>
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
-        <span class="text-sm font-medium">
-            {{ $label }}
-        </span>
+        <span class="text-sm font-medium">{{ $label }}</span>
         <span
             class="text-xs text-zinc-500 dark:text-zinc-400"
-            x-text="(() => {
-                const val = $parent.selectedValue;
-                if (!val || val === '' || val === null) return 'Not set';
-                try {
-                    const date = new Date(val);
-                    if (isNaN(date.getTime())) return 'Not set';
-                    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-                } catch(e) {
-                    return 'Not set';
-                }
-            })()"
-        ></span>
+            x-text="selectedValue ? (new Date(selectedValue).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' + new Date(selectedValue).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })) : 'Not set'"
+        >{{ $displayValue }}</span>
     </x-slot:trigger>
 
     <x-slot:options>
@@ -49,70 +56,48 @@
                 minute: '',
                 meridiem: 'AM',
                 days: [],
+                currentValue: @js($jsValue),
 
                 init() {
-                    const initialValue = @js($value && $value !== '' ? $value : null);
-
-                    // Ensure parent's selectedValue is set for display first
-                    $parent.selectedValue = initialValue;
-
-                    this.parseInitial(initialValue);
-
-                    // Always set month and year - use selectedDate if available, otherwise current date
-                    const baseDate = this.selectedDate || new Date();
-                    this.month = baseDate.getMonth();
-                    this.year = baseDate.getFullYear();
-
-                    if (this.type === 'datetime-local') {
-                        if (this.selectedDate && (!this.hour || !this.minute)) {
-                            this.setTimeFromDate(this.selectedDate);
-                        } else if (!this.selectedDate) {
-                            const now = new Date();
-                            this.setTimeFromDate(now);
-                        }
-                    }
-
-                    // Build days after month/year are set
-                    this.buildDays();
-
                     // Listen for backend updates
                     window.addEventListener('task-detail-field-updated', (event) => {
                         const { field, value } = event.detail || {};
                         if (field === '{{ $field }}') {
-                            $parent.selectedValue = value ?? '';
-                            this.parseInitial(value ?? null);
-                            if (this.selectedDate) {
-                                this.month = this.selectedDate.getMonth();
-                                this.year = this.selectedDate.getFullYear();
-                                this.buildDays();
-                            } else {
-                                const baseDate = new Date();
-                                this.month = baseDate.getMonth();
-                                this.year = baseDate.getFullYear();
-                                this.buildDays();
+                            this.currentValue = value ?? null;
+                            this.parseInitial(value);
+                            const baseDate = this.selectedDate ?? new Date();
+                            this.month = baseDate.getMonth();
+                            this.year = baseDate.getFullYear();
+                            if (this.type === 'datetime-local' && (!this.hour || !this.minute)) {
+                                const now = this.selectedDate ?? new Date();
+                                this.setTimeFromDate(now);
                             }
+                            this.buildDays();
                         }
                     });
+
+                    this.parseInitial(@js($jsValue));
+
+                    const baseDate = this.selectedDate ?? new Date();
+                    this.month = baseDate.getMonth();
+                    this.year = baseDate.getFullYear();
+
+                    if (this.type === 'datetime-local' && (!this.hour || !this.minute)) {
+                        const now = this.selectedDate ?? new Date();
+                        this.setTimeFromDate(now);
+                    }
+
+                    this.buildDays();
                 },
 
                 parseInitial(value) {
-                    if (!value || value === '' || value === null || value === undefined) {
-                        this.selectedDate = null;
-                        this.hour = '';
-                        this.minute = '';
-                        this.meridiem = 'AM';
+                    if (!value) {
                         return;
                     }
 
-                    // Handle datetime-local format: YYYY-MM-DDTHH:mm
-                    // The Date constructor should handle ISO 8601 format correctly
                     const parsed = new Date(value);
 
                     if (isNaN(parsed.getTime())) {
-                        this.selectedDate = null;
-                        this.hour = '';
-                        this.minute = '';
-                        this.meridiem = 'AM';
                         return;
                     }
 
@@ -217,8 +202,22 @@
                     this.hour = '';
                     this.minute = '';
                     this.meridiem = 'AM';
+                    this.currentValue = null;
 
-                    $parent.select(null);
+                    // Dispatch to parent to clear the date
+                    $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
+                        taskId: {{ $itemId }},
+                        field: '{{ $field }}',
+                        value: null,
+                    });
+
+                    // Notify listeners
+                    window.dispatchEvent(new CustomEvent('task-detail-field-updated', {
+                        detail: {
+                            field: '{{ $field }}',
+                            value: null,
+                        }
+                    }));
                 },
 
                 updateModel() {
@@ -261,7 +260,22 @@
                         value += `T${hours24}:${minutes}`;
                     }
 
-                    $parent.select(value);
+                    this.currentValue = value;
+
+                    // Dispatch to parent component
+                    $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
+                        taskId: {{ $itemId }},
+                        field: '{{ $field }}',
+                        value: value,
+                    });
+
+                    // Notify listeners so UI stays in sync
+                    window.dispatchEvent(new CustomEvent('task-detail-field-updated', {
+                        detail: {
+                            field: '{{ $field }}',
+                            value: value,
+                        }
+                    }));
                 },
 
                 isSelected(day) {
@@ -391,8 +405,8 @@
                                 @change="updateTime()"
                                 class="h-8 rounded-lg border border-zinc-200 bg-zinc-50 px-2 text-xs font-medium text-zinc-900 shadow-sm outline-none ring-0 focus:border-pink-500 focus:bg-white focus:ring-1 focus:ring-pink-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:focus:border-pink-400 dark:focus:ring-pink-400"
                             >
-                                <option value=\"AM\">AM</option>
-                                <option value=\"PM\">PM</option>
+                                <option value="AM">AM</option>
+                                <option value="PM">PM</option>
                             </select>
                         </div>
                     </div>
@@ -419,4 +433,4 @@
             </div>
         </div>
     </x-slot:options>
-</x-inline-edit-pill-dropdown>
+</x-inline-edit-dropdown>

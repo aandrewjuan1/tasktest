@@ -260,6 +260,12 @@ new class extends Component
         $this->updateTaskField($taskId, $field, $value);
     }
 
+    #[On('update-task-tags')]
+    public function handleUpdateTaskTags(int $itemId, string $itemType, array $tagIds): void
+    {
+        $this->updateTaskTags($itemId, $itemType, $tagIds);
+    }
+
     #[On('update-event-field')]
     public function handleUpdateEventField(int $eventId, string $field, mixed $value): void
     {
@@ -428,6 +434,52 @@ new class extends Component
             ]);
 
             $this->dispatch('notify', message: 'Failed to update task. Please try again.', type: 'error');
+        }
+    }
+
+    public function updateTaskTags(int $itemId, string $itemType, array $tagIds): void
+    {
+        try {
+            $model = match ($itemType) {
+                'task' => Task::with(['project', 'event', 'tags', 'reminders', 'pomodoroSessions'])
+                    ->findOrFail($itemId),
+                'event' => Event::with(['tags', 'reminders'])
+                    ->findOrFail($itemId),
+                'project' => Project::with(['tags', 'tasks', 'reminders'])
+                    ->findOrFail($itemId),
+                default => throw new \InvalidArgumentException("Invalid item type: {$itemType}"),
+            };
+
+            $this->authorize('update', $model);
+
+            validator(
+                ['tagIds' => $tagIds],
+                [
+                    'tagIds' => ['nullable', 'array'],
+                    'tagIds.*' => ['integer', 'exists:tags,id'],
+                ],
+                [],
+                ['tagIds' => 'tags'],
+            )->validate();
+
+            DB::transaction(function () use ($model, $tagIds) {
+                $model->tags()->sync($tagIds);
+                $model->refresh();
+            });
+
+            $this->dispatch('item-updated');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            \Log::error('Failed to update tags from parent', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'item_id' => $itemId,
+                'item_type' => $itemType,
+                'user_id' => auth()->id(),
+            ]);
+
+            $this->dispatch('notify', message: 'Failed to update tags. Please try again.', type: 'error');
         }
     }
 
