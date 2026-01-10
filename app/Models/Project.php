@@ -34,10 +34,7 @@ class Project extends Model
     protected static function booted(): void
     {
         static::creating(function (Project $project) {
-            // Set default start_datetime to current datetime if not provided
-            if (is_null($project->start_datetime)) {
-                $project->start_datetime = now();
-            }
+            // Dates can be null - no default assignment
         });
     }
 

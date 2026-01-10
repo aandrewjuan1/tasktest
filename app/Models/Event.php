@@ -45,13 +45,9 @@ class Event extends Model
                 $event->status = EventStatus::Scheduled;
             }
 
-            // Set default start_datetime to current datetime if not provided
-            if (is_null($event->start_datetime)) {
-                $event->start_datetime = now();
-            }
-
-            // Auto-calculate end_datetime if not provided
-            if (is_null($event->end_datetime) && $event->start_datetime) {
+            // Dates can be null - no default assignment
+            // Auto-calculate end_datetime only if start_datetime is provided but end_datetime is not
+            if ($event->start_datetime && is_null($event->end_datetime)) {
                 $event->end_datetime = $event->start_datetime->copy()->addHour();
             }
         });
@@ -214,6 +210,11 @@ class Event extends Model
                         $startOnlyQ->whereNotNull('start_datetime')
                             ->whereNull('end_datetime')
                             ->whereDate('start_datetime', '<=', $targetDate);
+                    })
+                // Items with no dates - show on all dates
+                    ->orWhere(function ($noDatesQ) {
+                        $noDatesQ->whereNull('start_datetime')
+                            ->whereNull('end_datetime');
                     });
             });
         });

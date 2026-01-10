@@ -22,20 +22,28 @@ class EventFactory extends Factory
     {
         $allDay = fake()->boolean(30); // 30% chance of all-day event
         // Start datetime is randomly set to be beyond today (anywhere from tomorrow to 3 months in the future)
-        $minStart = now()->addDay()->startOfDay();
-        $maxStart = now()->addMonths(3)->endOfDay();
-        $startDateTime = Carbon::createFromTimestamp(
-            fake()->numberBetween($minStart->timestamp, $maxStart->timestamp)
-        );
+        // Or randomly null
+        $startDateTime = fake()->boolean(70)
+            ? Carbon::createFromTimestamp(
+                fake()->numberBetween(
+                    now()->addDay()->startOfDay()->timestamp,
+                    now()->addMonths(3)->endOfDay()->timestamp
+                )
+            )
+            : null;
         // End datetime is randomly set to be after start datetime
         // For all-day events, end can be up to 7 days later; for timed events, up to 8 hours later
-        $minEnd = $startDateTime->copy()->addMinutes(30);
-        $maxEnd = $allDay
-            ? $startDateTime->copy()->addDays(7)
-            : $startDateTime->copy()->addHours(8);
-        $endDateTime = Carbon::createFromTimestamp(
-            fake()->numberBetween($minEnd->timestamp, $maxEnd->timestamp)
-        );
+        // Or randomly null
+        $endDateTime = ($startDateTime !== null && fake()->boolean(70))
+            ? Carbon::createFromTimestamp(
+                fake()->numberBetween(
+                    $startDateTime->copy()->addMinutes(30)->timestamp,
+                    ($allDay
+                        ? $startDateTime->copy()->addDays(7)
+                        : $startDateTime->copy()->addHours(8))->timestamp
+                )
+            )
+            : null;
 
         return [
             'user_id' => User::factory(),

@@ -96,7 +96,7 @@ new class extends Component
             priority: 'medium',
             complexity: 'moderate',
             duration: 60,
-            startDatetime: '{{ Carbon::now()->format('Y-m-d\TH:i') }}',
+            startDatetime: null,
             endDatetime: null,
             projectId: null,
             tagIds: []
@@ -104,13 +104,13 @@ new class extends Component
         event: {
             title: '',
             status: 'scheduled',
-            startDatetime: '{{ Carbon::now()->format('Y-m-d\TH:i') }}',
+            startDatetime: null,
             endDatetime: null,
             tagIds: []
         },
         project: {
             name: '',
-            startDatetime: '{{ Carbon::now()->format('Y-m-d\TH:i') }}',
+            startDatetime: null,
             endDatetime: null,
             tagIds: []
         }
@@ -153,7 +153,7 @@ new class extends Component
                 priority: 'medium',
                 complexity: 'moderate',
                 duration: 60,
-                startDatetime: '{{ Carbon::now()->format('Y-m-d\TH:i') }}',
+                startDatetime: null,
                 endDatetime: null,
                 projectId: null,
                 tagIds: []
@@ -161,7 +161,7 @@ new class extends Component
             event: {
                 title: '',
                 status: 'scheduled',
-                startDatetime: '{{ Carbon::now()->format('Y-m-d\TH:i') }}',
+                startDatetime: null,
                 endDatetime: null,
                 location: null,
                 color: null,
@@ -169,7 +169,7 @@ new class extends Component
             },
             project: {
                 name: '',
-                startDatetime: '{{ Carbon::now()->format('Y-m-d\TH:i') }}',
+                startDatetime: null,
                 endDatetime: null,
                 tagIds: []
             }

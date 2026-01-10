@@ -65,9 +65,7 @@ class Task extends Model
             if (is_null($task->duration)) {
                 $task->duration = 60;
             }
-            if (is_null($task->start_datetime)) {
-                $task->start_datetime = now();
-            }
+            // Dates can be null - no default assignment
         });
     }
 
@@ -250,6 +248,11 @@ class Task extends Model
                         $startOnlyQ->whereNotNull('start_datetime')
                             ->whereNull('end_datetime')
                             ->whereDate('start_datetime', '<=', $targetDate);
+                    })
+                // Items with no dates - show on all dates
+                    ->orWhere(function ($noDatesQ) {
+                        $noDatesQ->whereNull('start_datetime')
+                            ->whereNull('end_datetime');
                     });
             });
         });

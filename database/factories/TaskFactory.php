@@ -22,17 +22,25 @@ class TaskFactory extends Factory
     public function definition(): array
     {
         // Start datetime is randomly set to be beyond today (anywhere from tomorrow to 6 months in the future)
-        $minStart = now()->addDay()->startOfDay();
-        $maxStart = now()->addMonths(6)->endOfDay();
-        $startDatetime = Carbon::createFromTimestamp(
-            fake()->numberBetween($minStart->timestamp, $maxStart->timestamp)
-        );
+        // Or randomly null
+        $startDatetime = fake()->boolean(70)
+            ? Carbon::createFromTimestamp(
+                fake()->numberBetween(
+                    now()->addDay()->startOfDay()->timestamp,
+                    now()->addMonths(6)->endOfDay()->timestamp
+                )
+            )
+            : null;
         // End datetime is randomly set to be after start datetime (anywhere from 1 hour to 3 months later)
-        $minEnd = $startDatetime->copy()->addHour();
-        $maxEnd = $startDatetime->copy()->addMonths(3);
-        $endDatetime = Carbon::createFromTimestamp(
-            fake()->numberBetween($minEnd->timestamp, $maxEnd->timestamp)
-        );
+        // Or randomly null
+        $endDatetime = ($startDatetime !== null && fake()->boolean(70))
+            ? Carbon::createFromTimestamp(
+                fake()->numberBetween(
+                    $startDatetime->copy()->addHour()->timestamp,
+                    $startDatetime->copy()->addMonths(3)->timestamp
+                )
+            )
+            : null;
         $status = fake()->randomElement(TaskStatus::cases());
 
         return [

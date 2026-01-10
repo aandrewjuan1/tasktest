@@ -545,7 +545,17 @@ new class extends Component
                     class="mt-6 overflow-visible"
                 >
                     <!-- No Project Selected - Simple Add Button -->
-                    <div x-show="!hasProject()" class="flex items-center gap-2">
+                    <div
+                        x-show="!hasProject()"
+                        x-cloak
+                        x-transition:enter="transition ease-out duration-200"
+                        x-transition:enter-start="opacity-0 translate-y-1"
+                        x-transition:enter-end="opacity-100 translate-y-0"
+                        x-transition:leave="transition ease-in duration-150"
+                        x-transition:leave-start="opacity-100 translate-y-0"
+                        x-transition:leave-end="opacity-0 translate-y-1"
+                        class="flex items-center gap-2"
+                    >
                         <x-inline-edit-dropdown
                             field="projectId"
                             :item-id="$task->id"
@@ -582,12 +592,13 @@ new class extends Component
                     <!-- Project Selected - Full Card -->
                     <div
                         x-show="hasProject()"
-                        x-transition:enter="transition ease-out duration-300"
-                        x-transition:enter-start="opacity-0 transform scale-95"
-                        x-transition:enter-end="opacity-100 transform scale-100"
-                        x-transition:leave="transition ease-in duration-200"
-                        x-transition:leave-start="opacity-100 transform scale-100"
-                        x-transition:leave-end="opacity-0 transform scale-95"
+                        x-cloak
+                        x-transition:enter="transition ease-out duration-200"
+                        x-transition:enter-start="opacity-0 translate-y-1"
+                        x-transition:enter-end="opacity-100 translate-y-0"
+                        x-transition:leave="transition ease-in duration-150"
+                        x-transition:leave-start="opacity-100 translate-y-0"
+                        x-transition:leave-end="opacity-0 translate-y-1"
                         class="rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-gradient-to-br from-white to-zinc-50 dark:from-zinc-800 dark:to-zinc-900 shadow-lg shadow-zinc-200/50 dark:shadow-zinc-900/50 overflow-visible"
                     >
                         <div class="px-5 py-4 border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/30 rounded-t-2xl overflow-visible">
@@ -648,10 +659,10 @@ new class extends Component
 
                         <div
                             x-show="currentProject"
-                            x-transition:enter="transition ease-out duration-300"
+                            x-transition:enter="transition ease-out duration-150 delay-75"
                             x-transition:enter-start="opacity-0"
                             x-transition:enter-end="opacity-100"
-                            x-transition:leave="transition ease-in duration-200"
+                            x-transition:leave="transition ease-in duration-100"
                             x-transition:leave-start="opacity-100"
                             x-transition:leave-end="opacity-0"
                             class="px-5 py-4 space-y-3"

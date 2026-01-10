@@ -463,10 +463,14 @@ new class extends Component
                         $updateData['description'] = $value ?: null;
                         break;
                     case 'startDatetime':
-                        $startDatetime = Carbon::parse($value);
-                        $updateData['start_datetime'] = $startDatetime;
-                        if (! $event->end_datetime) {
-                            $updateData['end_datetime'] = $startDatetime->copy()->addHour();
+                        if ($value) {
+                            $startDatetime = Carbon::parse($value);
+                            $updateData['start_datetime'] = $startDatetime;
+                            if (! $event->end_datetime) {
+                                $updateData['end_datetime'] = $startDatetime->copy()->addHour();
+                            }
+                        } else {
+                            $updateData['start_datetime'] = null;
                         }
                         break;
                     case 'endDatetime':
@@ -924,7 +928,7 @@ new class extends Component
         return match ($field) {
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'startDatetime' => ['required', 'date'],
+            'startDatetime' => ['nullable', 'date'],
             'endDatetime' => ['nullable', 'date'],
             'status' => ['nullable', 'string', Rule::in($statusValues)],
             default => [],
@@ -1090,7 +1094,7 @@ new class extends Component
             })
             ->map(function ($event) {
                 $event->item_type = 'event';
-                $event->sort_date = $event->start_datetime;
+                $event->sort_date = $event->start_datetime ?? $event->created_at;
 
                 return $event;
             });
@@ -1161,7 +1165,7 @@ new class extends Component
                 })
                 ->map(function ($event) {
                     $event->item_type = 'event';
-                    $event->sort_date = $event->start_datetime;
+                    $event->sort_date = $event->start_datetime ?? $event->created_at;
                     return $event;
                 });
 
