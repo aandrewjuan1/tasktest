@@ -39,7 +39,7 @@ new class extends Component
     public function openModal(int $id): void
     {
         // Load task first before setting isOpen to prevent DOM flicker
-        $this->task = Task::with(['project', 'event', 'tags', 'reminders', 'pomodoroSessions'])
+        $this->task = Task::with(['project', 'event', 'tags', 'reminders', 'pomodoroSessions', 'recurringTask'])
             ->findOrFail($id);
 
         $this->authorize('view', $this->task);
@@ -340,6 +340,19 @@ new class extends Component
 
                     <!-- Key meta pills -->
                     <div class="mt-4 flex flex-wrap gap-2">
+                        <!-- Recurring Badge -->
+                        @if($task->recurringTask)
+                            <span
+                                class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-sm font-medium"
+                                title="Recurring: {{ ucfirst($task->recurringTask->recurrence_type->value) }}"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                Recurring
+                            </span>
+                        @endif
+
                         <!-- Status -->
                         <x-inline-edit-dropdown
                             field="status"
@@ -821,8 +834,8 @@ new class extends Component
                                     x-show="currentProject?.start_datetime || currentProject?.end_datetime"
                                     class="text-xs text-right text-zinc-500 dark:text-zinc-400"
                                 >
-                                    <div x-show="currentProject?.start_datetime" x-text="'Starts ' + currentProject.start_datetime"></div>
-                                    <div x-show="currentProject?.end_datetime" x-text="'Ends ' + currentProject.end_datetime"></div>
+                                    <div x-show="currentProject?.start_datetime" x-text="'Starts ' + (currentProject?.start_datetime || '')"></div>
+                                    <div x-show="currentProject?.end_datetime" x-text="'Ends ' + (currentProject?.end_datetime || '')"></div>
                                 </div>
                             </div>
                         </div>
@@ -893,6 +906,48 @@ new class extends Component
                         <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
                             {{ $task->pomodoroSessions->count() }} session(s) completed
                         </p>
+                    </div>
+                @endif
+
+                <!-- Recurring Task -->
+                @if($task->recurringTask)
+                    <div class="mt-4">
+                        <flux:heading size="sm" class="flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
+                            <svg class="w-4 h-4 text-green-500 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Recurring Task
+                        </flux:heading>
+                        <div class="mt-2 space-y-2">
+                            <div class="text-sm text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
+                                <span class="font-medium">Type:</span>
+                                <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-md bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+                                    {{ ucfirst($task->recurringTask->recurrence_type->value) }}
+                                </span>
+                            </div>
+                            @if($task->recurringTask->interval > 1)
+                                <div class="text-sm text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
+                                    <span class="font-medium">Interval:</span>
+                                    <span>Every {{ $task->recurringTask->interval }} {{ str($task->recurringTask->recurrence_type->value)->plural() }}</span>
+                                </div>
+                            @endif
+                            @if($task->recurringTask->start_datetime)
+                                <div class="text-sm text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
+                                    <span class="font-medium">Started:</span>
+                                    <span>{{ $task->recurringTask->start_datetime->format('M j, Y') }}</span>
+                                </div>
+                            @endif
+                            @if($task->recurringTask->end_datetime)
+                                <div class="text-sm text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
+                                    <span class="font-medium">Ends:</span>
+                                    <span>{{ $task->recurringTask->end_datetime->format('M j, Y') }}</span>
+                                </div>
+                            @else
+                                <div class="text-sm text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
+                                    <span>No end date</span>
+                                </div>
+                            @endif
+                        </div>
                     </div>
                 @endif
 

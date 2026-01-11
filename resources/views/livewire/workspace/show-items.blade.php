@@ -1,11 +1,14 @@
 <?php
 
 use App\Enums\EventStatus;
+use App\Enums\RecurrenceType;
 use App\Enums\TaskComplexity;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Models\Event;
 use App\Models\Project;
+use App\Models\RecurringEvent;
+use App\Models\RecurringTask;
 use App\Models\Tag;
 use App\Models\Task;
 use Illuminate\Support\Carbon;
@@ -188,6 +191,7 @@ new class extends Component
                 $task->delete();
             });
 
+            $this->dispatch('item-updated');
             $this->dispatch('notify', message: 'Task deleted successfully', type: 'success');
         } catch (\Exception $e) {
             \Log::error('Failed to delete task from parent', [
@@ -345,6 +349,12 @@ new class extends Component
                 'projectId' => ['nullable', 'exists:projects,id'],
                 'tagIds' => ['nullable', 'array'],
                 'tagIds.*' => ['integer', 'exists:tags,id'],
+                'recurrence' => ['nullable', 'array'],
+                'recurrence.enabled' => ['nullable', 'boolean'],
+                'recurrence.type' => ['nullable', 'required_if:recurrence.enabled,true', 'string', 'in:daily,weekly,monthly,yearly,custom'],
+                'recurrence.interval' => ['nullable', 'required_if:recurrence.enabled,true', 'integer', 'min:1'],
+                'recurrence.daysOfWeek' => ['nullable', 'array'],
+                'recurrence.daysOfWeek.*' => ['integer', 'min:0', 'max:6'],
             ], [], [
                 'title' => 'title',
                 'status' => 'status',
@@ -354,6 +364,8 @@ new class extends Component
                 'startDatetime' => 'start datetime',
                 'endDatetime' => 'end datetime',
                 'projectId' => 'project',
+                'recurrence.type' => 'recurrence type',
+                'recurrence.interval' => 'recurrence interval',
             ])->validate();
 
             $startDatetime = ! empty($validated['startDatetime'])
@@ -380,17 +392,40 @@ new class extends Component
                 if (! empty($validated['tagIds'])) {
                     $task->tags()->attach($validated['tagIds']);
                 }
+
+                // Create recurring task if enabled
+                if (! empty($validated['recurrence']['enabled']) && $validated['recurrence']['enabled']) {
+                    RecurringTask::create([
+                        'task_id' => $task->id,
+                        'recurrence_type' => RecurrenceType::from($validated['recurrence']['type']),
+                        'interval' => $validated['recurrence']['interval'] ?? 1,
+                        'start_datetime' => $task->start_datetime ?? now(),
+                        'end_datetime' => $task->end_datetime,
+                        'days_of_week' => ! empty($validated['recurrence']['daysOfWeek'])
+                            ? implode(',', $validated['recurrence']['daysOfWeek'])
+                            : null,
+                    ]);
+                }
             });
 
             $this->dispatch('notify', message: 'Task created successfully', type: 'success');
             $this->dispatch('item-created');
         } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::warning('Task creation validation failed', [
+                'user_id' => auth()->id(),
+                'validation_errors' => $e->errors(),
+                'input_data' => $data,
+            ]);
             throw $e;
         } catch (\Exception $e) {
             \Log::error('Failed to create task', [
                 'error' => $e->getMessage(),
+                'exception_class' => get_class($e),
                 'trace' => $e->getTraceAsString(),
                 'user_id' => auth()->id(),
+                'input_data' => $data,
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
 
             $this->dispatch('notify', message: 'Failed to create task. Please try again.', type: 'error');
@@ -400,7 +435,7 @@ new class extends Component
     public function updateTaskField(int $taskId, string $field, mixed $value): void
     {
         try {
-            $task = Task::with(['project', 'event', 'tags', 'reminders', 'pomodoroSessions'])
+            $task = Task::with(['project', 'event', 'tags', 'reminders', 'pomodoroSessions', 'recurringTask'])
                 ->findOrFail($taskId);
 
             $this->authorize('update', $task);
@@ -453,7 +488,6 @@ new class extends Component
 
                 if (! empty($updateData)) {
                     $task->update($updateData);
-                    $task->refresh();
                 }
             });
 
@@ -480,9 +514,9 @@ new class extends Component
     {
         try {
             $model = match ($itemType) {
-                'task' => Task::with(['project', 'event', 'tags', 'reminders', 'pomodoroSessions'])
+                'task' => Task::with(['project', 'event', 'tags', 'reminders', 'pomodoroSessions', 'recurringTask'])
                     ->findOrFail($itemId),
-                'event' => Event::with(['tags', 'reminders'])
+                'event' => Event::with(['tags', 'reminders', 'recurringEvent'])
                     ->findOrFail($itemId),
                 'project' => Project::with(['tags', 'tasks', 'reminders'])
                     ->findOrFail($itemId),
@@ -525,7 +559,7 @@ new class extends Component
     public function updateEventField(int $eventId, string $field, mixed $value): void
     {
         try {
-            $event = Event::with(['tags', 'reminders'])
+            $event = Event::with(['tags', 'reminders', 'recurringEvent'])
                 ->findOrFail($eventId);
 
             $this->authorize('update', $event);
@@ -574,7 +608,6 @@ new class extends Component
 
                 if (! empty($updateData)) {
                     $event->update($updateData);
-                    $event->refresh();
                 }
             });
 
@@ -659,7 +692,6 @@ new class extends Component
 
                 if (! empty($updateData)) {
                     $project->update($updateData);
-                    $project->refresh();
                 }
             });
 
@@ -715,11 +747,19 @@ new class extends Component
                 'endDatetime' => ['nullable', 'date', 'after:startDatetime'],
                 'tagIds' => ['nullable', 'array'],
                 'tagIds.*' => ['integer', 'exists:tags,id'],
+                'recurrence' => ['nullable', 'array'],
+                'recurrence.enabled' => ['nullable', 'boolean'],
+                'recurrence.type' => ['nullable', 'required_if:recurrence.enabled,true', 'string', 'in:daily,weekly,monthly,yearly,custom'],
+                'recurrence.interval' => ['nullable', 'required_if:recurrence.enabled,true', 'integer', 'min:1'],
+                'recurrence.daysOfWeek' => ['nullable', 'array'],
+                'recurrence.daysOfWeek.*' => ['integer', 'min:0', 'max:6'],
             ], [], [
                 'title' => 'title',
                 'status' => 'status',
                 'startDatetime' => 'start datetime',
                 'endDatetime' => 'end datetime',
+                'recurrence.type' => 'recurrence type',
+                'recurrence.interval' => 'recurrence interval',
             ])->validate();
 
             $startDatetime = ! empty($validated['startDatetime'])
@@ -742,17 +782,40 @@ new class extends Component
                 if (! empty($validated['tagIds'])) {
                     $event->tags()->attach($validated['tagIds']);
                 }
+
+                // Create recurring event if enabled
+                if (! empty($validated['recurrence']['enabled']) && $validated['recurrence']['enabled']) {
+                    RecurringEvent::create([
+                        'event_id' => $event->id,
+                        'recurrence_type' => RecurrenceType::from($validated['recurrence']['type']),
+                        'interval' => $validated['recurrence']['interval'] ?? 1,
+                        'start_datetime' => $event->start_datetime ?? now(),
+                        'end_datetime' => $event->end_datetime,
+                        'days_of_week' => ! empty($validated['recurrence']['daysOfWeek'])
+                            ? implode(',', $validated['recurrence']['daysOfWeek'])
+                            : null,
+                    ]);
+                }
             });
 
             $this->dispatch('notify', message: 'Event created successfully', type: 'success');
             $this->dispatch('item-created');
         } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::warning('Event creation validation failed', [
+                'user_id' => auth()->id(),
+                'validation_errors' => $e->errors(),
+                'input_data' => $data,
+            ]);
             throw $e;
         } catch (\Exception $e) {
             \Log::error('Failed to create event', [
                 'error' => $e->getMessage(),
+                'exception_class' => get_class($e),
                 'trace' => $e->getTraceAsString(),
                 'user_id' => auth()->id(),
+                'input_data' => $data,
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
 
             $this->dispatch('notify', message: 'Failed to create event. Please try again.', type: 'error');
@@ -800,12 +863,21 @@ new class extends Component
             $this->dispatch('notify', message: 'Project created successfully', type: 'success');
             $this->dispatch('item-created');
         } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::warning('Project creation validation failed', [
+                'user_id' => auth()->id(),
+                'validation_errors' => $e->errors(),
+                'input_data' => $data,
+            ]);
             throw $e;
         } catch (\Exception $e) {
             \Log::error('Failed to create project', [
                 'error' => $e->getMessage(),
+                'exception_class' => get_class($e),
                 'trace' => $e->getTraceAsString(),
                 'user_id' => auth()->id(),
+                'input_data' => $data,
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
 
             $this->dispatch('notify', message: 'Failed to create project. Please try again.', type: 'error');
@@ -863,7 +935,12 @@ new class extends Component
         } catch (\Exception $e) {
             \Log::error('Failed to create tag', [
                 'error' => $e->getMessage(),
-                'name' => $name,
+                'exception_class' => get_class($e),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => auth()->id(),
+                'tag_name' => $name,
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
 
             return ['success' => false, 'message' => 'Failed to create tag'];
@@ -884,7 +961,12 @@ new class extends Component
         } catch (\Exception $e) {
             \Log::error('Failed to delete tag', [
                 'error' => $e->getMessage(),
-                'tagId' => $tagId,
+                'exception_class' => get_class($e),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => auth()->id(),
+                'tag_id' => $tagId,
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
 
             return ['success' => false, 'message' => 'Failed to delete tag'];
@@ -895,59 +977,74 @@ new class extends Component
     {
         try {
             $model = match ($itemType) {
-                'task' => Task::findOrFail($itemId),
-                'event' => Event::findOrFail($itemId),
-                'project' => Project::findOrFail($itemId),
+                'task' => Task::with(['project', 'event', 'tags', 'reminders', 'pomodoroSessions', 'recurringTask'])
+                    ->findOrFail($itemId),
+                'event' => Event::with(['tags', 'reminders', 'recurringEvent'])
+                    ->findOrFail($itemId),
+                'project' => Project::with(['tags', 'tasks', 'reminders'])
+                    ->findOrFail($itemId),
                 default => throw new \InvalidArgumentException('Invalid item type'),
             };
 
             $this->authorize('update', $model);
 
-            if ($itemType === 'task') {
-                if ($newStart) {
-                    $model->start_datetime = Carbon::parse($newStart);
-                } else {
-                    $model->start_datetime = null;
-                }
-
-                if ($newEnd) {
-                    $model->end_datetime = Carbon::parse($newEnd);
-                    // Calculate duration from start and end times
-                    if ($model->start_datetime) {
-                        $model->duration = $model->start_datetime->diffInMinutes($model->end_datetime);
+            DB::transaction(function () use ($model, $itemType, $newStart, $newEnd) {
+                if ($itemType === 'task') {
+                    if ($newStart) {
+                        $model->start_datetime = Carbon::parse($newStart);
+                    } else {
+                        $model->start_datetime = null;
                     }
-                } else {
-                    $model->end_datetime = null;
-                }
-            } elseif ($itemType === 'event') {
-                if ($newStart) {
-                    $model->start_datetime = Carbon::parse($newStart);
-                }
-                if ($newEnd) {
-                    $model->end_datetime = Carbon::parse($newEnd);
-                } elseif ($newStart) {
-                    // Auto-calculate if start provided but no end
-                    $model->end_datetime = Carbon::parse($newStart)->addHour();
-                }
-            } elseif ($itemType === 'project') {
-                if ($newStart) {
-                    $model->start_datetime = Carbon::parse($newStart);
-                } else {
-                    $model->start_datetime = null;
-                }
-                if ($newEnd) {
-                    $model->end_datetime = Carbon::parse($newEnd);
-                } else {
-                    $model->end_datetime = null;
-                }
-            }
 
-            $model->save();
+                    if ($newEnd) {
+                        $model->end_datetime = Carbon::parse($newEnd);
+                        // Calculate duration from start and end times
+                        if ($model->start_datetime) {
+                            $model->duration = $model->start_datetime->diffInMinutes($model->end_datetime);
+                        }
+                    } else {
+                        $model->end_datetime = null;
+                    }
+                } elseif ($itemType === 'event') {
+                    if ($newStart) {
+                        $model->start_datetime = Carbon::parse($newStart);
+                    }
+                    if ($newEnd) {
+                        $model->end_datetime = Carbon::parse($newEnd);
+                    } elseif ($newStart) {
+                        // Auto-calculate if start provided but no end
+                        $model->end_datetime = Carbon::parse($newStart)->addHour();
+                    }
+                } elseif ($itemType === 'project') {
+                    if ($newStart) {
+                        $model->start_datetime = Carbon::parse($newStart);
+                    } else {
+                        $model->start_datetime = null;
+                    }
+                    if ($newEnd) {
+                        $model->end_datetime = Carbon::parse($newEnd);
+                    } else {
+                        $model->end_datetime = null;
+                    }
+                }
+
+                $model->save();
+            });
+
             $this->dispatch('item-updated');
             $this->dispatch('notify', message: 'Item updated successfully', type: 'success');
         } catch (\Exception $e) {
-            \Log::error('Failed to update item datetime', ['error' => $e->getMessage(), 'itemId' => $itemId, 'itemType' => $itemType]);
-            $this->dispatch('notify', message: 'Failed to update item', type: 'error');
+            \Log::error('Failed to update item datetime', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'item_id' => $itemId,
+                'item_type' => $itemType,
+                'user_id' => auth()->id(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            $this->dispatch('notify', message: 'Failed to update item. Please try again.', type: 'error');
         }
     }
 
@@ -962,33 +1059,47 @@ new class extends Component
             $newDurationMinutes = max(30, $newDurationMinutes); // Ensure still at least 30 after snapping
 
             $model = match ($itemType) {
-                'task' => Task::findOrFail($itemId),
-                'event' => Event::findOrFail($itemId),
+                'task' => Task::with(['project', 'event', 'tags', 'reminders', 'pomodoroSessions', 'recurringTask'])
+                    ->findOrFail($itemId),
+                'event' => Event::with(['tags', 'reminders', 'recurringEvent'])
+                    ->findOrFail($itemId),
                 default => throw new \InvalidArgumentException('Invalid item type'),
             };
 
             $this->authorize('update', $model);
 
-            if ($itemType === 'task') {
-                // For tasks, update duration and recalculate end_datetime if needed
-                $model->duration = $newDurationMinutes;
+            DB::transaction(function () use ($model, $itemType, $newDurationMinutes) {
+                if ($itemType === 'task') {
+                    // For tasks, update duration and recalculate end_datetime if needed
+                    $model->duration = $newDurationMinutes;
 
-                if ($model->start_datetime) {
-                    $endDateTime = $model->start_datetime->copy()->addMinutes($newDurationMinutes);
-                    $model->end_datetime = $endDateTime;
+                    if ($model->start_datetime) {
+                        $endDateTime = $model->start_datetime->copy()->addMinutes($newDurationMinutes);
+                        $model->end_datetime = $endDateTime;
+                    }
+                } elseif ($itemType === 'event') {
+                    // For events, update end_datetime while keeping start_datetime
+                    $startDateTime = Carbon::parse($model->start_datetime);
+                    $model->end_datetime = $startDateTime->copy()->addMinutes($newDurationMinutes);
                 }
-            } elseif ($itemType === 'event') {
-                // For events, update end_datetime while keeping start_datetime
-                $startDateTime = Carbon::parse($model->start_datetime);
-                $model->end_datetime = $startDateTime->copy()->addMinutes($newDurationMinutes);
-            }
 
-            $model->save();
+                $model->save();
+            });
+
             $this->dispatch('item-updated');
             $this->dispatch('notify', message: 'Duration updated successfully', type: 'success');
         } catch (\Exception $e) {
-            \Log::error('Failed to update item duration', ['error' => $e->getMessage(), 'itemId' => $itemId, 'itemType' => $itemType]);
-            $this->dispatch('notify', message: 'Failed to update duration', type: 'error');
+            \Log::error('Failed to update item duration', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'item_id' => $itemId,
+                'item_type' => $itemType,
+                'user_id' => auth()->id(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            $this->dispatch('notify', message: 'Failed to update duration. Please try again.', type: 'error');
         }
     }
 
@@ -1041,9 +1152,12 @@ new class extends Component
     {
         try {
             $model = match ($itemType) {
-                'task' => Task::findOrFail($itemId),
-                'event' => Event::findOrFail($itemId),
-                'project' => Project::findOrFail($itemId),
+                'task' => Task::with(['project', 'event', 'tags', 'reminders', 'pomodoroSessions', 'recurringTask'])
+                    ->findOrFail($itemId),
+                'event' => Event::with(['tags', 'reminders', 'recurringEvent'])
+                    ->findOrFail($itemId),
+                'project' => Project::with(['tags', 'tasks', 'reminders'])
+                    ->findOrFail($itemId),
                 default => throw new \InvalidArgumentException('Invalid item type'),
             };
 
@@ -1059,7 +1173,10 @@ new class extends Component
                 };
 
                 if ($statusEnum) {
-                    $model->update(['status' => $statusEnum]);
+                    DB::transaction(function () use ($model, $statusEnum) {
+                        $model->update(['status' => $statusEnum]);
+                    });
+
                     $this->dispatch('item-updated');
                     $this->dispatch('notify', message: 'Status updated successfully', type: 'success');
                 }
@@ -1077,16 +1194,101 @@ new class extends Component
                 };
 
                 if ($statusEnum) {
-                    $model->update(['status' => $statusEnum]);
+                    DB::transaction(function () use ($model, $statusEnum) {
+                        $model->update(['status' => $statusEnum]);
+                    });
+
                     $this->dispatch('item-updated');
                     $this->dispatch('notify', message: 'Status updated successfully', type: 'success');
                 }
             }
             // Projects don't have status, so no update needed
         } catch (\Exception $e) {
-            \Log::error('Failed to update item status', ['error' => $e->getMessage(), 'itemId' => $itemId, 'itemType' => $itemType]);
-            $this->dispatch('notify', message: 'Failed to update status', type: 'error');
+            \Log::error('Failed to update item status', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'item_id' => $itemId,
+                'item_type' => $itemType,
+                'user_id' => auth()->id(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            $this->dispatch('notify', message: 'Failed to update status. Please try again.', type: 'error');
         }
+    }
+
+    /**
+     * Get the date range for the current view mode.
+     * Used to determine which date range to generate instances for.
+     */
+    protected function getDateRangeForView(): array
+    {
+        if (in_array($this->viewMode, ['list', 'kanban'])) {
+            // For list/kanban views, use the current date (single day)
+            $date = $this->currentDate ?? now();
+            return [
+                'start' => $date->copy()->startOfDay(),
+                'end' => $date->copy()->endOfDay(),
+            ];
+        } elseif ($this->viewMode === 'daily-timegrid') {
+            // For daily timegrid, use the current date
+            $date = $this->currentDate ?? now();
+            return [
+                'start' => $date->copy()->startOfDay(),
+                'end' => $date->copy()->endOfDay(),
+            ];
+        } elseif ($this->viewMode === 'weekly-timegrid') {
+            // For weekly timegrid, use the week range
+            $weekStart = $this->weekStartDate ?? now()->startOfWeek();
+            return [
+                'start' => $weekStart->copy()->startOfDay(),
+                'end' => $weekStart->copy()->endOfWeek()->endOfDay(),
+            ];
+        }
+
+        // Default: current day
+        $date = now();
+        return [
+            'start' => $date->copy()->startOfDay(),
+            'end' => $date->copy()->endOfDay(),
+        ];
+    }
+
+    /**
+     * Sort a collection of items based on the current sort settings.
+     */
+    protected function sortCollection(Collection $items): Collection
+    {
+        if (! $this->sortBy) {
+            return $items->sortBy('created_at', SORT_REGULAR, $this->sortDirection === 'desc');
+        }
+
+        return $items->sort(function ($a, $b) {
+            $direction = $this->sortDirection === 'desc' ? -1 : 1;
+
+            return match ($this->sortBy) {
+                'priority' => $direction * $this->comparePriority($a->priority ?? null, $b->priority ?? null),
+                'created_at' => $direction * ($a->created_at <=> $b->created_at),
+                'start_datetime' => $direction * ($a->start_datetime <=> $b->start_datetime),
+                'end_datetime' => $direction * ($a->end_datetime <=> $b->end_datetime),
+                'title' => $direction * strcasecmp($a->title ?? '', $b->title ?? ''),
+                'status' => $direction * strcasecmp($a->status?->value ?? '', $b->status?->value ?? ''),
+                default => $direction * ($a->created_at <=> $b->created_at),
+            };
+        })->values();
+    }
+
+    /**
+     * Compare two priority values for sorting.
+     */
+    protected function comparePriority($priorityA, $priorityB): int
+    {
+        $priorityOrder = ['urgent' => 4, 'high' => 3, 'medium' => 2, 'low' => 1];
+        $valueA = $priorityOrder[$priorityA?->value ?? ''] ?? 0;
+        $valueB = $priorityOrder[$priorityB?->value ?? ''] ?? 0;
+
+        return $valueA <=> $valueB;
     }
 
     #[Computed]
@@ -1094,13 +1296,15 @@ new class extends Component
     {
         $user = auth()->user();
 
+        // Determine date range for instance generation
+        $dateRange = $this->getDateRangeForView();
+
         $query = Task::query()
             ->accessibleBy($user)
-            ->with(['project.tasks', 'tags', 'event']);
+            ->with(['project.tasks', 'tags', 'event', 'recurringTask']);
 
-        // Apply filters
+        // Apply filters (but not date filter - we'll handle that with instances)
         if ($this->filterType === 'task' || !$this->filterType || $this->filterType === 'all') {
-            // Only apply filters if we're showing tasks or all items
             if ($this->filterPriority) {
                 $query->filterByPriority($this->filterPriority);
             }
@@ -1111,30 +1315,57 @@ new class extends Component
                 $query->whereHas('tags', fn ($q) => $q->whereIn('tags.id', $this->filterTagIds));
             }
         } else {
-            // If filtering by type and it's not 'task', return empty collection
             return collect();
         }
 
-        // Apply date filter for list/kanban views
-        if (in_array($this->viewMode, ['list', 'kanban']) && $this->currentDate) {
-            $query->dateFilter($this->currentDate);
+        // Get all tasks (without date filtering)
+        $tasks = $query->get();
+
+        // Generate instances for each task within the date range
+        $allInstances = collect();
+        foreach ($tasks as $task) {
+            $instances = $task->getInstancesForDateRange($dateRange['start'], $dateRange['end']);
+
+            // Apply filters to instances
+            $filteredInstances = $instances->filter(function ($instance) {
+                // Filter by status if set
+                if ($this->filterStatus && $this->filterStatus !== 'all') {
+                    if ($instance->status?->value !== $this->filterStatus) {
+                        return false;
+                    }
+                }
+
+                // Filter by priority if set
+                if ($this->filterPriority && $this->filterPriority !== 'all') {
+                    if ($instance->priority?->value !== $this->filterPriority) {
+                        return false;
+                    }
+                }
+
+                // Filter by tags if set
+                if (! empty($this->filterTagIds)) {
+                    $instanceTagIds = $instance->tags->pluck('id')->toArray();
+                    if (empty(array_intersect($this->filterTagIds, $instanceTagIds))) {
+                        return false;
+                    }
+                }
+
+                // For timegrid views, only show items with at least one date
+                if (in_array($this->viewMode, ['daily-timegrid', 'weekly-timegrid'])) {
+                    return $instance->start_datetime || $instance->end_datetime;
+                }
+
+                return true;
+            });
+
+            $allInstances = $allInstances->merge($filteredInstances);
         }
 
         // Apply sorting
-        $query->orderByField($this->sortBy, $this->sortDirection);
-
-        return $query->get()
-            ->filter(function ($task) {
-                // For timegrid views, only show items with at least one date
-                if (in_array($this->viewMode, ['daily-timegrid', 'weekly-timegrid'])) {
-                    return $task->start_datetime || $task->end_datetime;
-                }
-                // For list and kanban views, show all items (including those without dates)
-                return true;
-            })
+        return $this->sortCollection($allInstances)
             ->map(function ($task) {
                 $task->item_type = 'task';
-                $task->sort_date = $task->end_datetime ?? $task->created_at;
+                $task->sort_date = $task->end_datetime ?? $task->start_datetime ?? $task->created_at;
 
                 return $task;
             });
@@ -1145,13 +1376,15 @@ new class extends Component
     {
         $user = auth()->user();
 
+        // Determine date range for instance generation
+        $dateRange = $this->getDateRangeForView();
+
         $query = Event::query()
             ->accessibleBy($user)
-            ->with(['tags', 'tasks']);
+            ->with(['tags', 'tasks', 'recurringEvent']);
 
-        // Apply filters
+        // Apply filters (but not date filter - we'll handle that with instances)
         if ($this->filterType === 'event' || !$this->filterType || $this->filterType === 'all') {
-            // Only apply filters if we're showing events or all items
             if ($this->filterPriority) {
                 $query->filterByPriority($this->filterPriority);
             }
@@ -1162,27 +1395,52 @@ new class extends Component
                 $query->whereHas('tags', fn ($q) => $q->whereIn('tags.id', $this->filterTagIds));
             }
         } else {
-            // If filtering by type and it's not 'event', return empty collection
             return collect();
         }
 
-        // Apply date filter for list/kanban views
-        if (in_array($this->viewMode, ['list', 'kanban']) && $this->currentDate) {
-            $query->dateFilter($this->currentDate);
+        // Get all events (without date filtering)
+        $events = $query->get();
+
+        // Generate instances for each event within the date range
+        $allInstances = collect();
+        foreach ($events as $event) {
+            $instances = $event->getInstancesForDateRange($dateRange['start'], $dateRange['end']);
+
+            // Apply filters to instances
+            $filteredInstances = $instances->filter(function ($instance) {
+                // Filter by status if set
+                if ($this->filterStatus && $this->filterStatus !== 'all') {
+                    if ($instance->status?->value !== $this->filterStatus) {
+                        return false;
+                    }
+                }
+
+                // Filter by tags if set
+                if (! empty($this->filterTagIds)) {
+                    $instanceTagIds = $instance->tags->pluck('id')->toArray();
+                    if (empty(array_intersect($this->filterTagIds, $instanceTagIds))) {
+                        return false;
+                    }
+                }
+
+                // Skip cancelled instances
+                if (isset($instance->cancelled) && $instance->cancelled) {
+                    return false;
+                }
+
+                // For timegrid views, only show items with at least one date
+                if (in_array($this->viewMode, ['daily-timegrid', 'weekly-timegrid'])) {
+                    return $instance->start_datetime || $instance->end_datetime;
+                }
+
+                return true;
+            });
+
+            $allInstances = $allInstances->merge($filteredInstances);
         }
 
         // Apply sorting
-        $query->orderByField($this->sortBy, $this->sortDirection);
-
-        return $query->get()
-            ->filter(function ($event) {
-                // For timegrid views, only show items with at least one date
-                if (in_array($this->viewMode, ['daily-timegrid', 'weekly-timegrid'])) {
-                    return $event->start_datetime || $event->end_datetime;
-                }
-                // For list and kanban views, show all items (including those without dates)
-                return true;
-            })
+        return $this->sortCollection($allInstances)
             ->map(function ($event) {
                 $event->item_type = 'event';
                 $event->sort_date = $event->start_datetime ?? $event->created_at;
@@ -1194,73 +1452,12 @@ new class extends Component
     #[Computed]
     public function filteredItems(): Collection
     {
-        // For timegrid views, apply filters and sorting but not date filtering (timegrid views handle their own date filtering)
+        // For timegrid views, use the same lazy generation approach
         if (in_array($this->viewMode, ['daily-timegrid', 'weekly-timegrid'])) {
-            $user = auth()->user();
-
-            // Get filtered tasks (without date filter)
-            $taskQuery = Task::query()
-                ->accessibleBy($user)
-                ->with(['project', 'tags', 'event']);
-
-            if ($this->filterType === 'task' || !$this->filterType || $this->filterType === 'all') {
-                if ($this->filterPriority) {
-                    $taskQuery->filterByPriority($this->filterPriority);
-                }
-                if ($this->filterStatus) {
-                    $taskQuery->filterByStatus($this->filterStatus);
-                }
-            if (! empty($this->filterTagIds)) {
-                $taskQuery->whereHas('tags', fn ($q) => $q->whereIn('tags.id', $this->filterTagIds));
-            }
-            } else {
-                $taskQuery->whereRaw('1 = 0'); // Return empty result
-            }
-
-            $taskQuery->orderByField($this->sortBy, $this->sortDirection);
-            $tasks = $taskQuery->get()
-                ->filter(function ($task) {
-                    // For timegrid views, only show items with at least one date
-                    return $task->start_datetime || $task->end_datetime;
-                })
-                ->map(function ($task) {
-                    $task->item_type = 'task';
-                    $task->sort_date = $task->end_datetime ?? $task->created_at;
-                    return $task;
-                });
-
-            // Get filtered events (without date filter)
-            $eventQuery = Event::query()
-                ->accessibleBy($user)
-                ->with(['tags', 'tasks']);
-
-            if ($this->filterType === 'event' || !$this->filterType || $this->filterType === 'all') {
-                if ($this->filterPriority) {
-                    $eventQuery->filterByPriority($this->filterPriority);
-                }
-                if ($this->filterStatus) {
-                    $eventQuery->filterByStatus($this->filterStatus);
-                }
-            if (! empty($this->filterTagIds)) {
-                $eventQuery->whereHas('tags', fn ($q) => $q->whereIn('tags.id', $this->filterTagIds));
-            }
-            } else {
-                $eventQuery->whereRaw('1 = 0'); // Return empty result
-            }
-
-            $eventQuery->orderByField($this->sortBy, $this->sortDirection);
-            $events = $eventQuery->get()
-                ->filter(function ($event) {
-                    // For timegrid views, only show items with at least one date
-                    return $event->start_datetime || $event->end_datetime;
-                })
-                ->map(function ($event) {
-                    $event->item_type = 'event';
-                    $event->sort_date = $event->start_datetime ?? $event->created_at;
-                    return $event;
-                });
-
-            return collect()->merge($tasks)->merge($events);
+            // Use the same methods which now handle lazy generation
+            return collect()
+                ->merge($this->filteredTasks)
+                ->merge($this->filteredEvents);
         }
 
         // For list/kanban views, merge filtered collections

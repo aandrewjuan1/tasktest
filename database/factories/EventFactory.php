@@ -20,42 +20,16 @@ class EventFactory extends Factory
      */
     public function definition(): array
     {
-        $allDay = fake()->boolean(30); // 30% chance of all-day event
-        // Start datetime is randomly set to be beyond today (anywhere from tomorrow to 3 months in the future)
-        // Or randomly null
-        $startDateTime = fake()->boolean(70)
-            ? Carbon::createFromTimestamp(
-                fake()->numberBetween(
-                    now()->addDay()->startOfDay()->timestamp,
-                    now()->addMonths(3)->endOfDay()->timestamp
-                )
-            )
-            : null;
-        // End datetime is randomly set to be after start datetime
-        // For all-day events, end can be up to 7 days later; for timed events, up to 8 hours later
-        // Or randomly null
-        $endDateTime = ($startDateTime !== null && fake()->boolean(70))
-            ? Carbon::createFromTimestamp(
-                fake()->numberBetween(
-                    $startDateTime->copy()->addMinutes(30)->timestamp,
-                    ($allDay
-                        ? $startDateTime->copy()->addDays(7)
-                        : $startDateTime->copy()->addHours(8))->timestamp
-                )
-            )
-            : null;
+        $startDateTime = Carbon::create(2026, 1, 31)->startOfDay();
+        $endDateTime = $startDateTime->copy()->endOfDay();
 
         return [
             'user_id' => User::factory(),
-            'title' => fake()->sentence(3),
-            'description' => fake()->optional()->paragraph(),
+            'title' => 'my bday',
+            'description' => null,
             'start_datetime' => $startDateTime,
             'end_datetime' => $endDateTime,
-            'all_day' => $allDay,
-            'timezone' => config('app.timezone'),
-            'location' => fake()->optional()->address(),
-            'color' => fake()->optional()->hexColor(),
-            'status' => fake()->randomElement(EventStatus::cases()),
+            'status' => EventStatus::Scheduled,
         ];
     }
 }

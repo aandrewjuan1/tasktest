@@ -19,6 +19,17 @@
         <span class="inline-flex items-center px-1.5 sm:px-2 py-0.5 text-xs font-medium rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
             Task
         </span>
+        @if($task->recurringTask)
+            <span
+                class="inline-flex items-center gap-0.5 px-1.5 sm:px-2 py-0.5 text-xs font-medium rounded-md bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                title="Recurring: {{ ucfirst($task->recurringTask->recurrence_type->value) }}"
+            >
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span class="hidden sm:inline">Recurring</span>
+            </span>
+        @endif
         @if($task->priority)
             <span
                 class="inline-flex items-center px-1.5 sm:px-2 py-0.5 text-xs font-medium rounded-md {{ $task->priority->badgeColor() }}"

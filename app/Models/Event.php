@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 
 class Event extends Model
 {
@@ -260,5 +261,86 @@ class Event extends Model
             'priority' => $query->orderBy('created_at', 'desc'), // Events don't have priority
             default => $query->orderBy('created_at', 'desc'),
         };
+    }
+
+    /**
+     * Get instances of this event for a given date range.
+     * For recurring events, calculates occurrences dynamically.
+     * For non-recurring events, returns the event itself if it falls within the range.
+     */
+    public function getInstancesForDateRange(Carbon $startDate, Carbon $endDate): Collection
+    {
+        // If not recurring, return the event itself if it falls within the date range
+        if (! $this->recurringEvent) {
+            $isInRange = false;
+
+            if ($this->start_datetime && $this->end_datetime) {
+                $eventStart = Carbon::parse($this->start_datetime);
+                $eventEnd = Carbon::parse($this->end_datetime);
+                // Check if event overlaps with the date range
+                $isInRange = $eventStart->lte($endDate) && $eventEnd->gte($startDate);
+            } elseif ($this->start_datetime) {
+                $isInRange = Carbon::parse($this->start_datetime)->between($startDate, $endDate);
+            } else {
+                // Event with no dates - show it
+                $isInRange = true;
+            }
+
+            return $isInRange ? collect([$this]) : collect();
+        }
+
+        // For recurring events, calculate occurrences
+        $recurringEvent = $this->recurringEvent;
+        $occurrences = $recurringEvent->calculateOccurrences($startDate, $endDate);
+
+        // Get exception dates to skip
+        $exceptionDates = $recurringEvent->getExceptionDates($startDate, $endDate);
+
+        // Filter out exceptions
+        $validOccurrences = $occurrences->reject(function ($occurrence) use ($exceptionDates) {
+            return $exceptionDates->contains($occurrence['start']->format('Y-m-d'));
+        });
+
+        // Get existing EventInstance records that might have modifications
+        $existingInstances = EventInstance::where('recurring_event_id', $recurringEvent->id)
+            ->whereBetween('instance_start', [$startDate, $endDate])
+            ->get()
+            ->keyBy(fn ($instance) => $instance->instance_start->format('Y-m-d H:i'));
+
+        // Create virtual instances for each valid occurrence
+        return $validOccurrences->map(function ($occurrence) use ($existingInstances) {
+            $startKey = $occurrence['start']->format('Y-m-d H:i');
+            $existingInstance = $existingInstances->get($startKey);
+
+            // If an instance exists with modifications, use it
+            if ($existingInstance && ($existingInstance->overridden_title || $existingInstance->overridden_description || $existingInstance->overridden_location || $existingInstance->cancelled)) {
+                // Create a virtual event object from the instance
+                $virtualEvent = $this->replicate();
+                $virtualEvent->id = $this->id.'-'.$occurrence['start']->format('YmdHis');
+                $virtualEvent->start_datetime = $existingInstance->instance_start;
+                $virtualEvent->end_datetime = $existingInstance->instance_end;
+                $virtualEvent->status = $existingInstance->status ?? $this->status;
+                $virtualEvent->title = $existingInstance->overridden_title ?? $this->title;
+                $virtualEvent->description = $existingInstance->overridden_description ?? $this->description;
+                $virtualEvent->completed_at = $existingInstance->completed_at;
+                $virtualEvent->is_instance = true;
+                $virtualEvent->instance_start = $occurrence['start'];
+                $virtualEvent->instance_end = $occurrence['end'];
+                $virtualEvent->cancelled = $existingInstance->cancelled ?? false;
+
+                return $virtualEvent;
+            }
+
+            // Create a virtual event object for this occurrence
+            $virtualEvent = $this->replicate();
+            $virtualEvent->id = $this->id.'-'.$occurrence['start']->format('YmdHis');
+            $virtualEvent->start_datetime = $occurrence['start'];
+            $virtualEvent->end_datetime = $occurrence['end'];
+            $virtualEvent->is_instance = true;
+            $virtualEvent->instance_start = $occurrence['start'];
+            $virtualEvent->instance_end = $occurrence['end'];
+
+            return $virtualEvent;
+        });
     }
 }

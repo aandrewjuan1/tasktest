@@ -59,7 +59,12 @@ new class extends Component
         } catch (\Exception $e) {
             \Log::error('Failed to create tag', [
                 'error' => $e->getMessage(),
-                'name' => $name,
+                'exception_class' => get_class($e),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => auth()->id(),
+                'tag_name' => $name,
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
 
             return ['success' => false, 'message' => 'Failed to create tag'];
@@ -78,7 +83,12 @@ new class extends Component
         } catch (\Exception $e) {
             \Log::error('Failed to delete tag', [
                 'error' => $e->getMessage(),
-                'tagId' => $tagId,
+                'exception_class' => get_class($e),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => auth()->id(),
+                'tag_id' => $tagId,
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
 
             return ['success' => false, 'message' => 'Failed to delete tag'];
@@ -99,14 +109,26 @@ new class extends Component
             startDatetime: null,
             endDatetime: null,
             projectId: null,
-            tagIds: []
+            tagIds: [],
+            recurrence: {
+                enabled: false,
+                type: null,
+                interval: 1,
+                daysOfWeek: []
+            }
         },
         event: {
             title: '',
             status: 'scheduled',
             startDatetime: null,
             endDatetime: null,
-            tagIds: []
+            tagIds: [],
+            recurrence: {
+                enabled: false,
+                type: null,
+                interval: 1,
+                daysOfWeek: []
+            }
         },
         project: {
             name: '',
@@ -161,7 +183,15 @@ new class extends Component
                 startDatetime: null,
                 endDatetime: null,
                 projectId: null,
-                tagIds: []
+                tagIds: [],
+                recurrence: {
+                    enabled: false,
+                    type: null,
+                    interval: 1,
+                    startDate: null,
+                    endDate: null,
+                    daysOfWeek: []
+                }
             },
             event: {
                 title: '',
@@ -170,7 +200,15 @@ new class extends Component
                 endDatetime: null,
                 location: null,
                 color: null,
-                tagIds: []
+                tagIds: [],
+                recurrence: {
+                    enabled: false,
+                    type: null,
+                    interval: 1,
+                    startDate: null,
+                    endDate: null,
+                    daysOfWeek: []
+                }
             },
             project: {
                 name: '',
@@ -183,14 +221,16 @@ new class extends Component
     submitTask() {
         this.closeModal();
 
-        const payload = { ...this.formData.task };
+        // Deep clone to ensure nested objects (like recurrence) are properly included
+        const payload = JSON.parse(JSON.stringify(this.formData.task));
 
         $wire.$parent.$call('createTask', payload);
     },
     submitEvent() {
         this.closeModal();
 
-        const payload = { ...this.formData.event };
+        // Deep clone to ensure nested objects (like recurrence) are properly included
+        const payload = JSON.parse(JSON.stringify(this.formData.event));
 
         $wire.$parent.$call('createEvent', payload);
     },
@@ -433,6 +473,12 @@ new class extends Component
                         type="datetime-local"
                     />
 
+                    <!-- Task Recurrence -->
+                    <x-workspace.inline-recurrence-picker
+                        model="formData.task.recurrence"
+                        type="task"
+                    />
+
                     <!-- Task Project -->
                     <x-inline-create-dropdown dropdown-class="w-48 max-h-60 overflow-y-auto">
                         <x-slot:trigger>
@@ -531,6 +577,12 @@ new class extends Component
                         label="End Date"
                         model="formData.event.endDatetime"
                         type="datetime-local"
+                    />
+
+                    <!-- Event Recurrence -->
+                    <x-workspace.inline-recurrence-picker
+                        model="formData.event.recurrence"
+                        type="event"
                     />
 
                     <!-- Event Tags -->

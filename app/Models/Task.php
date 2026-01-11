@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 
 class Task extends Model
 {
@@ -315,5 +316,108 @@ class Task extends Model
             'status' => $query->orderBy('status', $direction),
             default => $query->orderBy('created_at', 'desc'),
         };
+    }
+
+    /**
+     * Get instances of this task for a given date range.
+     * For recurring tasks, calculates occurrences dynamically.
+     * For non-recurring tasks, returns the task itself if it falls within the range.
+     */
+    public function getInstancesForDateRange(Carbon $startDate, Carbon $endDate): Collection
+    {
+        // If not recurring, return the task itself if it falls within the date range
+        if (! $this->recurringTask) {
+            $isInRange = false;
+
+            if ($this->end_datetime) {
+                $isInRange = Carbon::parse($this->end_datetime)->between($startDate, $endDate);
+            } elseif ($this->start_datetime) {
+                $isInRange = Carbon::parse($this->start_datetime)->between($startDate, $endDate);
+            } else {
+                // Task with no dates - show it
+                $isInRange = true;
+            }
+
+            return $isInRange ? collect([$this]) : collect();
+        }
+
+        // For recurring tasks, calculate occurrences
+        $recurringTask = $this->recurringTask;
+        $occurrenceDates = $recurringTask->calculateOccurrences($startDate, $endDate);
+
+        // Get exception dates to skip
+        $exceptionDates = $recurringTask->getExceptionDates($startDate, $endDate);
+
+        // Filter out exceptions
+        $validDates = $occurrenceDates->reject(function ($date) use ($exceptionDates) {
+            return $exceptionDates->contains($date->format('Y-m-d'));
+        });
+
+        // Get existing TaskInstance records that might have modifications
+        $existingInstances = TaskInstance::where('recurring_task_id', $recurringTask->id)
+            ->whereBetween('instance_date', [$startDate, $endDate])
+            ->get()
+            ->keyBy(fn ($instance) => $instance->instance_date->format('Y-m-d'));
+
+        // Create virtual instances for each valid date
+        return $validDates->map(function ($date) use ($existingInstances) {
+            $dateKey = $date->format('Y-m-d');
+            $existingInstance = $existingInstances->get($dateKey);
+
+            // If an instance exists with modifications, use it
+            if ($existingInstance && ($existingInstance->overridden_title || $existingInstance->overridden_description || $existingInstance->status)) {
+                // Create a virtual task object from the instance
+                $virtualTask = $this->replicate();
+                $virtualTask->id = $this->id.'-'.$dateKey; // Unique ID for virtual instance
+
+                // Set datetime from base task if available, otherwise keep null
+                if ($this->end_datetime) {
+                    $baseEnd = Carbon::parse($this->end_datetime);
+                    $virtualTask->end_datetime = $date->copy()->setTime($baseEnd->hour, $baseEnd->minute, $baseEnd->second);
+                } else {
+                    $virtualTask->end_datetime = null;
+                }
+
+                if ($this->start_datetime) {
+                    $baseStart = Carbon::parse($this->start_datetime);
+                    $virtualTask->start_datetime = $date->copy()->setTime($baseStart->hour, $baseStart->minute, $baseStart->second);
+                } else {
+                    $virtualTask->start_datetime = null;
+                }
+
+                $virtualTask->status = $existingInstance->status ?? $this->status;
+                $virtualTask->title = $existingInstance->overridden_title ?? $this->title;
+                $virtualTask->description = $existingInstance->overridden_description ?? $this->description;
+                $virtualTask->completed_at = $existingInstance->completed_at;
+                $virtualTask->is_instance = true;
+                $virtualTask->instance_date = $date;
+
+                return $virtualTask;
+            }
+
+            // Create a virtual task object for this occurrence
+            $virtualTask = $this->replicate();
+            $virtualTask->id = $this->id.'-'.$dateKey; // Unique ID for virtual instance
+
+            // Set datetime from base task if available, otherwise keep null
+            if ($this->end_datetime) {
+                $baseEnd = Carbon::parse($this->end_datetime);
+                $virtualTask->end_datetime = $date->copy()->setTime($baseEnd->hour, $baseEnd->minute, $baseEnd->second);
+            } else {
+                $virtualTask->end_datetime = null;
+            }
+
+            if ($this->start_datetime) {
+                $baseStart = Carbon::parse($this->start_datetime);
+                $virtualTask->start_datetime = $date->copy()->setTime($baseStart->hour, $baseStart->minute, $baseStart->second);
+            } else {
+                $virtualTask->start_datetime = null;
+            }
+
+            $virtualTask->is_instance = true;
+            $virtualTask->instance_date = $date;
+
+            return $virtualTask;
+        });
     }
 }
