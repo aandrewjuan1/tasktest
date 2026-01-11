@@ -340,27 +340,29 @@ new class extends Component
 
                     <!-- Key meta pills -->
                     <div class="mt-4 flex flex-wrap gap-2">
-                        <!-- Recurring Badge -->
-                        @if($task->recurringTask)
-                            <span
-                                class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-sm font-medium"
-                                title="Recurring: {{ ucfirst($task->recurringTask->recurrence_type->value) }}"
-                            >
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                </svg>
-                                Recurring
-                            </span>
-                        @endif
+                        <!-- Recurring -->
+                        <x-workspace.inline-edit-recurrence
+                            :item-id="$task->id"
+                            :recurring-task="$task->recurringTask"
+                        />
 
                         <!-- Status -->
+                        @php
+                            $statusColors = [
+                                'to_do' => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600',
+                                'doing' => 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800',
+                                'done' => 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800',
+                            ];
+                        @endphp
                         <x-inline-edit-dropdown
                             field="status"
                             :item-id="$task->id"
                             :use-parent="true"
                             :value="$task->status?->value ?? 'to_do'"
                             dropdown-class="w-48"
-                            trigger-class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors cursor-pointer text-sm font-medium"
+                            trigger-class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full transition-colors cursor-pointer text-sm font-medium"
+                            :color-map="$statusColors"
+                            default-color-class="bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600"
                         >
                             <x-slot:trigger>
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -401,13 +403,23 @@ new class extends Component
                         </x-inline-edit-dropdown>
 
                         <!-- Priority -->
+                        @php
+                            $priorityColors = [
+                                'low' => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600',
+                                'medium' => 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-800',
+                                'high' => 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-800',
+                                'urgent' => 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800',
+                            ];
+                        @endphp
                         <x-inline-edit-dropdown
                             field="priority"
                             :item-id="$task->id"
                             :use-parent="true"
                             :value="$task->priority?->value ?? ''"
                             dropdown-class="w-48"
-                            trigger-class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer text-sm font-medium"
+                            trigger-class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full transition-colors cursor-pointer text-sm font-medium"
+                            :color-map="$priorityColors"
+                            default-color-class="bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700"
                         >
                             <x-slot:trigger>
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -456,13 +468,22 @@ new class extends Component
                         </x-inline-edit-dropdown>
 
                         <!-- Complexity -->
+                        @php
+                            $complexityColors = [
+                                'simple' => 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800',
+                                'moderate' => 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-800',
+                                'complex' => 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800',
+                            ];
+                        @endphp
                         <x-inline-edit-dropdown
                             field="complexity"
                             :item-id="$task->id"
                             :use-parent="true"
                             :value="$task->complexity?->value ?? ''"
                             dropdown-class="w-48"
-                            trigger-class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer text-sm font-medium"
+                            trigger-class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full transition-colors cursor-pointer text-sm font-medium"
+                            :color-map="$complexityColors"
+                            default-color-class="bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700"
                         >
                             <x-slot:trigger>
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -523,7 +544,7 @@ new class extends Component
                                     <button
                                         @click="select({{ $minutes }})"
                                         class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                                        :class="selectedValue == {{ $minutes }} ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                                        :class="selectedValue === {{ $minutes }} ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                                     >
                                         {{ $minutes }} minutes
                                     </button>
@@ -531,12 +552,32 @@ new class extends Component
                                 <button
                                     @click="select(null)"
                                     class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                                    :class="selectedValue === null ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                                    :class="selectedValue === null || selectedValue === '' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                                 >
                                     Clear
                                 </button>
                             </x-slot:options>
                         </x-inline-edit-dropdown>
+
+                        <!-- Start Date -->
+                        <x-workspace.inline-edit-date-picker
+                            field="startDatetime"
+                            :item-id="$task->id"
+                            :value="$task->start_datetime?->toIso8601String()"
+                            label="Start Date"
+                            type="datetime-local"
+                            trigger-class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer text-sm font-medium"
+                        />
+
+                        <!-- Due Date -->
+                        <x-workspace.inline-edit-date-picker
+                            field="endDatetime"
+                            :item-id="$task->id"
+                            :value="$task->end_datetime?->toIso8601String()"
+                            label="Due Date"
+                            type="datetime-local"
+                            trigger-class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer text-sm font-medium"
+                        />
                     </div>
                 </div>
 
@@ -640,39 +681,6 @@ new class extends Component
                     </div>
                     <div x-show="!editing" @click="startEditing()" class="cursor-pointer">
                         <p class="text-sm text-zinc-600 dark:text-zinc-400" x-text="originalValue || 'No description provided.'"></p>
-                    </div>
-                </div>
-
-                <!-- Dates -->
-                <div class="mt-6 border-t border-zinc-200 dark:border-zinc-800 pt-4">
-                    <div class="flex items-center justify-between gap-2 mb-2">
-                        <flux:heading size="sm" class="flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
-                            <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            Dates
-                        </flux:heading>
-                    </div>
-                    <div class="flex flex-wrap gap-2">
-                        <!-- Start Date -->
-                        <x-workspace.inline-edit-date-picker
-                            field="startDatetime"
-                            :item-id="$task->id"
-                            :value="$task->start_datetime?->toIso8601String()"
-                            label="Start Date"
-                            type="datetime-local"
-                            trigger-class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer text-sm font-medium"
-                        />
-
-                        <!-- Due Date -->
-                        <x-workspace.inline-edit-date-picker
-                            field="endDatetime"
-                            :item-id="$task->id"
-                            :value="$task->end_datetime?->toIso8601String()"
-                            label="Due Date"
-                            type="datetime-local"
-                            trigger-class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer text-sm font-medium"
-                        />
                     </div>
                 </div>
 
@@ -906,48 +914,6 @@ new class extends Component
                         <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
                             {{ $task->pomodoroSessions->count() }} session(s) completed
                         </p>
-                    </div>
-                @endif
-
-                <!-- Recurring Task -->
-                @if($task->recurringTask)
-                    <div class="mt-4">
-                        <flux:heading size="sm" class="flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
-                            <svg class="w-4 h-4 text-green-500 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                            Recurring Task
-                        </flux:heading>
-                        <div class="mt-2 space-y-2">
-                            <div class="text-sm text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
-                                <span class="font-medium">Type:</span>
-                                <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-md bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
-                                    {{ ucfirst($task->recurringTask->recurrence_type->value) }}
-                                </span>
-                            </div>
-                            @if($task->recurringTask->interval > 1)
-                                <div class="text-sm text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
-                                    <span class="font-medium">Interval:</span>
-                                    <span>Every {{ $task->recurringTask->interval }} {{ str($task->recurringTask->recurrence_type->value)->plural() }}</span>
-                                </div>
-                            @endif
-                            @if($task->recurringTask->start_datetime)
-                                <div class="text-sm text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
-                                    <span class="font-medium">Started:</span>
-                                    <span>{{ $task->recurringTask->start_datetime->format('M j, Y') }}</span>
-                                </div>
-                            @endif
-                            @if($task->recurringTask->end_datetime)
-                                <div class="text-sm text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
-                                    <span class="font-medium">Ends:</span>
-                                    <span>{{ $task->recurringTask->end_datetime->format('M j, Y') }}</span>
-                                </div>
-                            @else
-                                <div class="text-sm text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
-                                    <span>No end date</span>
-                                </div>
-                            @endif
-                        </div>
                     </div>
                 @endif
 

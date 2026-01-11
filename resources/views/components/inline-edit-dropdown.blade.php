@@ -6,6 +6,8 @@
     'dropdownClass' => 'w-48',
     'triggerClass' => 'flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors',
     'position' => 'bottom', // 'top' or 'bottom'
+    'colorMap' => null, // Optional: array mapping values to color classes
+    'defaultColorClass' => null, // Optional: default color class when value is empty/null
 ])
 
 <div
@@ -14,6 +16,17 @@
         open: false,
         mouseLeaveTimer: null,
         selectedValue: @js($value ? $value : null),
+        colorMap: @js($colorMap),
+        defaultColorClass: @js($defaultColorClass),
+        getTriggerClass() {
+            const baseClass = '{{ $triggerClass }}';
+            if (!this.colorMap) {
+                return baseClass;
+            }
+            const value = this.selectedValue || '';
+            const colorClass = value && this.colorMap[value] ? this.colorMap[value] : (this.defaultColorClass || '');
+            return baseClass + (colorClass ? ' ' + colorClass : '');
+        },
         init() {
             @if($useParent && $itemId)
                 // Listen for backend updates
@@ -90,7 +103,7 @@
     <button
         type="button"
         @click.stop="toggleDropdown()"
-        class="{{ $triggerClass }}"
+        x-bind:class="getTriggerClass()"
     >
         {{ $trigger ?? '' }}
     </button>

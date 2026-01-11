@@ -446,12 +446,40 @@ new class extends Component
                 return;
             }
 
-            validator(
-                [$field => $value],
-                [$field => $validationRules],
-                [],
-                [$field => $field],
-            )->validate();
+            // Handle nested validation for recurrence
+            if ($field === 'recurrence') {
+                // If value is null, it means recurrence is being disabled - no validation needed
+                if ($value === null) {
+                    // Skip validation for null values (disabling recurrence)
+                } else {
+                    $rules = [
+                        'recurrence' => ['nullable', 'array'],
+                        'recurrence.enabled' => ['nullable', 'boolean'],
+                        'recurrence.type' => ['nullable', 'required_if:recurrence.enabled,true', 'string', 'in:daily,weekly,monthly,yearly,custom'],
+                        'recurrence.interval' => ['nullable', 'required_if:recurrence.enabled,true', 'integer', 'min:1'],
+                        'recurrence.daysOfWeek' => ['nullable', 'array'],
+                        'recurrence.daysOfWeek.*' => ['integer', 'min:0', 'max:6'],
+                        'recurrence.startDatetime' => ['nullable', 'date'],
+                        'recurrence.endDatetime' => ['nullable', 'date', 'after_or_equal:recurrence.startDatetime'],
+                    ];
+                    validator(
+                        [$field => $value],
+                        $rules,
+                        [],
+                        [
+                            'recurrence.type' => 'recurrence type',
+                            'recurrence.interval' => 'recurrence interval',
+                        ],
+                    )->validate();
+                }
+            } else {
+                validator(
+                    [$field => $value],
+                    [$field => $validationRules],
+                    [],
+                    [$field => $field],
+                )->validate();
+            }
 
             DB::transaction(function () use ($task, $field, $value) {
                 $updateData = [];
@@ -483,6 +511,35 @@ new class extends Component
                         break;
                     case 'projectId':
                         $updateData['project_id'] = $value ?: null;
+                        break;
+                    case 'recurrence':
+                        // Handle recurrence separately as it involves RecurringTask model
+                        $recurrenceData = $value;
+
+                        if ($recurrenceData === null || empty($recurrenceData) || ! ($recurrenceData['enabled'] ?? false)) {
+                            // Delete recurrence if it exists
+                            if ($task->recurringTask) {
+                                $task->recurringTask->delete();
+                            }
+                        } else {
+                            // Create or update recurrence
+                            $recurringTaskData = [
+                                'task_id' => $task->id,
+                                'recurrence_type' => RecurrenceType::from($recurrenceData['type']),
+                                'interval' => $recurrenceData['interval'] ?? 1,
+                                'start_datetime' => ! empty($recurrenceData['startDatetime']) ? Carbon::parse($recurrenceData['startDatetime']) : null,
+                                'end_datetime' => ! empty($recurrenceData['endDatetime']) ? Carbon::parse($recurrenceData['endDatetime']) : null,
+                                'days_of_week' => ! empty($recurrenceData['daysOfWeek']) && is_array($recurrenceData['daysOfWeek'])
+                                    ? implode(',', $recurrenceData['daysOfWeek'])
+                                    : null,
+                            ];
+
+                            if ($task->recurringTask) {
+                                $task->recurringTask->update($recurringTaskData);
+                            } else {
+                                RecurringTask::create($recurringTaskData);
+                            }
+                        }
                         break;
                 }
 
@@ -1119,6 +1176,10 @@ new class extends Component
             'startDatetime' => ['nullable', 'date'],
             'endDatetime' => ['nullable', 'date'],
             'projectId' => ['nullable', 'exists:projects,id'],
+            'recurrence' => [
+                'nullable',
+                'array',
+            ],
             default => [],
         };
     }
