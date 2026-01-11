@@ -128,6 +128,19 @@ new class extends Component
             </h3>
 
             <div class="space-y-3" aria-live="polite">
+                @if($status !== 'done')
+                    <!-- Create New Item CTA -->
+                    <button
+                        @click="$dispatch('open-create-modal', { status: '{{ $status }}' })"
+                        class="w-full bg-white dark:bg-zinc-800 rounded-lg border-2 border-dashed border-zinc-300 dark:border-zinc-600 hover:border-blue-400 dark:hover:border-blue-500 p-6 transition-all hover:bg-zinc-50 dark:hover:bg-zinc-700/50 flex items-center justify-center group cursor-pointer mb-3"
+                        draggable="false"
+                        aria-label="Create new item in {{ match($status) { 'to_do' => 'To Do', 'doing' => 'In Progress', default => '' } }}"
+                    >
+                        <svg class="w-10 h-10 text-zinc-400 dark:text-zinc-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                    </button>
+                @endif
                 @foreach(collect($this->itemsByStatus[$status] ?? [])->sortBy(function ($item) {
                     // Events get priority 0, tasks get priority 1
                     return $item->item_type === 'event' ? 0 : 1;
@@ -163,20 +176,6 @@ new class extends Component
                     <div class="text-center py-8 text-zinc-500 dark:text-zinc-400 text-sm select-none" draggable="false" aria-label="Empty column">
                         No items
                     </div>
-                @endif
-
-                @if($status !== 'done')
-                    <!-- Create New Item CTA -->
-                    <button
-                        @click="$dispatch('open-create-modal', { status: '{{ $status }}' })"
-                        class="w-full bg-white dark:bg-zinc-800 rounded-lg border-2 border-dashed border-zinc-300 dark:border-zinc-600 hover:border-blue-400 dark:hover:border-blue-500 p-6 transition-all hover:bg-zinc-50 dark:hover:bg-zinc-700/50 flex items-center justify-center group cursor-pointer mt-3"
-                        draggable="false"
-                        aria-label="Create new item in {{ match($status) { 'to_do' => 'To Do', 'doing' => 'In Progress', default => '' } }}"
-                    >
-                        <svg class="w-10 h-10 text-zinc-400 dark:text-zinc-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                        </svg>
-                    </button>
                 @endif
             </div>
         </div>

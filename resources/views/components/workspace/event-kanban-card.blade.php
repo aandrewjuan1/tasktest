@@ -1,7 +1,7 @@
 @props(['event'])
 
 <div
-    class="bg-white dark:bg-zinc-800 rounded-lg border border-blue-300 dark:border-blue-600 p-3 cursor-pointer transition-all flex items-center gap-2 sm:gap-3 flex-wrap"
+    class="bg-white dark:bg-zinc-800 rounded-lg border p-3 cursor-pointer transition-all flex items-center gap-2 sm:gap-3 flex-wrap"
     wire:click="$dispatch('view-event-detail', { id: {{ $event->id }} })"
     role="button"
     tabindex="0"

@@ -18,6 +18,8 @@ new class extends Component
 
     public bool $showDeleteConfirm = false;
 
+    public bool $isLoading = false;
+
     // Edit fields
     public string $title = '';
 
@@ -38,18 +40,22 @@ new class extends Component
     #[On('view-task-detail')]
     public function openModal(int $id): void
     {
-        // Load task first before setting isOpen to prevent DOM flicker
+        // Show loading state immediately
+        $this->isLoading = true;
+        $this->isOpen = true;
+        $this->showDeleteConfirm = false;
+
+        // Load task with relationships
         $this->task = Task::with(['project', 'event', 'tags', 'reminders', 'pomodoroSessions', 'recurringTask'])
             ->findOrFail($id);
 
         $this->authorize('view', $this->task);
 
-        // Load data before opening modal to ensure stable DOM structure
+        // Load data before showing content
         $this->loadTaskData();
 
-        // Set modal state after data is loaded
-        $this->isOpen = true;
-        $this->showDeleteConfirm = false;
+        // Hide loading state after data is loaded
+        $this->isLoading = false;
     }
 
     public function closeModal(): void
@@ -57,6 +63,7 @@ new class extends Component
         $this->isOpen = false;
         $this->task = null;
         $this->showDeleteConfirm = false;
+        $this->isLoading = false;
         $this->resetValidation();
     }
 
@@ -166,7 +173,21 @@ new class extends Component
         closeable="false"
     >
         <div class="space-y-6 px-4 py-4 sm:px-6 sm:py-5" wire:key="task-content-{{ $task?->id ?? 'empty' }}">
-            @if($task)
+            <!-- Loading State -->
+            @if($isLoading)
+                <div class="flex items-center justify-center py-12">
+                    <div class="flex flex-col items-center gap-3">
+                        <svg class="animate-spin h-8 w-8 text-blue-600 dark:text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <p class="text-sm text-zinc-600 dark:text-zinc-400">Loading task details...</p>
+                    </div>
+                </div>
+            @endif
+
+            <!-- Task Content -->
+            @if(!$isLoading && $task)
                 <!-- Header -->
                 <div class="border-b border-zinc-200 dark:border-zinc-800 pb-4">
                     <div class="flex-1"
@@ -941,7 +962,7 @@ new class extends Component
                         </flux:button>
                     </div>
                 </div>
-            @endif
+                @endif
         </div>
     </flux:modal>
 
