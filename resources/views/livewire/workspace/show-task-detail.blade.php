@@ -567,20 +567,45 @@ new class extends Component
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                                <span x-text="selectedValue ? selectedValue + ' min' : 'No duration'"></span>
+                                <span
+                                    x-text="selectedValue ? (() => { const mins = parseInt(selectedValue); if (mins >= 60) { const hours = Math.floor(mins / 60); const remainingMins = mins % 60; if (remainingMins === 0) { return hours + (hours === 1 ? ' hour' : ' hours'); } return hours + (hours === 1 ? ' hour' : ' hours') + ' ' + remainingMins + ' min'; } return mins + ' min'; })() : 'No duration'"
+                                >@php
+                                    if ($task->duration) {
+                                        $mins = $task->duration;
+                                        if ($mins >= 60) {
+                                            $hours = floor($mins / 60);
+                                            $remainingMins = $mins % 60;
+                                            if ($remainingMins === 0) {
+                                                echo $hours . ($hours === 1 ? ' hour' : ' hours');
+                                            } else {
+                                                echo $hours . ($hours === 1 ? ' hour' : ' hours') . ' ' . $remainingMins . ' min';
+                                            }
+                                        } else {
+                                            echo $mins . ' min';
+                                        }
+                                    } else {
+                                        echo 'No duration';
+                                    }
+                                @endphp</span>
                             </x-slot:trigger>
 
                             <x-slot:options>
                                 <div class="px-4 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-700">
                                     Duration
                                 </div>
-                                @foreach([15, 30, 45, 60, 90, 120, 180, 240, 300] as $minutes)
+                                @foreach([15, 30, 45, 60, 90, 120, 180, 240] as $minutes)
+                                    @php
+                                        $hours = floor($minutes / 60);
+                                        $displayText = $minutes < 60
+                                            ? $minutes . ' minutes'
+                                            : ($hours . ($hours === 1 ? ' hour' : ' hours') . ($minutes === 240 ? '+' : ''));
+                                    @endphp
                                     <button
                                         @click="select({{ $minutes }})"
                                         class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                                         :class="selectedValue === {{ $minutes }} ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                                     >
-                                        {{ $minutes }} minutes
+                                        {{ $displayText }}
                                     </button>
                                 @endforeach
                                 <button
