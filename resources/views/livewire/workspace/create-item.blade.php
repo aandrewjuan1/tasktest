@@ -436,26 +436,37 @@ new class extends Component
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             <span class="text-sm font-medium">Duration</span>
-                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.task.duration ? formData.task.duration + ' min' : 'Not set'"></span>
+                            <span class="text-xs text-zinc-500 dark:text-zinc-400" x-text="formData.task.duration ? (() => { const mins = parseInt(formData.task.duration); if (mins >= 60) { const hours = Math.floor(mins / 60); const remainingMins = mins % 60; if (remainingMins === 0) { return hours + (hours === 1 ? ' hour' : ' hours') + (mins >= 480 ? '+' : ''); } return hours + (hours === 1 ? ' hour' : ' hours') + ' ' + remainingMins + ' min'; } return mins + ' min'; })() : 'Not set'"></span>
                         </x-slot:trigger>
 
                         <x-slot:options>
-                            @foreach([15, 30, 45, 60, 90, 120, 180, 240, 300] as $minutes)
+                            <div class="px-4 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-700">
+                                Duration
+                            </div>
+                            <button
+                                x-show="formData.task.duration !== null && formData.task.duration !== ''"
+                                @click="select(() => formData.task.duration = null)"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 text-red-600 dark:text-red-400"
+                            >
+                                Clear
+                            </button>
+                            @foreach([10, 15, 30, 45, 60, 120, 240, 480] as $minutes)
+                                @php
+                                    if ($minutes < 60) {
+                                        $displayText = $minutes . ($minutes === 1 ? ' minute' : ' minutes');
+                                    } else {
+                                        $hours = floor($minutes / 60);
+                                        $displayText = $hours . ($hours === 1 ? ' hour' : ' hours') . ($minutes === 480 ? '+' : '');
+                                    }
+                                @endphp
                                 <button
                                     @click="select(() => formData.task.duration = {{ $minutes }})"
                                     :class="formData.task.duration === {{ $minutes }} ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                                     class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                                 >
-                                    {{ $minutes }} minutes
+                                    {{ $displayText }}
                                 </button>
                             @endforeach
-                            <button
-                                @click="select(() => formData.task.duration = null)"
-                                :class="formData.task.duration === null ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
-                                class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                            >
-                                Clear
-                            </button>
                         </x-slot:options>
                     </x-inline-create-dropdown>
 

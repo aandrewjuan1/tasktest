@@ -165,9 +165,9 @@ new class extends Component
                         class="cursor-move relative transition-all"
                     >
                         @if($item->item_type === 'task')
-                            <x-workspace.task-kanban-card :task="$item" />
+                            <x-workspace.task-card :task="$item" />
                         @elseif($item->item_type === 'event')
-                            <x-workspace.event-kanban-card :event="$item" />
+                            <x-workspace.event-card :event="$item" />
                         @endif
                     </div>
                 @endforeach

@@ -274,7 +274,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span
-                    x-text="selectedValue ? (() => { const mins = parseInt(selectedValue); if (mins >= 60) { const hours = Math.floor(mins / 60); const remainingMins = mins % 60; if (remainingMins === 0) { return hours + (hours === 1 ? ' hour' : ' hours'); } return hours + (hours === 1 ? ' hour' : ' hours') + ' ' + remainingMins + ' min'; } return mins + ' min'; })() : 'No duration'"
+                    x-text="selectedValue ? (() => { const mins = parseInt(selectedValue); if (mins >= 60) { const hours = Math.floor(mins / 60); const remainingMins = mins % 60; if (remainingMins === 0) { return hours + (hours === 1 ? ' hour' : ' hours') + (mins >= 480 ? '+' : ''); } return hours + (hours === 1 ? ' hour' : ' hours') + ' ' + remainingMins + ' min'; } return mins + ' min'; })() : 'No duration'"
                 >@php
                     if ($task->duration) {
                         $mins = $task->duration;
@@ -282,7 +282,7 @@
                             $hours = floor($mins / 60);
                             $remainingMins = $mins % 60;
                             if ($remainingMins === 0) {
-                                echo $hours . ($hours === 1 ? ' hour' : ' hours');
+                                echo $hours . ($hours === 1 ? ' hour' : ' hours') . ($mins >= 480 ? '+' : '');
                             } else {
                                 echo $hours . ($hours === 1 ? ' hour' : ' hours') . ' ' . $remainingMins . ' min';
                             }
@@ -299,12 +299,21 @@
                 <div class="px-4 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-700">
                     Duration
                 </div>
-                @foreach([15, 30, 45, 60, 90, 120, 180, 240] as $minutes)
+                <button
+                    x-show="selectedValue !== null && selectedValue !== ''"
+                    @click="select(null)"
+                    class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 text-red-600 dark:text-red-400"
+                >
+                    Clear
+                </button>
+                @foreach([10, 15, 30, 45, 60, 120, 240, 480] as $minutes)
                     @php
-                        $hours = floor($minutes / 60);
-                        $displayText = $minutes < 60
-                            ? $minutes . ' minutes'
-                            : ($hours . ($hours === 1 ? ' hour' : ' hours') . ($minutes === 240 ? '+' : ''));
+                        if ($minutes < 60) {
+                            $displayText = $minutes . ($minutes === 1 ? ' minute' : ' minutes');
+                        } else {
+                            $hours = floor($minutes / 60);
+                            $displayText = $hours . ($hours === 1 ? ' hour' : ' hours') . ($minutes === 480 ? '+' : '');
+                        }
                     @endphp
                     <button
                         @click="select({{ $minutes }})"
@@ -314,13 +323,6 @@
                         {{ $displayText }}
                     </button>
                 @endforeach
-                <button
-                    @click="select(null)"
-                    class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                    :class="selectedValue === null || selectedValue === '' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
-                >
-                    Clear
-                </button>
             </x-slot:options>
         </x-inline-edit-dropdown>
     </div>
