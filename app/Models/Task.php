@@ -364,8 +364,8 @@ class Task extends Model
             $dateKey = $date->format('Y-m-d');
             $existingInstance = $existingInstances->get($dateKey);
 
-            // If an instance exists with modifications, use it
-            if ($existingInstance && ($existingInstance->overridden_title || $existingInstance->overridden_description || $existingInstance->status)) {
+            // If an instance exists with status modification, use it
+            if ($existingInstance && $existingInstance->status) {
                 // Create a virtual task object from the instance
                 $virtualTask = $this->replicate();
                 $virtualTask->id = $this->id.'-'.$dateKey; // Unique ID for virtual instance
@@ -385,9 +385,7 @@ class Task extends Model
                     $virtualTask->start_datetime = null;
                 }
 
-                $virtualTask->status = $existingInstance->status ?? $this->status;
-                $virtualTask->title = $existingInstance->overridden_title ?? $this->title;
-                $virtualTask->description = $existingInstance->overridden_description ?? $this->description;
+                $virtualTask->status = $existingInstance->status;
                 $virtualTask->completed_at = $existingInstance->completed_at;
                 $virtualTask->is_instance = true;
                 $virtualTask->instance_date = $date;

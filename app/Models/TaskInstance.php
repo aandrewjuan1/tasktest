@@ -13,8 +13,6 @@ class TaskInstance extends Model
         'task_id',
         'instance_date',
         'status',
-        'overridden_title',
-        'overridden_description',
         'completed_at',
     ];
 

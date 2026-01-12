@@ -47,8 +47,10 @@
                 <x-inline-edit-dropdown
                     field="status"
                     :item-id="$event->id"
+                    item-type="event"
                     :use-parent="true"
                     :value="$event->status?->value ?? 'scheduled'"
+                    :instance-date="($event->is_instance ?? false) && isset($event->instance_date) ? $event->instance_date->format('Y-m-d') : null"
                     dropdown-class="w-48"
                     trigger-class="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full transition-colors cursor-pointer text-xs font-medium"
                     :color-map="$statusColors"

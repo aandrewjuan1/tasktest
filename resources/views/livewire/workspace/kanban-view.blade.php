@@ -96,6 +96,7 @@ new class extends Component
                  draggingOver = false;
                  const itemId = $event.dataTransfer.getData('itemId');
                  const itemType = $event.dataTransfer.getData('itemType');
+                 const instanceDate = $event.dataTransfer.getData('instanceDate');
 
                  // Validate itemId exists and is valid
                  if (!itemId || itemId === '' || isNaN(parseInt(itemId))) {
@@ -108,11 +109,18 @@ new class extends Component
                  }
 
                  // Send update to Livewire (server-side status change)
-                 $dispatch('update-item-status', {
+                 const eventData = {
                      itemId: parsedItemId,
                      itemType: itemType,
                      newStatus: '{{ $status }}'
-                 });
+                 };
+
+                 // Include instance date information if available
+                 if (instanceDate) {
+                     eventData.instanceDate = instanceDate;
+                 }
+
+                 $dispatch('update-item-status', eventData);
              "
              :class="{ 'ring-2 ring-blue-500': draggingOver }"
         >
@@ -156,6 +164,11 @@ new class extends Component
                             $event.dataTransfer.setData('itemId', {{ $item->id }});
                             $event.dataTransfer.setData('itemType', '{{ $item->item_type }}');
                             $event.dataTransfer.setData('label', '{{ $item->title ?? $item->name }}');
+                            @if(($item->is_instance ?? false) && isset($item->instance_date))
+                                $event.dataTransfer.setData('instanceDate', '{{ $item->instance_date->format('Y-m-d') }}');
+                            @elseif(($item->recurringTask ?? null) || ($item->recurringEvent ?? null))
+                                $event.dataTransfer.setData('instanceDate', '{{ ($currentDate ?? now())->format('Y-m-d') }}');
+                            @endif
                             $el.classList.add('opacity-50', 'ring-2', 'ring-blue-500');
                         "
                         @dragend="

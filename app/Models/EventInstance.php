@@ -11,14 +11,8 @@ class EventInstance extends Model
     protected $fillable = [
         'recurring_event_id',
         'event_id',
-        'instance_start',
-        'instance_end',
+        'instance_date',
         'status',
-        'overridden_title',
-        'overridden_description',
-        'overridden_location',
-        'all_day',
-        'timezone',
         'cancelled',
         'completed_at',
     ];
@@ -27,9 +21,7 @@ class EventInstance extends Model
     {
         return [
             'status' => EventStatus::class,
-            'instance_start' => 'datetime',
-            'instance_end' => 'datetime',
-            'all_day' => 'boolean',
+            'instance_date' => 'date',
             'cancelled' => 'boolean',
             'completed_at' => 'datetime',
         ];

@@ -43,6 +43,7 @@
                     :item-id="$task->id"
                     :use-parent="true"
                     :value="$task->status?->value ?? 'to_do'"
+                    :instance-date="($task->is_instance ?? false) && isset($task->instance_date) ? $task->instance_date->format('Y-m-d') : null"
                     dropdown-class="w-48"
                     trigger-class="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full transition-colors cursor-pointer text-xs font-medium"
                     :color-map="$statusColors"

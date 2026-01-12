@@ -6,11 +6,13 @@ use App\Enums\TaskComplexity;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Models\Event;
+use App\Models\EventInstance;
 use App\Models\Project;
 use App\Models\RecurringEvent;
 use App\Models\RecurringTask;
 use App\Models\Tag;
 use App\Models\Task;
+use App\Models\TaskInstance;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -158,9 +160,9 @@ new class extends Component
     }
 
     #[On('update-item-status')]
-    public function handleUpdateItemStatus(int $itemId, string $itemType, string $newStatus): void
+    public function handleUpdateItemStatus(int $itemId, string $itemType, string $newStatus, ?string $instanceDate = null): void
     {
-        $this->updateItemStatus($itemId, $itemType, $newStatus);
+        $this->updateItemStatus($itemId, $itemType, $newStatus, $instanceDate);
     }
 
     #[On('update-item-datetime')]
@@ -298,9 +300,9 @@ new class extends Component
     }
 
     #[On('update-task-field')]
-    public function handleUpdateTaskField(int $taskId, string $field, mixed $value): void
+    public function handleUpdateTaskField(int $taskId, string $field, mixed $value, ?string $instanceDate = null): void
     {
-        $this->updateTaskField($taskId, $field, $value);
+        $this->updateTaskField($taskId, $field, $value, $instanceDate);
     }
 
     #[On('update-task-tags')]
@@ -310,9 +312,9 @@ new class extends Component
     }
 
     #[On('update-event-field')]
-    public function handleUpdateEventField(int $eventId, string $field, mixed $value): void
+    public function handleUpdateEventField(int $eventId, string $field, mixed $value, ?string $instanceDate = null): void
     {
-        $this->updateEventField($eventId, $field, $value);
+        $this->updateEventField($eventId, $field, $value, $instanceDate);
     }
 
     #[On('delete-event')]
@@ -432,7 +434,7 @@ new class extends Component
         }
     }
 
-    public function updateTaskField(int $taskId, string $field, mixed $value): void
+    public function updateTaskField(int $taskId, string $field, mixed $value, ?string $instanceDate = null): void
     {
         try {
             $task = Task::with(['project', 'event', 'tags', 'reminders', 'pomodoroSessions', 'recurringTask'])
@@ -481,7 +483,51 @@ new class extends Component
                 )->validate();
             }
 
-            DB::transaction(function () use ($task, $field, $value) {
+            DB::transaction(function () use ($task, $field, $value, $instanceDate) {
+                // Handle status updates for recurring tasks with instance_date
+                if ($field === 'status' && $task->recurringTask && $instanceDate) {
+                    $statusEnum = match ($value) {
+                        'to_do' => TaskStatus::ToDo,
+                        'doing' => TaskStatus::Doing,
+                        'done' => TaskStatus::Done,
+                        default => null,
+                    };
+
+                    if ($statusEnum) {
+                        // Parse date and normalize
+                        $parsedDate = Carbon::parse($instanceDate)->startOfDay();
+                        $dateString = $parsedDate->format('Y-m-d');
+
+                        // Check if instance exists for this specific task_id, recurring_task_id and date
+                        // Use latest() to get the most recent instance if duplicates exist
+                        $existingInstance = TaskInstance::where('task_id', $task->id)
+                            ->where('recurring_task_id', $task->recurringTask->id)
+                            ->whereDate('instance_date', $dateString)
+                            ->latest('id')
+                            ->first();
+
+                        if ($existingInstance) {
+                            // Update existing instance
+                            $existingInstance->update([
+                                'task_id' => $task->id,
+                                'status' => $statusEnum,
+                                'completed_at' => $statusEnum === TaskStatus::Done ? now() : null,
+                            ]);
+                        } else {
+                            // Create new instance
+                            TaskInstance::create([
+                                'recurring_task_id' => $task->recurringTask->id,
+                                'task_id' => $task->id,
+                                'instance_date' => $dateString,
+                                'status' => $statusEnum,
+                                'completed_at' => $statusEnum === TaskStatus::Done ? now() : null,
+                            ]);
+                        }
+                    }
+
+                    return; // Don't update base task for instance status changes
+                }
+
                 $updateData = [];
 
                 switch ($field) {
@@ -622,7 +668,7 @@ new class extends Component
         }
     }
 
-    public function updateEventField(int $eventId, string $field, mixed $value): void
+    public function updateEventField(int $eventId, string $field, mixed $value, ?string $instanceDate = null): void
     {
         try {
             $event = Event::with(['tags', 'reminders', 'recurringEvent'])
@@ -643,7 +689,51 @@ new class extends Component
                 [$field => $field],
             )->validate();
 
-            DB::transaction(function () use ($event, $field, $value) {
+            DB::transaction(function () use ($event, $field, $value, $instanceDate) {
+                // Handle status updates for recurring events with instance_date
+                if ($field === 'status' && $event->recurringEvent && $instanceDate) {
+                    $statusEnum = match ($value) {
+                        'to_do', 'scheduled' => EventStatus::Scheduled,
+                        'doing', 'ongoing' => EventStatus::Ongoing,
+                        'done', 'completed' => EventStatus::Completed,
+                        'cancelled' => EventStatus::Cancelled,
+                        'tentative' => EventStatus::Tentative,
+                        default => null,
+                    };
+
+                    if ($statusEnum) {
+                        // Parse date and normalize
+                        $parsedDate = Carbon::parse($instanceDate)->startOfDay();
+                        $dateString = $parsedDate->format('Y-m-d');
+
+                        // Check if instance exists for this specific event_id and date
+                        $existingInstance = EventInstance::where('event_id', $event->id)
+                            ->whereDate('instance_date', $dateString)
+                            ->first();
+
+                        if ($existingInstance) {
+                            // Update existing instance
+                            $existingInstance->update([
+                                'status' => $statusEnum,
+                                'cancelled' => $statusEnum === EventStatus::Cancelled,
+                                'completed_at' => $statusEnum === EventStatus::Completed ? now() : null,
+                            ]);
+                        } else {
+                            // Create new instance
+                            EventInstance::create([
+                                'recurring_event_id' => $event->recurringEvent->id,
+                                'event_id' => $event->id,
+                                'instance_date' => $dateString,
+                                'status' => $statusEnum,
+                                'cancelled' => $statusEnum === EventStatus::Cancelled,
+                                'completed_at' => $statusEnum === EventStatus::Completed ? now() : null,
+                            ]);
+                        }
+                    }
+
+                    return; // Don't update base event for instance status changes
+                }
+
                 $updateData = [];
 
                 switch ($field) {
@@ -1218,7 +1308,7 @@ new class extends Component
         };
     }
 
-    public function updateItemStatus(int $itemId, string $itemType, string $newStatus): void
+    public function updateItemStatus(int $itemId, string $itemType, string $newStatus, ?string $instanceDate = null): void
     {
         try {
             $model = match ($itemType) {
@@ -1243,8 +1333,42 @@ new class extends Component
                 };
 
                 if ($statusEnum) {
-                    DB::transaction(function () use ($model, $statusEnum) {
-                        $model->update(['status' => $statusEnum]);
+                    DB::transaction(function () use ($model, $statusEnum, $instanceDate) {
+                        // Handle status updates for recurring tasks with instance_date
+                        if ($model->recurringTask && $instanceDate) {
+                            // Parse date and normalize
+                            $parsedDate = Carbon::parse($instanceDate)->startOfDay();
+                            $dateString = $parsedDate->format('Y-m-d');
+
+                            // Check if instance exists for this specific task_id, recurring_task_id and date
+                            // Use latest() to get the most recent instance if duplicates exist
+                            $existingInstance = TaskInstance::where('task_id', $model->id)
+                                ->where('recurring_task_id', $model->recurringTask->id)
+                                ->whereDate('instance_date', $dateString)
+                                ->latest('id')
+                                ->first();
+
+                            if ($existingInstance) {
+                                // Update existing instance
+                                $existingInstance->update([
+                                    'task_id' => $model->id,
+                                    'status' => $statusEnum,
+                                    'completed_at' => $statusEnum === TaskStatus::Done ? now() : null,
+                                ]);
+                            } else {
+                                // Create new instance
+                                TaskInstance::create([
+                                    'recurring_task_id' => $model->recurringTask->id,
+                                    'task_id' => $model->id,
+                                    'instance_date' => $dateString,
+                                    'status' => $statusEnum,
+                                    'completed_at' => $statusEnum === TaskStatus::Done ? now() : null,
+                                ]);
+                            }
+                        } else {
+                            // Update base task for non-recurring tasks or when no instance date provided
+                            $model->update(['status' => $statusEnum]);
+                        }
                     });
 
                     $this->dispatch('item-updated');
@@ -1264,8 +1388,40 @@ new class extends Component
                 };
 
                 if ($statusEnum) {
-                    DB::transaction(function () use ($model, $statusEnum) {
-                        $model->update(['status' => $statusEnum]);
+                    DB::transaction(function () use ($model, $statusEnum, $instanceDate) {
+                        // Handle status updates for recurring events with instance_date
+                        if ($model->recurringEvent && $instanceDate) {
+                            // Parse date and normalize
+                            $parsedDate = Carbon::parse($instanceDate)->startOfDay();
+                            $dateString = $parsedDate->format('Y-m-d');
+
+                            // Check if instance exists for this specific event_id and date
+                            $existingInstance = EventInstance::where('event_id', $model->id)
+                                ->whereDate('instance_date', $dateString)
+                                ->first();
+
+                            if ($existingInstance) {
+                                // Update existing instance
+                                $existingInstance->update([
+                                    'status' => $statusEnum,
+                                    'cancelled' => $statusEnum === EventStatus::Cancelled,
+                                    'completed_at' => $statusEnum === EventStatus::Completed ? now() : null,
+                                ]);
+                            } else {
+                                // Create new instance
+                                EventInstance::create([
+                                    'recurring_event_id' => $model->recurringEvent->id,
+                                    'event_id' => $model->id,
+                                    'instance_date' => $dateString,
+                                    'status' => $statusEnum,
+                                    'cancelled' => $statusEnum === EventStatus::Cancelled,
+                                    'completed_at' => $statusEnum === EventStatus::Completed ? now() : null,
+                                ]);
+                            }
+                        } else {
+                            // Update base event for non-recurring events or when no instance date provided
+                            $model->update(['status' => $statusEnum]);
+                        }
                     });
 
                     $this->dispatch('item-updated');

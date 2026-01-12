@@ -3,6 +3,8 @@
     'value' => null,
     'useParent' => false,
     'itemId' => null,
+    'itemType' => 'task', // 'task' or 'event'
+    'instanceDate' => null, // For recurring task/event instances
     'dropdownClass' => 'w-48',
     'triggerClass' => 'flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors',
     'position' => 'bottom', // 'top' or 'bottom'
@@ -73,11 +75,39 @@
         select(value) {
             this.selectedValue = value;
             @if($useParent && $itemId)
-                $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
-                    taskId: {{ $itemId }},
-                    field: '{{ $field }}',
-                    value: value,
-                });
+                @if(isset($instanceDate) && $instanceDate)
+                    // For recurring task/event instances
+                    @if($itemType === 'event')
+                        $wire.$dispatchTo('workspace.show-items', 'update-event-field', {
+                            eventId: {{ $itemId }},
+                            field: '{{ $field }}',
+                            value: value,
+                            instanceDate: @js($instanceDate),
+                        });
+                    @else
+                        $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
+                            taskId: {{ $itemId }},
+                            field: '{{ $field }}',
+                            value: value,
+                            instanceDate: @js($instanceDate),
+                        });
+                    @endif
+                @else
+                    // For regular tasks/events
+                    @if($itemType === 'event')
+                        $wire.$dispatchTo('workspace.show-items', 'update-event-field', {
+                            eventId: {{ $itemId }},
+                            field: '{{ $field }}',
+                            value: value,
+                        });
+                    @else
+                        $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
+                            taskId: {{ $itemId }},
+                            field: '{{ $field }}',
+                            value: value,
+                        });
+                    @endif
+                @endif
 
                 // Notify any listeners in the task detail modal so header
                 // pills and other UI can stay in sync with this dropdown.

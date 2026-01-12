@@ -303,29 +303,37 @@ class Event extends Model
 
         // Get existing EventInstance records that might have modifications
         $existingInstances = EventInstance::where('recurring_event_id', $recurringEvent->id)
-            ->whereBetween('instance_start', [$startDate, $endDate])
+            ->whereBetween('instance_date', [$startDate, $endDate])
             ->get()
-            ->keyBy(fn ($instance) => $instance->instance_start->format('Y-m-d H:i'));
+            ->keyBy(fn ($instance) => $instance->instance_date->format('Y-m-d'));
 
         // Create virtual instances for each valid occurrence
         return $validOccurrences->map(function ($occurrence) use ($existingInstances) {
-            $startKey = $occurrence['start']->format('Y-m-d H:i');
-            $existingInstance = $existingInstances->get($startKey);
+            $dateKey = $occurrence['start']->format('Y-m-d');
+            $existingInstance = $existingInstances->get($dateKey);
 
-            // If an instance exists with modifications, use it
-            if ($existingInstance && ($existingInstance->overridden_title || $existingInstance->overridden_description || $existingInstance->overridden_location || $existingInstance->cancelled)) {
+            // If an instance exists with status modification or cancellation, use it
+            if ($existingInstance && ($existingInstance->status || $existingInstance->cancelled)) {
                 // Create a virtual event object from the instance
                 $virtualEvent = $this->replicate();
-                $virtualEvent->id = $this->id.'-'.$occurrence['start']->format('YmdHis');
-                $virtualEvent->start_datetime = $existingInstance->instance_start;
-                $virtualEvent->end_datetime = $existingInstance->instance_end;
+                $virtualEvent->id = $this->id.'-'.$dateKey;
+                // Set datetime from base event if available, otherwise use occurrence times
+                if ($this->start_datetime) {
+                    $baseStart = Carbon::parse($this->start_datetime);
+                    $virtualEvent->start_datetime = $occurrence['start']->copy()->setTime($baseStart->hour, $baseStart->minute, $baseStart->second);
+                } else {
+                    $virtualEvent->start_datetime = $occurrence['start'];
+                }
+                if ($this->end_datetime) {
+                    $baseEnd = Carbon::parse($this->end_datetime);
+                    $virtualEvent->end_datetime = $occurrence['end']->copy()->setTime($baseEnd->hour, $baseEnd->minute, $baseEnd->second);
+                } else {
+                    $virtualEvent->end_datetime = $occurrence['end'];
+                }
                 $virtualEvent->status = $existingInstance->status ?? $this->status;
-                $virtualEvent->title = $existingInstance->overridden_title ?? $this->title;
-                $virtualEvent->description = $existingInstance->overridden_description ?? $this->description;
                 $virtualEvent->completed_at = $existingInstance->completed_at;
                 $virtualEvent->is_instance = true;
-                $virtualEvent->instance_start = $occurrence['start'];
-                $virtualEvent->instance_end = $occurrence['end'];
+                $virtualEvent->instance_date = $existingInstance->instance_date;
                 $virtualEvent->cancelled = $existingInstance->cancelled ?? false;
 
                 return $virtualEvent;
@@ -333,12 +341,11 @@ class Event extends Model
 
             // Create a virtual event object for this occurrence
             $virtualEvent = $this->replicate();
-            $virtualEvent->id = $this->id.'-'.$occurrence['start']->format('YmdHis');
+            $virtualEvent->id = $this->id.'-'.$dateKey;
             $virtualEvent->start_datetime = $occurrence['start'];
             $virtualEvent->end_datetime = $occurrence['end'];
             $virtualEvent->is_instance = true;
-            $virtualEvent->instance_start = $occurrence['start'];
-            $virtualEvent->instance_end = $occurrence['end'];
+            $virtualEvent->instance_date = $occurrence['start']->copy()->startOfDay();
 
             return $virtualEvent;
         });
