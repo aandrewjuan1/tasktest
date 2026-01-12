@@ -523,11 +523,20 @@ new class extends Component
                             }
                         } else {
                             // Create or update recurrence
+                            // Ensure start_datetime is never null - use fallback chain
+                            $startDatetime = ! empty($recurrenceData['startDatetime'])
+                                ? Carbon::parse($recurrenceData['startDatetime'])
+                                : ($task->start_datetime
+                                    ? Carbon::parse($task->start_datetime)
+                                    : ($task->end_datetime
+                                        ? Carbon::parse($task->end_datetime)
+                                        : Carbon::now()));
+
                             $recurringTaskData = [
                                 'task_id' => $task->id,
                                 'recurrence_type' => RecurrenceType::from($recurrenceData['type']),
                                 'interval' => $recurrenceData['interval'] ?? 1,
-                                'start_datetime' => ! empty($recurrenceData['startDatetime']) ? Carbon::parse($recurrenceData['startDatetime']) : null,
+                                'start_datetime' => $startDatetime,
                                 'end_datetime' => ! empty($recurrenceData['endDatetime']) ? Carbon::parse($recurrenceData['endDatetime']) : null,
                                 'days_of_week' => ! empty($recurrenceData['daysOfWeek']) && is_array($recurrenceData['daysOfWeek'])
                                     ? implode(',', $recurrenceData['daysOfWeek'])

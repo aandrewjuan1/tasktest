@@ -127,4 +127,25 @@ class TaskFactory extends Factory
             'end_datetime' => null,
         ]);
     }
+
+    /**
+     * Indicate that the task is "day trading forex".
+     */
+    public function dayTradingForex(): static
+    {
+        $today = Carbon::today();
+        $startDatetime = $today->copy()->setTime(15, 0, 0); // 3pm
+        $endDatetime = $today->copy()->setTime(23, 0, 0); // 11pm
+
+        return $this->state(fn (array $attributes) => [
+            'title' => 'day trading forex',
+            'description' => null,
+            'status' => TaskStatus::ToDo,
+            'priority' => TaskPriority::High,
+            'complexity' => TaskComplexity::Moderate,
+            'duration' => 480, // 8 hours (3pm to 11pm)
+            'start_datetime' => $startDatetime,
+            'end_datetime' => $endDatetime,
+        ]);
+    }
 }

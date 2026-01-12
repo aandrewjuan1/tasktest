@@ -127,8 +127,10 @@
             this.recurrence.type = newType;
             if (newType !== 'weekly') {
                 this.recurrence.daysOfWeek = [];
+                // Auto-save for daily, monthly, yearly
+                this.saveRecurrence();
             }
-            this.saveRecurrence();
+            // For weekly, don't save yet - wait for day selection
         },
         toggleDayOfWeek(day) {
             const days = this.recurrence.daysOfWeek || [];
@@ -140,7 +142,10 @@
                 days.sort();
             }
             this.recurrence.daysOfWeek = days;
-            this.saveRecurrence();
+            // Only save if at least one day is selected
+            if (days.length > 0) {
+                this.saveRecurrence();
+            }
         },
         isDaySelected(day) {
             return (this.recurrence.daysOfWeek || []).includes(day);
