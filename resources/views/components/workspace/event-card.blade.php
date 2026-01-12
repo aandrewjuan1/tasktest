@@ -9,7 +9,7 @@
 >
     {{-- Header Section --}}
     <div class="mb-2">
-        {{-- First Row: Title, Status Buttons, and Badges --}}
+        {{-- First Row: Title, Status Pills, and Badges --}}
         <div class="flex items-center gap-2 sm:gap-3 mb-2">
             <h3 class="font-semibold text-zinc-900 dark:text-zinc-100 text-base sm:text-lg leading-tight flex-1 min-w-0 flex items-center gap-1.5 sm:gap-2 flex-wrap">
                 <span class="line-clamp-2">{{ $event->title }}</span>
@@ -35,107 +35,120 @@
                 <span class="inline-flex items-center px-1.5 sm:px-2.5 py-0.5 sm:py-1 text-xs font-medium rounded-md bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
                     Event
                 </span>
-                @if($event->status)
-                    <span
-                        class="inline-flex items-center px-1.5 sm:px-2.5 py-0.5 sm:py-1 text-xs font-medium rounded-md {{ $event->status->badgeColor() }}"
-                    >
-                        {{ ucfirst($event->status->value) }}
-                    </span>
-                @endif
+                @php
+                    $statusColors = [
+                        'scheduled' => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600',
+                        'ongoing' => 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800',
+                        'completed' => 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800',
+                        'cancelled' => 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800',
+                        'tentative' => 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-800',
+                    ];
+                @endphp
+                <x-inline-edit-dropdown
+                    field="status"
+                    :item-id="$event->id"
+                    :use-parent="true"
+                    :value="$event->status?->value ?? 'scheduled'"
+                    dropdown-class="w-48"
+                    trigger-class="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full transition-colors cursor-pointer text-xs font-medium"
+                    :color-map="$statusColors"
+                    default-color-class="bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600"
+                >
+                    <x-slot:trigger>
+                        <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                        </svg>
+                        <span
+                            x-text="{
+                                scheduled: 'Scheduled',
+                                ongoing: 'Ongoing',
+                                completed: 'Completed',
+                                cancelled: 'Cancelled',
+                                tentative: 'Tentative',
+                            }[selectedValue || 'scheduled']"
+                        >{{ match($event->status?->value ?? 'scheduled') {
+                            'scheduled' => 'Scheduled',
+                            'ongoing' => 'Ongoing',
+                            'completed' => 'Completed',
+                            'cancelled' => 'Cancelled',
+                            'tentative' => 'Tentative',
+                        } }}</span>
+                    </x-slot:trigger>
 
-                @if($event->status)
-                    <div class="flex items-center gap-0.5 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-md p-0.5">
-                    @php
-                        $currentStatus = $event->status->value;
-                        $availableStatuses = match($currentStatus) {
-                            'scheduled' => [
-                                ['status' => 'ongoing', 'icon' => 'play', 'tooltip' => 'Mark as Ongoing'],
-                                ['status' => 'completed', 'icon' => 'check', 'tooltip' => 'Mark as Completed'],
-                                ['status' => 'cancelled', 'icon' => 'archive-box-x-mark', 'tooltip' => 'Mark as Cancelled'],
-                            ],
-                            'ongoing' => [
-                                ['status' => 'scheduled', 'icon' => 'clock', 'tooltip' => 'Mark as Scheduled'],
-                                ['status' => 'completed', 'icon' => 'check', 'tooltip' => 'Mark as Completed'],
-                                ['status' => 'cancelled', 'icon' => 'archive-box-x-mark', 'tooltip' => 'Mark as Cancelled'],
-                            ],
-                            'completed' => [
-                                ['status' => 'scheduled', 'icon' => 'clock', 'tooltip' => 'Mark as Scheduled'],
-                                ['status' => 'ongoing', 'icon' => 'play', 'tooltip' => 'Mark as Ongoing'],
-                                ['status' => 'cancelled', 'icon' => 'archive-box-x-mark', 'tooltip' => 'Mark as Cancelled'],
-                            ],
-                            'cancelled' => [
-                                ['status' => 'scheduled', 'icon' => 'clock', 'tooltip' => 'Mark as Scheduled'],
-                                ['status' => 'ongoing', 'icon' => 'play', 'tooltip' => 'Mark as Ongoing'],
-                                ['status' => 'completed', 'icon' => 'check', 'tooltip' => 'Mark as Completed'],
-                            ],
-                            'tentative' => [
-                                ['status' => 'scheduled', 'icon' => 'clock', 'tooltip' => 'Mark as Scheduled'],
-                                ['status' => 'ongoing', 'icon' => 'play', 'tooltip' => 'Mark as Ongoing'],
-                                ['status' => 'completed', 'icon' => 'check', 'tooltip' => 'Mark as Completed'],
-                            ],
-                            default => [],
-                        };
-                    @endphp
-                    @foreach($availableStatuses as $statusOption)
-                        <flux:button
-                            variant="ghost"
-                            size="xs"
-                            icon="{{ $statusOption['icon'] }}"
-                            tooltip="{{ $statusOption['tooltip'] }}"
-                            @click="$dispatch('update-item-status', { itemId: {{ $event->id }}, itemType: 'event', newStatus: '{{ $statusOption['status'] }}' })"
-                            class="!p-0.5 !w-5 !h-5 hover:bg-blue-50 dark:hover:bg-blue-900 rounded"
-                        />
-                    @endforeach
-                    </div>
-                @endif
+                    <x-slot:options>
+                        <div class="px-4 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-700">
+                            Status
+                        </div>
+                        <button
+                            @click="select('scheduled')"
+                            class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                            :class="selectedValue === 'scheduled' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                        >
+                            Scheduled
+                        </button>
+                        <button
+                            @click="select('ongoing')"
+                            class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                            :class="selectedValue === 'ongoing' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                        >
+                            Ongoing
+                        </button>
+                        <button
+                            @click="select('completed')"
+                            class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                            :class="selectedValue === 'completed' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                        >
+                            Completed
+                        </button>
+                        <button
+                            @click="select('cancelled')"
+                            class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                            :class="selectedValue === 'cancelled' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                        >
+                            Cancelled
+                        </button>
+                        <button
+                            @click="select('tentative')"
+                            class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                            :class="selectedValue === 'tentative' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                        >
+                            Tentative
+                        </button>
+                    </x-slot:options>
+                </x-inline-edit-dropdown>
             </div>
         </div>
 
         {{-- Second Row: Dates --}}
-        @if($event->start_datetime || $event->end_datetime)
-            <div class="flex items-center gap-2 sm:gap-3 text-xs text-zinc-600 dark:text-zinc-400">
-                @if($event->start_datetime)
-                    <div class="flex items-center gap-1 sm:gap-1.5">
-                        <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0 text-zinc-400 dark:text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span class="whitespace-nowrap hidden sm:inline">{{ $event->start_datetime->format('M j, g:i A') }}</span>
-                        <span class="whitespace-nowrap sm:hidden">{{ $event->start_datetime->format('M j') }}</span>
-                    </div>
-                @endif
+        <div class="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-0 flex-wrap" @click.stop>
+            <x-workspace.inline-edit-date-picker
+                field="startDatetime"
+                :item-id="$event->id"
+                :value="$event->start_datetime?->toIso8601String()"
+                label="Start"
+                type="datetime-local"
+                trigger-class="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer text-xs font-medium"
+            />
 
-                @if($event->end_datetime)
-                    <div class="flex items-center gap-1 sm:gap-1.5">
-                        <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0 text-zinc-400 dark:text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        <span class="whitespace-nowrap hidden sm:inline">{{ $event->end_datetime->format('M j, g:i A') }}</span>
-                        <span class="whitespace-nowrap sm:hidden">{{ $event->end_datetime->format('M j') }}</span>
-                    </div>
-                @endif
-            </div>
-        @endif
+            <x-workspace.inline-edit-date-picker
+                field="endDatetime"
+                :item-id="$event->id"
+                :value="$event->end_datetime?->toIso8601String()"
+                label="End"
+                type="datetime-local"
+                trigger-class="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer text-xs font-medium"
+            />
+        </div>
     </div>
 
     {{-- Badges Section --}}
     @if($event->recurringEvent)
-        <div class="flex flex-wrap gap-1.5 sm:gap-2">
-            @php
-                $recurrenceType = ucfirst($event->recurringEvent->recurrence_type->value);
-                $displayText = $recurrenceType;
-                if ($event->recurringEvent->interval > 1) {
-                    $displayText .= ' (Every ' . $event->recurringEvent->interval . ')';
-                }
-            @endphp
-            <span
-                class="inline-flex items-center gap-1 px-1.5 sm:px-2.5 py-0.5 sm:py-1 text-xs font-medium rounded-md bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-                title="Recurring: {{ $recurrenceType }}"
-            >
-                <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                <span class="hidden sm:inline">{{ $displayText }}</span>
-            </span>
+        <div class="flex flex-wrap gap-1.5 sm:gap-2" @click.stop>
+            <x-workspace.inline-edit-recurrence
+                :item-id="$event->id"
+                :recurring-event="$event->recurringEvent"
+                trigger-class="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/40 transition-colors cursor-pointer text-xs font-medium"
+            />
         </div>
     @endif
 </div>
