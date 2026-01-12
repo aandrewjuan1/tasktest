@@ -1,11 +1,7 @@
 @props(['task'])
 
 <div
-    class="bg-white dark:bg-zinc-800 rounded-lg border-l-4 border-purple-500 dark:border-purple-400 border-r border-t border-b border-zinc-200 dark:border-zinc-700 p-3 sm:p-5 cursor-pointer hover:shadow-md hover:shadow-purple-100 dark:hover:shadow-purple-900/20 hover:border-purple-600 dark:hover:border-purple-300 transition-all flex flex-col h-full"
-    wire:click="$dispatch('view-task-detail', { id: {{ $task->id }} })"
-    role="button"
-    tabindex="0"
-    aria-label="View task details: {{ $task->title }}"
+    class="bg-white dark:bg-zinc-800 rounded-lg border-l-4 border-l-purple-500 border-r border-t border-b border-zinc-200 dark:border-zinc-700 p-3 sm:p-5 transition-all flex flex-col h-full"
 >
     {{-- Header Section --}}
     <div class="mb-4">
@@ -188,5 +184,21 @@
             </div>
         </div>
     @endif
+
+    {{-- Actions Section --}}
+    <div class="mt-auto pt-3 border-t border-dashed border-zinc-200 dark:border-zinc-700 flex justify-end">
+        <button
+            type="button"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium text-purple-700 dark:text-purple-200 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/40 dark:hover:bg-purple-800/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-zinc-900 transition-colors"
+            wire:click="$dispatch('view-task-detail', { id: {{ $task->id }} })"
+            aria-label="View task details: {{ $task->title }}"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+            <span>View details</span>
+        </button>
+    </div>
 
 </div>
