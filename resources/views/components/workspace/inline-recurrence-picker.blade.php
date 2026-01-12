@@ -20,11 +20,19 @@
             class="space-y-4 px-3 pb-3 pt-1"
             x-data="{
                 toggleEnabled() {
+                    const wasEnabled = {{ $model }}.enabled;
                     {{ $model }}.enabled = !{{ $model }}.enabled;
                     if (!{{ $model }}.enabled) {
                         {{ $model }}.type = null;
                         {{ $model }}.interval = 1;
                         {{ $model }}.daysOfWeek = [];
+                    } else if (!wasEnabled) {
+                        if (!{{ $model }}.type) {
+                            {{ $model }}.type = 'daily';
+                        }
+                        if (!{{ $model }}.interval || {{ $model }}.interval < 1) {
+                            {{ $model }}.interval = 1;
+                        }
                     }
                 },
                 setType(newType) {
@@ -63,6 +71,14 @@
                     }
                     if ({{ $model }}.daysOfWeek === undefined) {
                         {{ $model }}.daysOfWeek = [];
+                    }
+                    if ({{ $model }}.enabled) {
+                        if (!{{ $model }}.type) {
+                            {{ $model }}.type = 'daily';
+                        }
+                        if (!{{ $model }}.interval || {{ $model }}.interval < 1) {
+                            {{ $model }}.interval = 1;
+                        }
                     }
                 }
             }"

@@ -25,6 +25,14 @@
         mouseLeaveTimer: null,
         recurrence: @js($initialData),
         init() {
+            // Initialize defaults for enabled recurrence without type
+            if (this.recurrence.enabled && !this.recurrence.type) {
+                this.recurrence.type = 'daily';
+            }
+            if (!this.recurrence.interval || this.recurrence.interval < 1) {
+                this.recurrence.interval = 1;
+            }
+
             // Listen for backend updates
             window.addEventListener('task-detail-field-updated', (event) => {
                 const { field, value, taskId } = event.detail || {};
@@ -47,6 +55,10 @@
                             startDatetime: value.startDatetime ?? null,
                             endDatetime: value.endDatetime ?? null,
                         };
+                        // Ensure default type if enabled but no type
+                        if (this.recurrence.enabled && !this.recurrence.type) {
+                            this.recurrence.type = 'daily';
+                        }
                     }
                 }
             });
@@ -116,11 +128,20 @@
             }));
         },
         toggleEnabled() {
+            const wasEnabled = this.recurrence.enabled;
             this.recurrence.enabled = !this.recurrence.enabled;
             if (!this.recurrence.enabled) {
                 this.recurrence.type = null;
                 this.recurrence.interval = 1;
                 this.recurrence.daysOfWeek = [];
+            } else if (!wasEnabled) {
+                // When enabling, set default to daily if no type is set
+                if (!this.recurrence.type) {
+                    this.recurrence.type = 'daily';
+                }
+                if (!this.recurrence.interval || this.recurrence.interval < 1) {
+                    this.recurrence.interval = 1;
+                }
             }
             this.saveRecurrence();
         },
