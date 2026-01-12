@@ -21,8 +21,8 @@
         init() {
             // Listen for backend updates
             window.addEventListener('task-detail-field-updated', (event) => {
-                const { field, value } = event.detail || {};
-                if (field === 'tags') {
+                const { field, value, taskId } = event.detail || {};
+                if (field === 'tags' && taskId === {{ $itemId }}) {
                     this.selectedTagIds = value ?? [];
                 }
             });
@@ -68,6 +68,7 @@
                 detail: {
                     field: 'tags',
                     value: this.selectedTagIds,
+                    taskId: {{ $itemId }},
                 }
             }));
         },

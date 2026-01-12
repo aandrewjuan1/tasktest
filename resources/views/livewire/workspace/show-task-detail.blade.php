@@ -199,8 +199,8 @@ new class extends Component
                              init() {
                                  // Listen for backend updates
                                  window.addEventListener('task-detail-field-updated', (event) => {
-                                     const { field, value } = event.detail || {};
-                                     if (field === 'title') {
+                                     const { field, value, taskId } = event.detail || {};
+                                     if (field === 'title' && taskId === {{ $task->id }}) {
                                          this.originalValue = value ?? '';
                                          this.currentValue = value ?? '';
                                          $wire.title = value ?? '';
@@ -239,6 +239,7 @@ new class extends Component
                                          detail: {
                                              field: 'title',
                                              value: this.currentValue,
+                                             taskId: {{ $task->id }},
                                          }
                                      }));
                                  } else {
@@ -318,8 +319,8 @@ new class extends Component
                             init() {
                                 // Listen for tag updates
                                 window.addEventListener('task-detail-field-updated', (event) => {
-                                    const { field, value } = event.detail || {};
-                                    if (field === 'tags') {
+                                    const { field, value, taskId } = event.detail || {};
+                                    if (field === 'tags' && taskId === {{ $task->id }}) {
                                         this.selectedTagIds = value ?? [];
                                     }
                                 });
@@ -399,6 +400,9 @@ new class extends Component
                             </x-slot:trigger>
 
                             <x-slot:options>
+                                <div class="px-4 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-700">
+                                    Status
+                                </div>
                                 <button
                                     @click="select('to_do')"
                                     class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
@@ -457,6 +461,9 @@ new class extends Component
                             </x-slot:trigger>
 
                             <x-slot:options>
+                                <div class="px-4 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-700">
+                                    Priority
+                                </div>
                                 <button
                                     @click="select('low')"
                                     class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
@@ -520,6 +527,9 @@ new class extends Component
                             </x-slot:trigger>
 
                             <x-slot:options>
+                                <div class="px-4 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-700">
+                                    Complexity
+                                </div>
                                 <button
                                     @click="select('simple')"
                                     class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
@@ -561,6 +571,9 @@ new class extends Component
                             </x-slot:trigger>
 
                             <x-slot:options>
+                                <div class="px-4 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-700">
+                                    Duration
+                                </div>
                                 @foreach([15, 30, 45, 60, 90, 120, 180, 240, 300] as $minutes)
                                     <button
                                         @click="select({{ $minutes }})"
@@ -611,8 +624,8 @@ new class extends Component
                          init() {
                              // Listen for backend updates
                              window.addEventListener('task-detail-field-updated', (event) => {
-                                 const { field, value } = event.detail || {};
-                                 if (field === 'description') {
+                                 const { field, value, taskId } = event.detail || {};
+                                 if (field === 'description' && taskId === {{ $task->id }}) {
                                      this.originalValue = value ?? '';
                                      this.currentValue = value ?? '';
                                      $wire.description = value ?? '';
@@ -641,6 +654,7 @@ new class extends Component
                                     detail: {
                                         field: 'description',
                                         value: this.currentValue,
+                                        taskId: {{ $task->id }},
                                     }
                                 }));
                              } else {
@@ -746,8 +760,8 @@ new class extends Component
                         },
                         init() {
                             window.addEventListener('task-detail-field-updated', (event) => {
-                                const { field, value } = event.detail || {};
-                                if (field === 'projectId') {
+                                const { field, value, taskId } = event.detail || {};
+                                if (field === 'projectId' && taskId === {{ $task->id }}) {
                                     this.selectedProjectId = value ?? '';
                                     this.currentProject = value && this.projects[String(value)] ? this.projects[String(value)] : null;
                                 }

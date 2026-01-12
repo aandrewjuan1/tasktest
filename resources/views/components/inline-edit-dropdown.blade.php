@@ -31,8 +31,8 @@
             @if($useParent && $itemId)
                 // Listen for backend updates
                 window.addEventListener('task-detail-field-updated', (event) => {
-                    const { field, value } = event.detail || {};
-                    if (field === '{{ $field }}') {
+                    const { field, value, taskId } = event.detail || {};
+                    if (field === '{{ $field }}' && taskId === {{ $itemId }}) {
                         this.selectedValue = value ?? '';
                     }
                 });
@@ -85,6 +85,7 @@
                     detail: {
                         field: '{{ $field }}',
                         value: value,
+                        taskId: {{ $itemId }},
                     }
                 }));
 

@@ -27,8 +27,8 @@
         init() {
             // Listen for backend updates
             window.addEventListener('task-detail-field-updated', (event) => {
-                const { field, value } = event.detail || {};
-                if (field === 'recurrence') {
+                const { field, value, taskId } = event.detail || {};
+                if (field === 'recurrence' && taskId === {{ $itemId }}) {
                     if (value === null || !value.enabled) {
                         this.recurrence = {
                             enabled: false,
@@ -111,6 +111,7 @@
                 detail: {
                     field: 'recurrence',
                     value: value,
+                    taskId: {{ $itemId }},
                 }
             }));
         },
