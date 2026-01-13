@@ -76,12 +76,21 @@ class RecurringEvent extends Model
 
         // Use event's start_datetime if recurrence start_datetime is not set
         $recurrenceStart = $this->start_datetime ?? $baseEvent->start_datetime ?? now();
-        $currentDate = Carbon::parse($recurrenceStart)->startOfDay();
+        $recurrenceStartDate = Carbon::parse($recurrenceStart)->startOfDay();
         $endLimit = $this->end_datetime ? Carbon::parse($this->end_datetime)->endOfDay() : null;
 
-        // Don't start before the requested start date
-        if ($currentDate->lt($startDate)) {
-            $currentDate = $startDate->copy();
+        // For yearly recurrence, find the first occurrence within the date range
+        if ($this->recurrence_type === RecurrenceType::Yearly) {
+            $currentDate = $this->getFirstYearlyOccurrenceInRange($recurrenceStartDate, $startDate, $endDate);
+            if (! $currentDate) {
+                return $occurrences; // No occurrences in this range
+            }
+        } else {
+            $currentDate = $recurrenceStartDate->copy();
+            // Don't start before the requested start date
+            if ($currentDate->lt($startDate)) {
+                $currentDate = $startDate->copy();
+            }
         }
 
         // Don't go beyond the requested end date or recurrence end date
@@ -120,7 +129,7 @@ class RecurringEvent extends Model
             RecurrenceType::Daily => $nextDate->addDays($this->interval),
             RecurrenceType::Weekly => $this->getNextWeeklyDate($nextDate),
             RecurrenceType::Monthly => $this->getNextMonthlyDate($nextDate),
-            RecurrenceType::Yearly => $nextDate->addYears($this->interval),
+            RecurrenceType::Yearly => $this->getNextYearlyDate($nextDate),
             RecurrenceType::Custom => $this->getNextCustomDate($nextDate),
         };
     }
@@ -156,6 +165,12 @@ class RecurringEvent extends Model
             $allowedDays = array_map('intval', explode(',', $this->days_of_week));
 
             return in_array($dayOfWeek, $allowedDays);
+        }
+
+        // For yearly recurrence, check if month and day match
+        if ($this->recurrence_type === RecurrenceType::Yearly) {
+            return $date->month === $recurrenceStartDate->month
+                && $date->day === $recurrenceStartDate->day;
         }
 
         return true;
@@ -205,6 +220,24 @@ class RecurringEvent extends Model
     }
 
     /**
+     * Get next yearly occurrence date.
+     * Ensures we always jump to the correct month/day combination.
+     */
+    protected function getNextYearlyDate(Carbon $fromDate): Carbon
+    {
+        $recurrenceStart = $this->start_datetime ?? $this->event?->start_datetime ?? now();
+        $recurrenceStartDate = Carbon::parse($recurrenceStart);
+        $recurrenceMonth = $recurrenceStartDate->month;
+        $recurrenceDay = $recurrenceStartDate->day;
+
+        // Get the next year's occurrence of the same month/day
+        $nextYear = $fromDate->year + $this->interval;
+        $nextDate = Carbon::create($nextYear, $recurrenceMonth, $recurrenceDay)->startOfDay();
+
+        return $nextDate;
+    }
+
+    /**
      * Get next custom occurrence date (placeholder for future custom logic).
      */
     protected function getNextCustomDate(Carbon $fromDate): Carbon
@@ -212,6 +245,33 @@ class RecurringEvent extends Model
         // For now, treat custom as daily
         // This can be extended based on rrule or other custom patterns
         return $fromDate->addDay();
+    }
+
+    /**
+     * Get the first yearly occurrence within a date range.
+     * For yearly events, we need to find the next occurrence of the month/day
+     * that falls within the requested date range.
+     */
+    protected function getFirstYearlyOccurrenceInRange(Carbon $recurrenceStart, Carbon $startDate, Carbon $endDate): ?Carbon
+    {
+        $recurrenceMonth = $recurrenceStart->month;
+        $recurrenceDay = $recurrenceStart->day;
+
+        // Start from the requested start date
+        $currentYear = $startDate->year;
+        $currentDate = Carbon::create($currentYear, $recurrenceMonth, $recurrenceDay)->startOfDay();
+
+        // If this year's occurrence is before the start date, try next year
+        if ($currentDate->lt($startDate)) {
+            $currentDate = Carbon::create($currentYear + 1, $recurrenceMonth, $recurrenceDay)->startOfDay();
+        }
+
+        // Check if this occurrence is within the end date
+        if ($currentDate->lte($endDate)) {
+            return $currentDate;
+        }
+
+        return null;
     }
 
     /**

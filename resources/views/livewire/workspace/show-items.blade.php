@@ -75,7 +75,6 @@ new class extends Component
 
         $this->weekStartDate = now()->startOfWeek();
         $this->currentDate = now();
-        $this->dispatch('date-focused', date: $this->currentDate->format('Y-m-d'));
     }
 
     protected function getTaskService(): TaskService
@@ -109,7 +108,6 @@ new class extends Component
     {
         if (in_array($this->viewMode, ['list', 'kanban'])) {
             $this->currentDate = now();
-            $this->dispatch('date-focused', date: $this->currentDate->format('Y-m-d'));
         }
     }
 
@@ -117,7 +115,6 @@ new class extends Component
     {
         if (in_array($this->viewMode, ['list', 'kanban']) && $this->currentDate) {
             $this->currentDate = $this->currentDate->copy()->subDay();
-            $this->dispatch('date-focused', date: $this->currentDate->format('Y-m-d'));
         }
     }
 
@@ -125,35 +122,9 @@ new class extends Component
     {
         if (in_array($this->viewMode, ['list', 'kanban']) && $this->currentDate) {
             $this->currentDate = $this->currentDate->copy()->addDay();
-            $this->dispatch('date-focused', date: $this->currentDate->format('Y-m-d'));
         }
     }
 
-    #[On('switch-to-day-view')]
-    public function switchToDayView(string $date): void
-    {
-        // This method is kept for backward compatibility
-        // Calendar now dispatches date-focused directly, but other components might still use this
-        $this->viewMode = 'list';
-        $this->currentDate = Carbon::parse($date);
-    }
-
-    #[On('date-focused')]
-    public function updateCurrentDate(string $date): void
-    {
-        $parsedDate = Carbon::parse($date);
-
-        // Update the appropriate date property based on current view mode
-        if (in_array($this->viewMode, ['list', 'kanban'])) {
-            $this->currentDate = $parsedDate;
-        } elseif ($this->viewMode === 'weekly-timegrid') {
-            // For weekly timegrid view, update to the start of the week containing the clicked date
-            $this->weekStartDate = $parsedDate->copy()->startOfWeek();
-        } elseif ($this->viewMode === 'daily-timegrid') {
-            // For daily timegrid view, update the current date
-            $this->currentDate = $parsedDate;
-        }
-    }
 
     #[On('switch-to-daily-timegrid')]
     public function switchToDailyTimegrid(?string $date = null): void
