@@ -1,7 +1,7 @@
 @props(['event'])
 
 <div
-    class="bg-white dark:bg-zinc-800 rounded-lg rounded-br-lg border border-zinc-200 dark:border-zinc-700 p-2 sm:p-3 flex flex-col h-full"
+    class="@container bg-white dark:bg-zinc-800 rounded-lg rounded-br-lg border border-zinc-200 dark:border-zinc-700 p-2 sm:p-3 flex flex-col h-full"
     wire:click="$dispatch('view-event-detail', { id: {{ $event->id }} })"
     role="button"
     tabindex="0"
@@ -10,7 +10,7 @@
     {{-- Header Section --}}
     <div class="mb-2">
         {{-- First Row: Title, Status Pills, and Badges --}}
-        <div class="flex items-center gap-2 sm:gap-3 mb-2">
+        <div class="flex flex-col @[300px]:flex-row @[300px]:items-center gap-2 sm:gap-3 mb-2">
             <h3 class="font-semibold text-zinc-900 dark:text-zinc-100 text-base sm:text-lg leading-tight flex-1 min-w-0 flex items-center gap-1.5 sm:gap-2 flex-wrap">
                 <span class="line-clamp-2">{{ $event->title }}</span>
                 @if($event->tags->isNotEmpty())

@@ -15,8 +15,8 @@
 @if(!$noWrapper)
 <div class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden {{ $mb ? 'mb-4' : '' }}">
 @endif
-    <div class="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-700">
-        <div class="flex items-center gap-3">
+    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between p-4 border-b border-zinc-200 dark:border-zinc-700">
+        <div class="flex flex-wrap items-center gap-3">
             <!-- View Switcher -->
             <div class="bg-zinc-50 dark:bg-zinc-900/50 rounded-lg border border-zinc-200 dark:border-zinc-700 p-1">
                 <div class="flex gap-1" role="group" aria-label="View mode selection">
@@ -25,9 +25,9 @@
                             @click="$wire.$parent.switchView('list')"
                             aria-label="Switch to list view"
                             aria-pressed="{{ $viewMode === 'list' ? 'true' : 'false' }}"
-                            class="px-2 py-1.5 rounded transition-colors {{ $viewMode === 'list' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-transparent text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600' }} disabled:opacity-50 disabled:cursor-not-allowed"
+                            class="px-3 py-2 rounded-md text-sm transition-colors {{ $viewMode === 'list' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-transparent text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600' }} disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                             </svg>
                         </button>
@@ -37,9 +37,9 @@
                             @click="$wire.$parent.switchView('kanban')"
                             aria-label="Switch to kanban view"
                             aria-pressed="{{ $viewMode === 'kanban' ? 'true' : 'false' }}"
-                            class="px-2 py-1.5 rounded transition-colors {{ $viewMode === 'kanban' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-transparent text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600' }} disabled:opacity-50 disabled:cursor-not-allowed"
+                            class="px-3 py-2 rounded-md text-sm transition-colors {{ $viewMode === 'kanban' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-transparent text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600' }} disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
                             </svg>
                         </button>
@@ -49,9 +49,9 @@
                             @click="$wire.$parent.switchView('daily-timegrid')"
                             aria-label="Switch to timegrid view"
                             aria-pressed="{{ in_array($viewMode, ['daily-timegrid', 'weekly-timegrid']) ? 'true' : 'false' }}"
-                            class="px-2 py-1.5 rounded transition-colors {{ in_array($viewMode, ['daily-timegrid', 'weekly-timegrid']) ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-transparent text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600' }} disabled:opacity-50 disabled:cursor-not-allowed"
+                            class="px-3 py-2 rounded-md text-sm transition-colors {{ in_array($viewMode, ['daily-timegrid', 'weekly-timegrid']) ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-transparent text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600' }} disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                         </button>
@@ -84,6 +84,18 @@
                     <flux:button
                         variant="ghost"
                         size="sm"
+                        icon="chevron-left"
+                        wire:click="previousWeek"
+                        wire:loading.attr="disabled"
+                        wire:target="goToToday,previousWeek,nextWeek"
+                        aria-label="Previous week"
+                        class="border border-zinc-200 dark:border-zinc-700 shadow-sm"
+                    >
+                    </flux:button>
+                    <flux:button
+                        variant="ghost"
+                        size="sm"
+                        class="font-semibold border border-zinc-200 dark:border-zinc-700 shadow-sm rounded-full px-3"
                         wire:click="goToToday"
                         wire:loading.attr="disabled"
                         wire:target="goToToday,previousWeek,nextWeek"
@@ -100,21 +112,12 @@
                     <flux:button
                         variant="ghost"
                         size="sm"
-                        icon="chevron-left"
-                        wire:click="previousWeek"
-                        wire:loading.attr="disabled"
-                        wire:target="goToToday,previousWeek,nextWeek"
-                        aria-label="Previous week"
-                    >
-                    </flux:button>
-                    <flux:button
-                        variant="ghost"
-                        size="sm"
                         icon="chevron-right"
                         wire:click="nextWeek"
                         wire:loading.attr="disabled"
                         wire:target="goToToday,previousWeek,nextWeek"
                         aria-label="Next week"
+                        class="border border-zinc-200 dark:border-zinc-700 shadow-sm"
                     >
                     </flux:button>
                 </div>
@@ -123,6 +126,18 @@
                     <flux:button
                         variant="ghost"
                         size="sm"
+                        icon="chevron-left"
+                        wire:click="previousDay"
+                        wire:loading.attr="disabled"
+                        wire:target="goToToday,previousDay,nextDay"
+                        aria-label="Previous day"
+                        class="border border-zinc-200 dark:border-zinc-700 shadow-sm"
+                    >
+                    </flux:button>
+                    <flux:button
+                        variant="ghost"
+                        size="sm"
+                        class="font-semibold border border-zinc-200 dark:border-zinc-700 shadow-sm rounded-full px-3"
                         wire:click="goToToday"
                         wire:loading.attr="disabled"
                         wire:target="goToToday,previousDay,nextDay"
@@ -139,21 +154,12 @@
                     <flux:button
                         variant="ghost"
                         size="sm"
-                        icon="chevron-left"
-                        wire:click="previousDay"
-                        wire:loading.attr="disabled"
-                        wire:target="goToToday,previousDay,nextDay"
-                        aria-label="Previous day"
-                    >
-                    </flux:button>
-                    <flux:button
-                        variant="ghost"
-                        size="sm"
                         icon="chevron-right"
                         wire:click="nextDay"
                         wire:loading.attr="disabled"
                         wire:target="goToToday,previousDay,nextDay"
                         aria-label="Next day"
+                        class="border border-zinc-200 dark:border-zinc-700 shadow-sm"
                     >
                     </flux:button>
                 </div>
@@ -162,6 +168,18 @@
                     <flux:button
                         variant="ghost"
                         size="sm"
+                        icon="chevron-left"
+                        wire:click="previousWeek"
+                        wire:loading.attr="disabled"
+                        wire:target="goToToday,previousWeek,nextWeek"
+                        aria-label="Previous week"
+                        class="border border-zinc-200 dark:border-zinc-700 shadow-sm"
+                    >
+                    </flux:button>
+                    <flux:button
+                        variant="ghost"
+                        size="sm"
+                        class="font-semibold border border-zinc-200 dark:border-zinc-700 shadow-sm rounded-full px-3"
                         wire:click="goToToday"
                         wire:loading.attr="disabled"
                         wire:target="goToToday,previousWeek,nextWeek"
@@ -178,21 +196,12 @@
                     <flux:button
                         variant="ghost"
                         size="sm"
-                        icon="chevron-left"
-                        wire:click="previousWeek"
-                        wire:loading.attr="disabled"
-                        wire:target="goToToday,previousWeek,nextWeek"
-                        aria-label="Previous week"
-                    >
-                    </flux:button>
-                    <flux:button
-                        variant="ghost"
-                        size="sm"
                         icon="chevron-right"
                         wire:click="nextWeek"
                         wire:loading.attr="disabled"
                         wire:target="goToToday,previousWeek,nextWeek"
                         aria-label="Next week"
+                        class="border border-zinc-200 dark:border-zinc-700 shadow-sm"
                     >
                     </flux:button>
                 </div>
@@ -218,6 +227,18 @@
                     <flux:button
                         variant="ghost"
                         size="sm"
+                        icon="chevron-left"
+                        @click="navigateDate('previous')"
+                        wire:loading.attr="disabled"
+                        wire:target="goToTodayDate,previousDay,nextDay"
+                        aria-label="Previous day"
+                        class="border border-zinc-200 dark:border-zinc-700 shadow-sm"
+                    >
+                    </flux:button>
+                    <flux:button
+                        variant="ghost"
+                        size="sm"
+                        class="font-semibold border border-zinc-200 dark:border-zinc-700 shadow-sm rounded-full px-3"
                         @click="navigateDate('today')"
                         wire:loading.attr="disabled"
                         wire:target="goToTodayDate,previousDay,nextDay"
@@ -234,21 +255,12 @@
                     <flux:button
                         variant="ghost"
                         size="sm"
-                        icon="chevron-left"
-                        @click="navigateDate('previous')"
-                        wire:loading.attr="disabled"
-                        wire:target="goToTodayDate,previousDay,nextDay"
-                        aria-label="Previous day"
-                    >
-                    </flux:button>
-                    <flux:button
-                        variant="ghost"
-                        size="sm"
                         icon="chevron-right"
                         @click="navigateDate('next')"
                         wire:loading.attr="disabled"
                         wire:target="goToTodayDate,previousDay,nextDay"
                         aria-label="Next day"
+                        class="border border-zinc-200 dark:border-zinc-700 shadow-sm"
                     >
                     </flux:button>
                 </div>

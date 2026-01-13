@@ -17,6 +17,7 @@
                     variant="ghost"
                     size="sm"
                     icon="funnel"
+                    class="px-2 py-1.5 rounded [&>svg]:w-4 [&>svg]:h-4"
                     :class="$hasActiveFilters ? 'text-blue-600 dark:text-blue-400' : ''"
                     aria-label="Filter items"
                 />
@@ -60,6 +61,7 @@
                     variant="ghost"
                     size="sm"
                     icon="arrows-up-down"
+                    class="px-2 py-1.5 rounded [&>svg]:w-4 [&>svg]:h-4"
                     :class="$sortBy ? 'text-blue-600 dark:text-blue-400' : ''"
                     aria-label="Sort items"
                 />
