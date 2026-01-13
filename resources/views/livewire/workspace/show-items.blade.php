@@ -27,7 +27,7 @@ use Livewire\WithPagination;
 
 new class extends Component
 {
-    use WithPagination, FiltersItems, SortsItems, HandlesDateRanges;
+    use FiltersItems, HandlesDateRanges, SortsItems, WithPagination;
 
     protected ?TaskService $taskService = null;
 
@@ -50,15 +50,19 @@ new class extends Component
     // Filter properties
     #[Url]
     public ?string $filterType = null;
+
     #[Url]
     public ?string $filterPriority = null;
+
     #[Url]
     public ?string $filterStatus = null;
+
     public array $filterTagIds = [];
 
     // Sort properties
     #[Url]
     public ?string $sortBy = null;
+
     #[Url]
     public string $sortDirection = 'asc';
 
@@ -106,25 +110,30 @@ new class extends Component
 
     public function goToTodayDate(): void
     {
-        if (in_array($this->viewMode, ['list', 'kanban'])) {
-            $this->currentDate = now();
+        if (in_array($this->viewMode, ['list', 'kanban', 'daily-timegrid'])) {
+            $this->currentDate = now()->startOfDay();
+            // Force recomputation of computed properties
+            unset($this->filteredTasks, $this->filteredEvents, $this->filteredItems, $this->itemsByStatus);
         }
     }
 
     public function previousDay(): void
     {
-        if (in_array($this->viewMode, ['list', 'kanban']) && $this->currentDate) {
-            $this->currentDate = $this->currentDate->copy()->subDay();
+        if (in_array($this->viewMode, ['list', 'kanban', 'daily-timegrid']) && $this->currentDate) {
+            $this->currentDate = $this->currentDate->copy()->startOfDay()->subDay();
+            // Force recomputation of computed properties
+            unset($this->filteredTasks, $this->filteredEvents, $this->filteredItems, $this->itemsByStatus);
         }
     }
 
     public function nextDay(): void
     {
-        if (in_array($this->viewMode, ['list', 'kanban']) && $this->currentDate) {
-            $this->currentDate = $this->currentDate->copy()->addDay();
+        if (in_array($this->viewMode, ['list', 'kanban', 'daily-timegrid']) && $this->currentDate) {
+            $this->currentDate = $this->currentDate->copy()->startOfDay()->addDay();
+            // Force recomputation of computed properties
+            unset($this->filteredTasks, $this->filteredEvents, $this->filteredItems, $this->itemsByStatus);
         }
     }
-
 
     #[On('switch-to-daily-timegrid')]
     public function switchToDailyTimegrid(?string $date = null): void
@@ -170,33 +179,38 @@ new class extends Component
     }
 
     #[On('update-item-status')]
-    public function handleUpdateItemStatus(int $itemId, string $itemType, string $newStatus, ?string $instanceDate = null): void
+    public function handleUpdateItemStatus(int|string $itemId, string $itemType, string $newStatus, ?string $instanceDate = null): void
     {
         $this->updateItemStatus($itemId, $itemType, $newStatus, $instanceDate);
     }
 
     #[On('update-item-datetime')]
-    public function handleUpdateItemDateTime(int $itemId, string $itemType, string $newStart, ?string $newEnd = null): void
+    public function handleUpdateItemDateTime(int|string $itemId, string $itemType, string $newStart, ?string $newEnd = null): void
     {
         $this->updateItemDateTime($itemId, $itemType, $newStart, $newEnd);
     }
 
     #[On('update-item-duration')]
-    public function handleUpdateItemDuration(int $itemId, string $itemType, int $newDurationMinutes): void
+    public function handleUpdateItemDuration(int|string $itemId, string $itemType, int $newDurationMinutes): void
     {
         $this->updateItemDuration($itemId, $itemType, $newDurationMinutes);
     }
 
     #[On('delete-task')]
-    public function handleDeleteTask(int $taskId): void
+    public function handleDeleteTask(int|string $taskId): void
     {
         $this->deleteTask($taskId);
     }
 
-    public function deleteTask(int $taskId): void
+    public function deleteTask(int|string $taskId): void
     {
         try {
-            $task = Task::findOrFail($taskId);
+            // Extract base task ID if it's a virtual instance ID (format: "123-2024-01-15")
+            $baseTaskId = is_string($taskId) && str_contains($taskId, '-')
+                ? (int) explode('-', $taskId)[0]
+                : (int) $taskId;
+
+            $task = Task::findOrFail($baseTaskId);
             $this->authorize('delete', $task);
 
             $this->getTaskService()->deleteTask($task);
@@ -304,7 +318,7 @@ new class extends Component
     }
 
     #[On('update-task-field')]
-    public function handleUpdateTaskField(int $taskId, string $field, mixed $value, ?string $instanceDate = null): void
+    public function handleUpdateTaskField(int|string $taskId, string $field, mixed $value, ?string $instanceDate = null): void
     {
         $this->updateTaskField($taskId, $field, $value, $instanceDate);
     }
@@ -316,13 +330,13 @@ new class extends Component
     }
 
     #[On('update-event-field')]
-    public function handleUpdateEventField(int $eventId, string $field, mixed $value, ?string $instanceDate = null): void
+    public function handleUpdateEventField(int|string $eventId, string $field, mixed $value, ?string $instanceDate = null): void
     {
         $this->updateEventField($eventId, $field, $value, $instanceDate);
     }
 
     #[On('delete-event')]
-    public function handleDeleteEvent(int $eventId): void
+    public function handleDeleteEvent(int|string $eventId): void
     {
         $this->deleteEvent($eventId);
     }
@@ -357,7 +371,7 @@ new class extends Component
                 'tagIds.*' => ['integer', 'exists:tags,id'],
                 'recurrence' => ['nullable', 'array'],
                 'recurrence.enabled' => ['nullable', 'boolean'],
-                'recurrence.type' => ['nullable', 'required_if:recurrence.enabled,true', 'string', 'in:daily,weekly,monthly,yearly,custom'],
+                'recurrence.type' => ['nullable', 'required_if:recurrence.enabled,true', 'string', 'in:daily,weekly,monthly,yearly'],
                 'recurrence.interval' => ['nullable', 'required_if:recurrence.enabled,true', 'integer', 'min:1'],
                 'recurrence.daysOfWeek' => ['nullable', 'array'],
                 'recurrence.daysOfWeek.*' => ['integer', 'min:0', 'max:6'],
@@ -400,11 +414,24 @@ new class extends Component
         }
     }
 
-    public function updateTaskField(int $taskId, string $field, mixed $value, ?string $instanceDate = null): void
+    public function updateTaskField(int|string $taskId, string $field, mixed $value, ?string $instanceDate = null): void
     {
         try {
+            // Extract base task ID if it's a virtual instance ID (format: "123-2024-01-15")
+            $baseTaskId = is_string($taskId) && str_contains($taskId, '-')
+                ? (int) explode('-', $taskId)[0]
+                : (int) $taskId;
+
             $task = Task::with(['project', 'event', 'tags', 'reminders', 'pomodoroSessions', 'recurringTask'])
-                ->findOrFail($taskId);
+                ->findOrFail($baseTaskId);
+
+            // If instanceDate wasn't provided but this is a virtual instance, extract it from the ID
+            if (! $instanceDate && is_string($taskId) && str_contains($taskId, '-')) {
+                $parts = explode('-', $taskId, 2);
+                if (count($parts) === 2) {
+                    $instanceDate = $parts[1]; // Extract date part (e.g., "2024-01-15")
+                }
+            }
 
             $this->authorize('update', $task);
 
@@ -423,7 +450,7 @@ new class extends Component
                     $rules = [
                         'recurrence' => ['nullable', 'array'],
                         'recurrence.enabled' => ['nullable', 'boolean'],
-                        'recurrence.type' => ['nullable', 'required_if:recurrence.enabled,true', 'string', 'in:daily,weekly,monthly,yearly,custom'],
+                        'recurrence.type' => ['nullable', 'required_if:recurrence.enabled,true', 'string', 'in:daily,weekly,monthly,yearly'],
                         'recurrence.interval' => ['nullable', 'required_if:recurrence.enabled,true', 'integer', 'min:1'],
                         'recurrence.daysOfWeek' => ['nullable', 'array'],
                         'recurrence.daysOfWeek.*' => ['integer', 'min:0', 'max:6'],
@@ -517,11 +544,24 @@ new class extends Component
         }
     }
 
-    public function updateEventField(int $eventId, string $field, mixed $value, ?string $instanceDate = null): void
+    public function updateEventField(int|string $eventId, string $field, mixed $value, ?string $instanceDate = null): void
     {
         try {
+            // Extract base event ID if it's a virtual instance ID (format: "123-2024-01-15")
+            $baseEventId = is_string($eventId) && str_contains($eventId, '-')
+                ? (int) explode('-', $eventId)[0]
+                : (int) $eventId;
+
             $event = Event::with(['tags', 'reminders', 'recurringEvent'])
-                ->findOrFail($eventId);
+                ->findOrFail($baseEventId);
+
+            // If instanceDate wasn't provided but this is a virtual instance, extract it from the ID
+            if (! $instanceDate && is_string($eventId) && str_contains($eventId, '-')) {
+                $parts = explode('-', $eventId, 2);
+                if (count($parts) === 2) {
+                    $instanceDate = $parts[1]; // Extract date part (e.g., "2024-01-15")
+                }
+            }
 
             $this->authorize('update', $event);
 
@@ -556,10 +596,15 @@ new class extends Component
         }
     }
 
-    public function deleteEvent(int $eventId): void
+    public function deleteEvent(int|string $eventId): void
     {
         try {
-            $event = Event::findOrFail($eventId);
+            // Extract base event ID if it's a virtual instance ID (format: "123-2024-01-15")
+            $baseEventId = is_string($eventId) && str_contains($eventId, '-')
+                ? (int) explode('-', $eventId)[0]
+                : (int) $eventId;
+
+            $event = Event::findOrFail($baseEventId);
             $this->authorize('delete', $event);
 
             $this->getEventService()->deleteEvent($event);
@@ -653,7 +698,7 @@ new class extends Component
                 'tagIds.*' => ['integer', 'exists:tags,id'],
                 'recurrence' => ['nullable', 'array'],
                 'recurrence.enabled' => ['nullable', 'boolean'],
-                'recurrence.type' => ['nullable', 'required_if:recurrence.enabled,true', 'string', 'in:daily,weekly,monthly,yearly,custom'],
+                'recurrence.type' => ['nullable', 'required_if:recurrence.enabled,true', 'string', 'in:daily,weekly,monthly,yearly'],
                 'recurrence.interval' => ['nullable', 'required_if:recurrence.enabled,true', 'integer', 'min:1'],
                 'recurrence.daysOfWeek' => ['nullable', 'array'],
                 'recurrence.daysOfWeek.*' => ['integer', 'min:0', 'max:6'],
@@ -819,16 +864,21 @@ new class extends Component
         }
     }
 
-    public function updateItemDateTime(int $itemId, string $itemType, string $newStart, ?string $newEnd = null): void
+    public function updateItemDateTime(int|string $itemId, string $itemType, string $newStart, ?string $newEnd = null): void
     {
         try {
+            // Extract base item ID if it's a virtual instance ID (format: "123-2024-01-15")
+            $baseItemId = is_string($itemId) && str_contains($itemId, '-')
+                ? (int) explode('-', $itemId)[0]
+                : (int) $itemId;
+
             $model = match ($itemType) {
                 'task' => Task::with(['project', 'event', 'tags', 'reminders', 'pomodoroSessions', 'recurringTask'])
-                    ->findOrFail($itemId),
+                    ->findOrFail($baseItemId),
                 'event' => Event::with(['tags', 'reminders', 'recurringEvent'])
-                    ->findOrFail($itemId),
+                    ->findOrFail($baseItemId),
                 'project' => Project::with(['tags', 'tasks', 'reminders'])
-                    ->findOrFail($itemId),
+                    ->findOrFail($baseItemId),
                 default => throw new \InvalidArgumentException('Invalid item type'),
             };
 
@@ -857,14 +907,19 @@ new class extends Component
         }
     }
 
-    public function updateItemDuration(int $itemId, string $itemType, int $newDurationMinutes): void
+    public function updateItemDuration(int|string $itemId, string $itemType, int $newDurationMinutes): void
     {
         try {
+            // Extract base item ID if it's a virtual instance ID (format: "123-2024-01-15")
+            $baseItemId = is_string($itemId) && str_contains($itemId, '-')
+                ? (int) explode('-', $itemId)[0]
+                : (int) $itemId;
+
             $model = match ($itemType) {
                 'task' => Task::with(['project', 'event', 'tags', 'reminders', 'pomodoroSessions', 'recurringTask'])
-                    ->findOrFail($itemId),
+                    ->findOrFail($baseItemId),
                 'event' => Event::with(['tags', 'reminders', 'recurringEvent'])
-                    ->findOrFail($itemId),
+                    ->findOrFail($baseItemId),
                 default => throw new \InvalidArgumentException('Invalid item type'),
             };
 
@@ -941,16 +996,29 @@ new class extends Component
         };
     }
 
-    public function updateItemStatus(int $itemId, string $itemType, string $newStatus, ?string $instanceDate = null): void
+    public function updateItemStatus(int|string $itemId, string $itemType, string $newStatus, ?string $instanceDate = null): void
     {
         try {
+            // Extract base item ID if it's a virtual instance ID (format: "123-2024-01-15")
+            $baseItemId = is_string($itemId) && str_contains($itemId, '-')
+                ? (int) explode('-', $itemId)[0]
+                : (int) $itemId;
+
+            // If instanceDate wasn't provided but this is a virtual instance, extract it from the ID
+            if (! $instanceDate && is_string($itemId) && str_contains($itemId, '-')) {
+                $parts = explode('-', $itemId, 2);
+                if (count($parts) === 2) {
+                    $instanceDate = $parts[1]; // Extract date part (e.g., "2024-01-15")
+                }
+            }
+
             $model = match ($itemType) {
                 'task' => Task::with(['project', 'event', 'tags', 'reminders', 'pomodoroSessions', 'recurringTask'])
-                    ->findOrFail($itemId),
+                    ->findOrFail($baseItemId),
                 'event' => Event::with(['tags', 'reminders', 'recurringEvent'])
-                    ->findOrFail($itemId),
+                    ->findOrFail($baseItemId),
                 'project' => Project::with(['tags', 'tasks', 'reminders'])
-                    ->findOrFail($itemId),
+                    ->findOrFail($baseItemId),
                 default => throw new \InvalidArgumentException('Invalid item type'),
             };
 
@@ -1037,7 +1105,6 @@ new class extends Component
      * Apply base query filters using the FiltersItems trait.
      *
      * @param  \Illuminate\Database\Eloquent\Builder  $query
-     * @param  string  $itemType
      * @return \Illuminate\Database\Eloquent\Builder
      */
     protected function applyBaseFilters($query, string $itemType)
@@ -1236,7 +1303,7 @@ new class extends Component
 
     <!-- List View -->
     @if($viewMode === 'list')
-        <div wire:key="list-view-container">
+        <div wire:key="list-view-container-{{ ($currentDate ?? now())->format('Y-m-d') }}">
             <livewire:workspace.list-view
                 :items="$this->filteredItems"
                 :current-date="$currentDate"
@@ -1247,14 +1314,14 @@ new class extends Component
                 :sort-direction="$sortDirection"
                 :has-active-filters="$this->hasActiveFilters"
                 :view-mode="$viewMode"
-                wire:key="list-view-{{ $viewMode }}"
+                wire:key="list-view-{{ $viewMode }}-{{ ($currentDate ?? now())->format('Y-m-d') }}"
             />
         </div>
     @endif
 
     <!-- Kanban View -->
     @if($viewMode === 'kanban')
-        <div wire:key="kanban-view-container">
+        <div wire:key="kanban-view-container-{{ ($currentDate ?? now())->format('Y-m-d') }}">
             <livewire:workspace.kanban-view
                 :items="$this->filteredItems"
                 :items-by-status="$this->itemsByStatus"
@@ -1266,7 +1333,7 @@ new class extends Component
                 :sort-direction="$sortDirection"
                 :has-active-filters="$this->hasActiveFilters"
                 :view-mode="$viewMode"
-                wire:key="kanban-view-{{ $viewMode }}"
+                wire:key="kanban-view-{{ $viewMode }}-{{ ($currentDate ?? now())->format('Y-m-d') }}"
             />
         </div>
     @endif

@@ -8,5 +8,4 @@ enum RecurrenceType: string
     case Weekly = 'weekly';
     case Monthly = 'monthly';
     case Yearly = 'yearly';
-    case Custom = 'custom';
 }

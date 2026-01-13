@@ -88,7 +88,6 @@ class RecurringTask extends Model
             RecurrenceType::Weekly => $this->getNextWeeklyDate($nextDate),
             RecurrenceType::Monthly => $nextDate->addMonths($this->interval),
             RecurrenceType::Yearly => $nextDate->addYears($this->interval),
-            RecurrenceType::Custom => $this->getNextCustomDate($nextDate),
         };
     }
 
@@ -161,16 +160,6 @@ class RecurringTask extends Model
         }
 
         return $nextDate;
-    }
-
-    /**
-     * Get next custom occurrence date (placeholder for future custom logic).
-     */
-    protected function getNextCustomDate(Carbon $fromDate): Carbon
-    {
-        // For now, treat custom as daily
-        // This can be extended based on rrule or other custom patterns
-        return $fromDate->addDay();
     }
 
     /**

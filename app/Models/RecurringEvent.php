@@ -130,7 +130,6 @@ class RecurringEvent extends Model
             RecurrenceType::Weekly => $this->getNextWeeklyDate($nextDate),
             RecurrenceType::Monthly => $this->getNextMonthlyDate($nextDate),
             RecurrenceType::Yearly => $this->getNextYearlyDate($nextDate),
-            RecurrenceType::Custom => $this->getNextCustomDate($nextDate),
         };
     }
 
@@ -235,16 +234,6 @@ class RecurringEvent extends Model
         $nextDate = Carbon::create($nextYear, $recurrenceMonth, $recurrenceDay)->startOfDay();
 
         return $nextDate;
-    }
-
-    /**
-     * Get next custom occurrence date (placeholder for future custom logic).
-     */
-    protected function getNextCustomDate(Carbon $fromDate): Carbon
-    {
-        // For now, treat custom as daily
-        // This can be extended based on rrule or other custom patterns
-        return $fromDate->addDay();
     }
 
     /**

@@ -126,6 +126,44 @@ class EventService
                 case 'status':
                     $updateData['status'] = $value ?: 'scheduled';
                     break;
+                case 'recurrence':
+                    // Handle recurrence separately as it involves RecurringEvent model
+                    $recurrenceData = $value;
+
+                    if ($recurrenceData === null || empty($recurrenceData) || ! ($recurrenceData['enabled'] ?? false)) {
+                        // Delete recurrence if it exists
+                        if ($event->recurringEvent) {
+                            $event->recurringEvent->delete();
+                        }
+                    } else {
+                        // Create or update recurrence
+                        // Ensure start_datetime is never null - use fallback chain
+                        $startDatetime = ! empty($recurrenceData['startDatetime'])
+                            ? Carbon::parse($recurrenceData['startDatetime'])
+                            : ($event->start_datetime
+                                ? Carbon::parse($event->start_datetime)
+                                : ($event->end_datetime
+                                    ? Carbon::parse($event->end_datetime)
+                                    : Carbon::now()));
+
+                        $recurringEventData = [
+                            'event_id' => $event->id,
+                            'recurrence_type' => RecurrenceType::from($recurrenceData['type']),
+                            'interval' => $recurrenceData['interval'] ?? 1,
+                            'start_datetime' => $startDatetime,
+                            'end_datetime' => ! empty($recurrenceData['endDatetime']) ? Carbon::parse($recurrenceData['endDatetime']) : null,
+                            'days_of_week' => ! empty($recurrenceData['daysOfWeek']) && is_array($recurrenceData['daysOfWeek'])
+                                ? implode(',', $recurrenceData['daysOfWeek'])
+                                : null,
+                        ];
+
+                        if ($event->recurringEvent) {
+                            $event->recurringEvent->update($recurringEventData);
+                        } else {
+                            RecurringEvent::create($recurringEventData);
+                        }
+                    }
+                    break;
             }
 
             if (! empty($updateData)) {

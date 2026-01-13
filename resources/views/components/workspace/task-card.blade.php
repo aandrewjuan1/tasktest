@@ -1,7 +1,19 @@
 @props(['task'])
 
+@php
+    $priorityBorderColors = [
+        'low' => 'border-l-zinc-300 dark:border-l-zinc-500',
+        'medium' => 'border-l-yellow-400 dark:border-l-yellow-500',
+        'high' => 'border-l-orange-500 dark:border-l-orange-500',
+        'urgent' => 'border-l-red-500 dark:border-l-red-500',
+    ];
+
+    $priorityValue = $task->priority?->value ?? null;
+    $priorityBorderClass = $priorityValue ? ($priorityBorderColors[$priorityValue] ?? 'border-l-purple-500') : 'border-l-purple-500';
+@endphp
+
 <div
-    class="bg-white dark:bg-zinc-800 rounded-lg border-l-4 border-l-purple-500 border-r border-t border-b border-zinc-200 dark:border-zinc-700 p-3 sm:p-5 transition-all flex flex-col h-full"
+    class="bg-white dark:bg-zinc-800 rounded-lg border-l-4 {{ $priorityBorderClass }} border-r border-t border-b border-zinc-200 dark:border-zinc-700 p-3 sm:p-5 transition-all flex flex-col h-full"
 >
     {{-- Header Section --}}
     <div class="mb-4">
