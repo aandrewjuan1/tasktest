@@ -20,6 +20,14 @@ new class extends Component
 
     public bool $isLoading = false;
 
+    public bool $canViewComments = false;
+
+    public bool $canComment = false;
+
+    public bool $showDeleteCommentConfirm = false;
+
+    public ?int $commentIdToDelete = null;
+
     // Edit fields
     public string $title = '';
 
@@ -46,10 +54,22 @@ new class extends Component
         $this->showDeleteConfirm = false;
 
         // Load task with relationships
-        $this->task = Task::with(['project', 'event', 'tags', 'reminders', 'pomodoroSessions', 'recurringTask'])
-            ->findOrFail($id);
+        $this->task = Task::with([
+            'project',
+            'event',
+            'tags',
+            'reminders',
+            'pomodoroSessions',
+            'recurringTask',
+            'comments.user',
+        ])->findOrFail($id);
 
         $this->authorize('view', $this->task);
+
+        // Compute comment permissions for the current user
+        $user = auth()->user();
+        $this->canViewComments = $this->task->canUserView($user);
+        $this->canComment = $this->task->canUserComment($user);
 
         // Load data before showing content
         $this->loadTaskData();
@@ -64,6 +84,10 @@ new class extends Component
         $this->task = null;
         $this->showDeleteConfirm = false;
         $this->isLoading = false;
+        $this->canViewComments = false;
+        $this->canComment = false;
+        $this->showDeleteCommentConfirm = false;
+        $this->commentIdToDelete = null;
         $this->resetValidation();
     }
 
@@ -205,16 +229,25 @@ new class extends Component
                                          this.currentValue = value ?? '';
                                          $wire.title = value ?? '';
                                          this.errorMessage = null;
+                                         this.editing = false;
                                      }
                                  });
                              },
                              startEditing() {
-                                 this.editing = true;
-                                 this.currentValue = this.originalValue;
-                                 $wire.title = this.originalValue;
-                                 this.errorMessage = null;
-                                 $nextTick(() => $refs.input?.focus());
-                             },
+                                this.editing = true;
+                                this.currentValue = this.originalValue;
+                                $wire.title = this.originalValue;
+                                this.errorMessage = null;
+                                $nextTick(() => {
+                                    const input = $refs.input;
+                                    if (input) {
+                                        input.focus();
+                                        const length = input.value.length;
+                                        // Place caret at the end without selecting all text
+                                        input.setSelectionRange(length, length);
+                                    }
+                                });
+                            },
                              save() {
                                  // Validate title is not empty or null
                                  const trimmedValue = (this.currentValue || '').trim();
@@ -254,16 +287,20 @@ new class extends Component
                              }
                          }"
                     >
-                        <div x-show="!editing" class="flex items-center gap-2">
+                        <!-- Display Mode -->
+                        <div
+                            x-show="!editing"
+                            class="flex items-center gap-2 group"
+                        >
                             <flux:heading
                                 size="xl"
                                 x-text="originalValue"
-                                class="cursor-pointer text-zinc-900 dark:text-zinc-50 tracking-tight"
+                                class="cursor-text text-zinc-900 dark:text-zinc-50 tracking-tight min-h-[2rem] flex items-center"
                                 @click="startEditing()"
                             ></flux:heading>
                             <button
-                                @click="startEditing()"
-                                class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                                @click.stop="startEditing()"
+                                class="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-all duration-200"
                                 type="button"
                             >
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -271,36 +308,30 @@ new class extends Component
                                 </svg>
                             </button>
                         </div>
-                        <div x-show="editing" x-cloak @click.away="cancel()" class="space-y-2">
-                            <div class="flex items-start gap-2">
-                                <div class="flex-1">
-                                    <flux:input
-                                        x-ref="input"
-                                        x-model="currentValue"
-                                        x-on:input="$wire.title = currentValue"
-                                        @keydown.enter.prevent="save()"
-                                        @keydown.escape="cancel()"
-                                        label="Title"
-                                        required
-                                    />
-                                </div>
-                                <div class="flex items-center pt-6">
-                                    <button
-                                        @click="save()"
-                                        class="p-2 text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg transition-colors"
-                                        type="button"
-                                    >
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-                            <div x-show="errorMessage" class="mt-1">
+
+                        <!-- Edit Mode -->
+                        <div
+                            x-show="editing"
+                            x-cloak
+                            @click.away="cancel()"
+                            class="relative"
+                        >
+                            <input
+                                x-ref="input"
+                                x-model="currentValue"
+                                x-on:input="$wire.title = currentValue"
+                                @keydown.enter.prevent="save()"
+                                @keydown.escape="cancel()"
+                                @blur="save()"
+                                type="text"
+                                class="w-full text-2xl font-bold text-zinc-900 dark:text-zinc-50 tracking-tight bg-transparent border-none outline-none focus:outline-none focus:ring-0 p-0 m-0 resize-none overflow-hidden"
+                                style="font-family: inherit; line-height: inherit;"
+                            />
+                            <div x-show="errorMessage" class="mt-2">
                                 <p class="text-sm text-red-600 dark:text-red-400" x-text="errorMessage"></p>
                             </div>
                             @error('title')
-                                <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
+                                <p class="text-sm text-red-600 dark:text-red-400 mt-2">{{ $message }}</p>
                             @enderror
                         </div>
                     </div>
@@ -656,6 +687,7 @@ new class extends Component
                                      this.originalValue = value ?? '';
                                      this.currentValue = value ?? '';
                                      $wire.description = value ?? '';
+                                     this.editing = false;
                                  }
                              });
                          },
@@ -663,7 +695,16 @@ new class extends Component
                              this.editing = true;
                              this.currentValue = this.originalValue;
                              $wire.description = this.originalValue;
-                             $nextTick(() => $refs.input?.focus());
+                             $nextTick(() => {
+                                 const textarea = $refs.input;
+                                 if (textarea) {
+                                     textarea.focus();
+                                     // Move cursor to end
+                                     textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+                                     // Adjust height initially
+                                     this.adjustHeight();
+                                 }
+                             });
                          },
                          save() {
                              if (this.currentValue !== this.originalValue) {
@@ -692,8 +733,25 @@ new class extends Component
                              this.currentValue = this.originalValue;
                              $wire.description = this.originalValue;
                              this.editing = false;
+                         },
+                         adjustHeight() {
+                             const textarea = $refs.input;
+                             if (textarea) {
+                                 textarea.style.height = 'auto';
+                                 textarea.style.height = textarea.scrollHeight + 'px';
+                             }
+                         },
+                         handleEnterKey(event) {
+                             if (event.shiftKey) {
+                                 // Shift+Enter: allow default behavior (new line)
+                                 return;
+                             }
+                             // Enter: prevent default and save
+                             event.preventDefault();
+                             this.save();
                          }
                      }"
+                     class="group"
                 >
                     <div class="mb-2">
                         <div class="flex items-center gap-2">
@@ -706,8 +764,8 @@ new class extends Component
                             </flux:heading>
                             <button
                                 x-show="!editing"
-                                @click="startEditing()"
-                                class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                                @click.stop="startEditing()"
+                                class="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-all duration-200"
                                 type="button"
                             >
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -716,33 +774,36 @@ new class extends Component
                             </button>
                         </div>
                     </div>
-                    <div x-show="editing" x-cloak @click.away="cancel()" class="space-y-2">
-                        <flux:textarea
+
+                    <!-- Display Mode -->
+                    <div
+                        x-show="!editing"
+                        @click="startEditing()"
+                        class="cursor-text min-h-[1.5rem]"
+                    >
+                        <p class="text-sm text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap" x-text="originalValue || 'No description provided.'"></p>
+                    </div>
+
+                    <!-- Edit Mode -->
+                    <div
+                        x-show="editing"
+                        x-cloak
+                        @click.away="save()"
+                        class="relative"
+                    >
+                        <textarea
                             x-ref="input"
                             x-model="currentValue"
-                            x-on:input="$wire.description = currentValue"
-                            @keydown.ctrl.enter.prevent="save()"
-                            @keydown.meta.enter.prevent="save()"
+                            x-on:input="$wire.description = currentValue; adjustHeight()"
+                            @keydown.enter="handleEnterKey($event)"
                             @keydown.escape="cancel()"
-                            rows="4"
-                        />
-                        <div class="flex items-center">
-                            <button
-                                @click="save()"
-                                class="p-2 text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg transition-colors"
-                                type="button"
-                            >
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                                </svg>
-                            </button>
-                        </div>
+                            class="w-full text-sm text-zinc-600 dark:text-zinc-400 bg-transparent border-none outline-none focus:outline-none focus:ring-0 p-0 m-0 resize-none overflow-hidden"
+                            style="font-family: inherit; line-height: 1.5rem; min-height: 1.5rem;"
+                            rows="1"
+                        ></textarea>
                         @error('description')
-                            <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
+                            <p class="text-sm text-red-600 dark:text-red-400 mt-2">{{ $message }}</p>
                         @enderror
-                    </div>
-                    <div x-show="!editing" @click="startEditing()" class="cursor-pointer">
-                        <p class="text-sm text-zinc-600 dark:text-zinc-400" x-text="originalValue || 'No description provided.'"></p>
                     </div>
                 </div>
 
@@ -941,6 +1002,69 @@ new class extends Component
                         </div>
                     </div>
                 </div>
+
+                <!-- Comments -->
+                @if($canViewComments)
+                    @php
+                        $currentUser = auth()->user();
+                        $commentsData = $task->comments()
+                            ->with('user')
+                            ->orderByDesc('created_at')
+                            ->get()
+                            ->map(function ($comment) use ($task, $currentUser) {
+                                $isAuthor = $currentUser && $comment->user_id === $currentUser->id;
+                                $isOwner = $currentUser && $task->user_id === $currentUser->id;
+
+                                return [
+                                    'id' => $comment->id,
+                                    'content' => $comment->content,
+                                    'created_at' => optional($comment->created_at)->diffForHumans(),
+                                    'is_edited' => (bool) $comment->is_edited,
+                                    'edited_at' => optional($comment->edited_at)->diffForHumans(),
+                                    'user_name' => $comment->user?->name ?? 'Unknown',
+                                    'user_id' => $comment->user_id,
+                                    'can_manage' => $isAuthor || $isOwner,
+                                ];
+                            });
+                    @endphp
+
+                    <x-workspace.comment-section
+                        :task-id="$task->id"
+                        :comments="$commentsData"
+                        :can-comment="$canComment"
+                    />
+
+                    <!-- Delete Comment Confirmation Modal (kept here to use Livewire state) -->
+                    <flux:modal
+                        wire:model="showDeleteCommentConfirm"
+                        class="max-w-md my-10 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl bg-white dark:bg-zinc-900"
+                    >
+                        <flux:heading size="lg" class="mb-2 text-red-600 dark:text-red-400">Delete Comment</flux:heading>
+                        <p class="text-sm text-zinc-600 dark:text-zinc-400 mb-6">
+                            Are you sure you want to delete this comment? This action cannot be undone.
+                        </p>
+                        <div class="flex justify-end gap-2">
+                            <flux:button
+                                variant="ghost"
+                                @click="$wire.showDeleteCommentConfirm = false"
+                            >
+                                Cancel
+                            </flux:button>
+                            <flux:button
+                                variant="danger"
+                                x-data="{}"
+                                @click="
+                                    const id = $wire.commentIdToDelete;
+                                    if (id && window.commentSectionDelete) {
+                                        window.commentSectionDelete(id);
+                                    }
+                                "
+                            >
+                                Delete
+                            </flux:button>
+                        </div>
+                    </flux:modal>
+                @endif
 
                 <!-- Reminders -->
                 @if($task->reminders->isNotEmpty())
