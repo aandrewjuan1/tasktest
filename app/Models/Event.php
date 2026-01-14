@@ -89,11 +89,6 @@ class Event extends Model
         return $this->morphMany(Collaboration::class, 'collaboratable');
     }
 
-    public function messages(): MorphMany
-    {
-        return $this->morphMany(Message::class, 'messageable');
-    }
-
     public function collaborators(): MorphToMany
     {
         return $this->morphToMany(User::class, 'collaboratable', 'collaborations')

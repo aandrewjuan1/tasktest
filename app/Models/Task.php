@@ -95,6 +95,11 @@ class Task extends Model
         return $this->hasOne(RecurringTask::class);
     }
 
+    public function comments(): HasMany
+    {
+        return $this->hasMany(Comment::class);
+    }
+
     public function pomodoroSessions(): HasMany
     {
         return $this->hasMany(PomodoroSession::class);
@@ -113,11 +118,6 @@ class Task extends Model
     public function collaborations(): MorphMany
     {
         return $this->morphMany(Collaboration::class, 'collaboratable');
-    }
-
-    public function messages(): MorphMany
-    {
-        return $this->morphMany(Message::class, 'messageable');
     }
 
     public function collaborators(): MorphToMany

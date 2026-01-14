@@ -113,7 +113,6 @@ class User extends Authenticatable
         return $this->hasOne(NotificationPreference::class);
     }
 
-
     /**
      * Collaborations where user is a collaborator.
      */
@@ -122,12 +121,9 @@ class User extends Authenticatable
         return $this->hasMany(Collaboration::class);
     }
 
-    /**
-     * Messages sent by the user.
-     */
-    public function messages(): HasMany
+    public function comments(): HasMany
     {
-        return $this->hasMany(Message::class);
+        return $this->hasMany(Comment::class);
     }
 
     /**
