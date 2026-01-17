@@ -10,6 +10,7 @@
     'position' => 'bottom', // 'top' or 'bottom'
     'colorMap' => null, // Optional: array mapping values to color classes
     'defaultColorClass' => null, // Optional: default color class when value is empty/null
+    'disabled' => false,
 ])
 
 <div
@@ -20,14 +21,19 @@
         selectedValue: @js($value ? $value : null),
         colorMap: @js($colorMap),
         defaultColorClass: @js($defaultColorClass),
+        disabled: @js($disabled),
         getTriggerClass() {
             const baseClass = '{{ $triggerClass }}';
+            let classes = baseClass;
+            if (this.disabled) {
+                classes += ' opacity-50 cursor-not-allowed';
+            }
             if (!this.colorMap) {
-                return baseClass;
+                return classes;
             }
             const value = this.selectedValue || '';
             const colorClass = value && this.colorMap[value] ? this.colorMap[value] : (this.defaultColorClass || '');
-            return baseClass + (colorClass ? ' ' + colorClass : '');
+            return classes + (colorClass ? ' ' + colorClass : '');
         },
         init() {
             @if($useParent && $itemId)
@@ -56,6 +62,9 @@
             }
         },
         toggleDropdown() {
+            if (this.disabled) {
+                return;
+            }
             this.open = !this.open;
         },
         closeDropdown() {
@@ -73,6 +82,9 @@
             }, 300);
         },
         select(value) {
+            if (this.disabled) {
+                return;
+            }
             this.selectedValue = value;
             @if($useParent && $itemId)
                 @if(isset($instanceDate) && $instanceDate)
@@ -135,6 +147,7 @@
         type="button"
         @click.stop="toggleDropdown()"
         x-bind:class="getTriggerClass()"
+        x-bind:disabled="disabled"
     >
         {{ $trigger ?? '' }}
     </button>

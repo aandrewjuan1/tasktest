@@ -4,6 +4,7 @@
     'dropdownClass' => 'w-96 p-4',
     'triggerClass' => 'inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/40 transition-colors cursor-pointer text-sm font-medium',
     'position' => 'bottom',
+    'disabled' => false,
 ])
 
 @php
@@ -24,6 +25,7 @@
         open: false,
         mouseLeaveTimer: null,
         recurrence: @js($initialData),
+        disabled: @js($disabled),
         init() {
             // Initialize defaults for enabled recurrence without type
             if (this.recurrence.enabled && !this.recurrence.type) {
@@ -85,6 +87,9 @@
             return text;
         },
         toggleDropdown() {
+            if (this.disabled) {
+                return;
+            }
             this.open = !this.open;
         },
         closeDropdown() {
@@ -103,6 +108,9 @@
         },
         intervalDebounceTimer: null,
         saveRecurrence() {
+            if (this.disabled) {
+                return;
+            }
             const value = this.recurrence.enabled ? {
                 enabled: this.recurrence.enabled,
                 type: this.recurrence.type,
@@ -189,7 +197,8 @@
     <button
         type="button"
         @click.stop="toggleDropdown()"
-        class="{{ $triggerClass }}"
+        x-bind:class="disabled ? '{{ $triggerClass }} opacity-50 cursor-not-allowed' : '{{ $triggerClass }}'"
+        x-bind:disabled="disabled"
     >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />

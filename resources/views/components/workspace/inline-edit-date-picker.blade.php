@@ -7,6 +7,7 @@
     'dropdownClass' => 'w-80 p-4',
     'triggerClass' => 'inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer text-sm font-medium',
     'position' => 'bottom',
+    'disabled' => false,
 ])
 
 @php
@@ -32,6 +33,7 @@
     dropdown-class="{{ $dropdownClass }}"
     trigger-class="{{ $triggerClass }}"
     position="{{ $position }}"
+    :disabled="$disabled"
 >
     <x-slot:trigger>
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

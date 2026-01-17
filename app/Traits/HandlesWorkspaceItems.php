@@ -2,14 +2,18 @@
 
 namespace App\Traits;
 
+use App\Enums\CollaborationPermission;
 use App\Enums\EventStatus;
 use App\Enums\TaskComplexity;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Models\Collaboration;
 use App\Models\Comment;
 use App\Models\Event;
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\User;
+use App\Services\CollaborationService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -172,6 +176,167 @@ trait HandlesWorkspaceItems
             ]);
 
             $this->dispatch('notify', message: 'Failed to delete comment. Please try again.', type: 'error');
+        }
+    }
+
+    public function addTaskCollaborator(int|string $taskId, string $email, string $permission): void
+    {
+        try {
+            $baseTaskId = is_string($taskId) && str_contains($taskId, '-')
+                ? (int) explode('-', $taskId)[0]
+                : (int) $taskId;
+
+            $task = Task::findOrFail($baseTaskId);
+            $this->authorize('update', $task);
+
+            // Only task owner can manage collaborators
+            if ($task->user_id !== Auth::id()) {
+                $this->dispatch('notify', message: 'Only the task owner can manage collaborators.', type: 'error');
+
+                return;
+            }
+
+            validator(
+                ['email' => $email, 'permission' => $permission],
+                [
+                    'email' => ['required', 'email', 'exists:users,email'],
+                    'permission' => ['required', 'string', Rule::in(['view', 'edit'])],
+                ],
+                [],
+                ['email' => 'email', 'permission' => 'permission'],
+            )->validate();
+
+            $user = User::where('email', $email)->firstOrFail();
+
+            // Check if user is the task owner
+            if ($task->user_id === $user->id) {
+                $this->dispatch('notify', message: 'Cannot add task owner as a collaborator.', type: 'error');
+
+                return;
+            }
+
+            // Check if user is already a collaborator
+            if ($task->isCollaborator($user)) {
+                $this->dispatch('notify', message: 'User is already a collaborator on this task.', type: 'error');
+
+                return;
+            }
+
+            $permissionEnum = CollaborationPermission::from($permission);
+            $collaborationService = app(CollaborationService::class);
+            $collaborationService->addCollaborator($task, $user, $permissionEnum);
+
+            $this->dispatch('item-updated');
+            $this->dispatch('notify', message: 'Collaborator added successfully', type: 'success');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // Extract email validation error message
+            $errors = $e->errors();
+            $emailError = $errors['email'][0] ?? 'The email address is invalid or does not exist.';
+
+            // Dispatch event for frontend to catch (don't throw, let frontend handle it)
+            $this->dispatch('collaborator-validation-error', message: $emailError, email: $email);
+
+            // Don't throw - let the frontend handle the error display
+            return;
+        } catch (\Exception $e) {
+            Log::error('Failed to add task collaborator', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'task_id' => $taskId,
+                'email' => $email,
+                'user_id' => Auth::id(),
+            ]);
+
+            $this->dispatch('notify', message: 'Failed to add collaborator. Please try again.', type: 'error');
+        }
+    }
+
+    public function updateTaskCollaboratorPermission(int|string $taskId, int $collaborationId, string $permission): void
+    {
+        try {
+            $baseTaskId = is_string($taskId) && str_contains($taskId, '-')
+                ? (int) explode('-', $taskId)[0]
+                : (int) $taskId;
+
+            $task = Task::findOrFail($baseTaskId);
+            $this->authorize('update', $task);
+
+            // Only task owner can manage collaborators
+            if ($task->user_id !== Auth::id()) {
+                $this->dispatch('notify', message: 'Only the task owner can manage collaborators.', type: 'error');
+
+                return;
+            }
+
+            $collaboration = Collaboration::where('collaboratable_type', Task::class)
+                ->where('collaboratable_id', $task->id)
+                ->findOrFail($collaborationId);
+
+            validator(
+                ['permission' => $permission],
+                ['permission' => ['required', 'string', Rule::in(['view', 'edit'])],
+                ],
+                [],
+                ['permission' => 'permission'],
+            )->validate();
+
+            $permissionEnum = CollaborationPermission::from($permission);
+            $collaborationService = app(CollaborationService::class);
+            $collaborationService->updateCollaboratorPermission($collaboration, $permissionEnum);
+
+            $this->dispatch('item-updated');
+            $this->dispatch('notify', message: 'Collaborator permission updated', type: 'success');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('Failed to update task collaborator permission', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'task_id' => $taskId,
+                'collaboration_id' => $collaborationId,
+                'user_id' => Auth::id(),
+            ]);
+
+            $this->dispatch('notify', message: 'Failed to update collaborator permission. Please try again.', type: 'error');
+        }
+    }
+
+    public function removeTaskCollaborator(int|string $taskId, int $collaborationId): void
+    {
+        try {
+            $baseTaskId = is_string($taskId) && str_contains($taskId, '-')
+                ? (int) explode('-', $taskId)[0]
+                : (int) $taskId;
+
+            $task = Task::findOrFail($baseTaskId);
+            $this->authorize('update', $task);
+
+            // Only task owner can manage collaborators
+            if ($task->user_id !== Auth::id()) {
+                $this->dispatch('notify', message: 'Only the task owner can manage collaborators.', type: 'error');
+
+                return;
+            }
+
+            $collaboration = Collaboration::where('collaboratable_type', Task::class)
+                ->where('collaboratable_id', $task->id)
+                ->findOrFail($collaborationId);
+
+            $collaborationService = app(CollaborationService::class);
+            $collaborationService->removeCollaborator($collaboration);
+
+            $this->dispatch('item-updated');
+            $this->dispatch('notify', message: 'Collaborator removed successfully', type: 'success');
+        } catch (\Exception $e) {
+            Log::error('Failed to remove task collaborator', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'task_id' => $taskId,
+                'collaboration_id' => $collaborationId,
+                'user_id' => Auth::id(),
+            ]);
+
+            $this->dispatch('notify', message: 'Failed to remove collaborator. Please try again.', type: 'error');
         }
     }
 
@@ -854,7 +1019,7 @@ trait HandlesWorkspaceItems
 
         $query = Task::query()
             ->accessibleBy($user)
-            ->with(['project.tasks', 'tags', 'event', 'recurringTask']);
+            ->with(['project.tasks', 'tags', 'event', 'recurringTask', 'collaborations.user', 'user']);
 
         $this->applyBaseFilters($query, 'task');
 

@@ -163,10 +163,10 @@ class Task extends Model
             return true;
         }
 
-        // Check if user has comment or edit permission
+        // Check if user has edit permission
         $permission = $this->getCollaboratorPermission($user);
 
-        return in_array($permission, [CollaborationPermission::Comment, CollaborationPermission::Edit]);
+        return $permission === CollaborationPermission::Edit;
     }
 
     public function canUserView(User $user): bool

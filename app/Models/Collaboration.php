@@ -41,11 +41,6 @@ class Collaboration extends Model
         return $this->permission === CollaborationPermission::Edit;
     }
 
-    public function canComment(): bool
-    {
-        return in_array($this->permission, [CollaborationPermission::Comment, CollaborationPermission::Edit]);
-    }
-
     public function canView(): bool
     {
         return true; // All permissions can view
@@ -59,11 +54,6 @@ class Collaboration extends Model
     public function scopeEditors($query)
     {
         return $query->where('permission', CollaborationPermission::Edit);
-    }
-
-    public function scopeCommenters($query)
-    {
-        return $query->whereIn('permission', [CollaborationPermission::Comment, CollaborationPermission::Edit]);
     }
 
     public function scopeViewers($query)

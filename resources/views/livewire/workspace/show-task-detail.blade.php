@@ -3,9 +3,7 @@
 use App\Models\Project;
 use App\Models\Tag;
 use App\Models\Task;
-use Carbon\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
@@ -21,8 +19,6 @@ new class extends Component
     public bool $isLoading = false;
 
     public bool $canViewComments = false;
-
-    public bool $canComment = false;
 
     // Edit fields
     public string $title = '';
@@ -58,6 +54,7 @@ new class extends Component
             'pomodoroSessions',
             'recurringTask',
             'comments.user',
+            'collaborations.user',
         ])->findOrFail($id);
 
         $this->authorize('view', $this->task);
@@ -65,7 +62,6 @@ new class extends Component
         // Compute comment permissions for the current user
         $user = auth()->user();
         $this->canViewComments = $this->task->canUserView($user);
-        $this->canComment = $this->task->canUserComment($user);
 
         // Load data before showing content
         $this->loadTaskData();
@@ -81,7 +77,6 @@ new class extends Component
         $this->showDeleteConfirm = false;
         $this->isLoading = false;
         $this->canViewComments = false;
-        $this->canComment = false;
         $this->resetValidation();
     }
 
@@ -122,6 +117,72 @@ new class extends Component
     public function availableTags(): Collection
     {
         return Tag::orderBy('name')->get();
+    }
+
+    #[Computed]
+    public function collaborators(): Collection
+    {
+        if (! $this->task) {
+            return collect();
+        }
+
+        return $this->task->collaborations()
+            ->with('user')
+            ->get()
+            ->map(fn ($collab) => [
+                'id' => $collab->id,
+                'user_id' => $collab->user_id,
+                'user_name' => $collab->user->name,
+                'user_email' => $collab->user->email,
+                'permission' => $collab->permission->value,
+            ]);
+    }
+
+    #[Computed]
+    public function currentUserPermission(): ?string
+    {
+        if (! $this->task) {
+            return null;
+        }
+
+        $user = auth()->user();
+        if (! $user || $this->task->user_id === $user->id) {
+            return null; // Owner doesn't need permission indicator
+        }
+
+        $permission = $this->task->getCollaboratorPermission($user);
+
+        return $permission?->value;
+    }
+
+    #[Computed]
+    public function canEdit(): bool
+    {
+        if (! $this->task) {
+            return false;
+        }
+
+        $user = auth()->user();
+        if (! $user) {
+            return false;
+        }
+
+        return $this->task->canUserEdit($user);
+    }
+
+    #[Computed]
+    public function canDelete(): bool
+    {
+        if (! $this->task) {
+            return false;
+        }
+
+        $user = auth()->user();
+        if (! $user) {
+            return false;
+        }
+
+        return $this->task->user_id === $user->id;
     }
 
     public function createTag(string $name): array
@@ -214,6 +275,7 @@ new class extends Component
                              originalValue: @js($task->title),
                              currentValue: @js($task->title),
                              errorMessage: null,
+                             canEdit: @js($this->canEdit),
                              init() {
                                  // Listen for backend updates
                                  window.addEventListener('task-detail-field-updated', (event) => {
@@ -228,6 +290,9 @@ new class extends Component
                                  });
                              },
                              startEditing() {
+                                if (!this.canEdit) {
+                                    return;
+                                }
                                 this.editing = true;
                                 this.currentValue = this.originalValue;
                                 $wire.title = this.originalValue;
@@ -243,6 +308,9 @@ new class extends Component
                                 });
                             },
                              save() {
+                                 if (!this.canEdit) {
+                                     return;
+                                 }
                                  // Validate title is not empty or null
                                  const trimmedValue = (this.currentValue || '').trim();
                                  if (!trimmedValue || trimmedValue === '') {
@@ -289,10 +357,11 @@ new class extends Component
                             <flux:heading
                                 size="xl"
                                 x-text="originalValue"
-                                class="cursor-text text-zinc-900 dark:text-zinc-50 tracking-tight min-h-[2rem] flex items-center"
+                                x-bind:class="canEdit ? 'cursor-text text-zinc-900 dark:text-zinc-50 tracking-tight min-h-[2rem] flex items-center' : 'text-zinc-900 dark:text-zinc-50 tracking-tight min-h-[2rem] flex items-center opacity-75'"
                                 @click="startEditing()"
                             ></flux:heading>
                             <button
+                                x-show="canEdit"
                                 @click.stop="startEditing()"
                                 class="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-all duration-200"
                                 type="button"
@@ -381,6 +450,7 @@ new class extends Component
                                 :available-tags="$this->availableTags"
                                 :simple-trigger="true"
                                 trigger-class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+                                :disabled="!$this->canEdit"
                             />
                         </div>
                     </div>
@@ -391,6 +461,7 @@ new class extends Component
                         <x-workspace.inline-edit-recurrence
                             :item-id="$task->id"
                             :recurring-task="$task->recurringTask"
+                            :disabled="!$this->canEdit"
                         />
 
                         <!-- Status -->
@@ -410,6 +481,7 @@ new class extends Component
                             trigger-class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full transition-colors cursor-pointer text-sm font-medium"
                             :color-map="$statusColors"
                             default-color-class="bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600"
+                            :disabled="!$this->canEdit"
                         >
                             <x-slot:trigger>
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -470,6 +542,7 @@ new class extends Component
                             trigger-class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full transition-colors cursor-pointer text-sm font-medium"
                             :color-map="$priorityColors"
                             default-color-class="bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                            :disabled="!$this->canEdit"
                         >
                             <x-slot:trigger>
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -537,6 +610,7 @@ new class extends Component
                             trigger-class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full transition-colors cursor-pointer text-sm font-medium"
                             :color-map="$complexityColors"
                             default-color-class="bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                            :disabled="!$this->canEdit"
                         >
                             <x-slot:trigger>
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -587,6 +661,7 @@ new class extends Component
                             :value="$task->duration"
                             dropdown-class="w-48 max-h-60 overflow-y-auto"
                             trigger-class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer text-sm font-medium"
+                            :disabled="!$this->canEdit"
                         >
                             <x-slot:trigger>
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -653,6 +728,7 @@ new class extends Component
                             label="Start Date"
                             type="datetime-local"
                             trigger-class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer text-sm font-medium"
+                            :disabled="!$this->canEdit"
                         />
 
                         <!-- Due Date -->
@@ -663,9 +739,37 @@ new class extends Component
                             label="Due Date"
                             type="datetime-local"
                             trigger-class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer text-sm font-medium"
+                            :disabled="!$this->canEdit"
                         />
                     </div>
                 </div>
+
+                <!-- Collaborator Permission Indicator -->
+                @if($this->currentUserPermission)
+                    @php
+                        $permissionColors = [
+                            'view' => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-600',
+                            'edit' => 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300 border-green-200 dark:border-green-800',
+                        ];
+                        $permissionLabels = [
+                            'view' => 'View Only',
+                            'edit' => 'Can Edit',
+                        ];
+                        $permissionColor = $permissionColors[$this->currentUserPermission] ?? $permissionColors['view'];
+                        $permissionLabel = $permissionLabels[$this->currentUserPermission] ?? 'View Only';
+                        $ownerName = $task->user?->name ?? 'Unknown';
+                    @endphp
+                    <div class="flex items-center gap-2 px-3 py-2 rounded-lg border {{ $permissionColor }} text-xs">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        <span class="flex-1">
+                            <span class="font-medium">Shared by {{ $ownerName }}</span>
+                            <span class="text-zinc-500 dark:text-zinc-400"> • </span>
+                            <span>{{ $permissionLabel }}</span>
+                        </span>
+                    </div>
+                @endif
 
                 <!-- Description -->
                 <div
@@ -673,6 +777,7 @@ new class extends Component
                          editing: false,
                          originalValue: @js($task->description ?? ''),
                          currentValue: @js($task->description ?? ''),
+                         canEdit: @js($this->canEdit),
                          init() {
                              // Listen for backend updates
                              window.addEventListener('task-detail-field-updated', (event) => {
@@ -686,6 +791,9 @@ new class extends Component
                              });
                          },
                          startEditing() {
+                             if (!this.canEdit) {
+                                 return;
+                             }
                              this.editing = true;
                              this.currentValue = this.originalValue;
                              $wire.description = this.originalValue;
@@ -701,6 +809,9 @@ new class extends Component
                              });
                          },
                          save() {
+                             if (!this.canEdit) {
+                                 return;
+                             }
                              if (this.currentValue !== this.originalValue) {
                                 this.originalValue = this.currentValue;
                                 this.editing = false;
@@ -757,7 +868,7 @@ new class extends Component
                                 Description
                             </flux:heading>
                             <button
-                                x-show="!editing"
+                                x-show="!editing && canEdit"
                                 @click.stop="startEditing()"
                                 class="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-all duration-200"
                                 type="button"
@@ -772,8 +883,8 @@ new class extends Component
                     <!-- Display Mode -->
                     <div
                         x-show="!editing"
+                        x-bind:class="canEdit ? 'cursor-text min-h-[1.5rem]' : 'min-h-[1.5rem] opacity-75'"
                         @click="startEditing()"
-                        class="cursor-text min-h-[1.5rem]"
                     >
                         <p class="text-sm text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap" x-text="originalValue || 'No description provided.'"></p>
                     </div>
@@ -871,6 +982,7 @@ new class extends Component
                             :value="$task->project_id ? (string) $task->project_id : ''"
                             dropdown-class="w-56 max-h-60 overflow-y-auto"
                             trigger-class="inline-flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
+                            :disabled="!$this->canEdit"
                         >
                             <x-slot:trigger>
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -923,6 +1035,7 @@ new class extends Component
                                         dropdown-class="w-56 max-h-60 overflow-y-auto"
                                         trigger-class="inline-flex items-center gap-2 text-base font-semibold text-zinc-900 dark:text-zinc-100 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
                                         position="top"
+                                        :disabled="!$this->canEdit"
                                     >
                                         <x-slot:trigger>
                                             <span x-text="selectedValue && projectNames[String(selectedValue)] ? projectNames[String(selectedValue)] : 'Select a project'"></span>
@@ -1025,7 +1138,6 @@ new class extends Component
                     <x-workspace.comment-section
                         :task-id="$task->id"
                         :comments="$commentsData"
-                        :can-comment="$canComment"
                     />
                 @endif
 
@@ -1066,30 +1178,27 @@ new class extends Component
                     </div>
                 @endif
 
-                <!-- Collaboration Placeholder -->
-                <div class="border-t border-zinc-200 dark:border-zinc-700 pt-4 mt-4">
-                    <flux:heading size="sm" class="flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
-                        <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-5-3.87M9 20H4v-2a4 4 0 015-3.87M12 12a4 4 0 100-8 4 4 0 000 8zm6 8H6" />
-                        </svg>
-                        Collaboration
-                    </flux:heading>
-                    <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">
-                        Collaboration features coming soon...
-                    </p>
-                </div>
+                <!-- Collaboration -->
+                @if($task->user_id === auth()->id())
+                    <x-workspace.collaboration-section
+                        :task-id="$task->id"
+                        :collaborators="$this->collaborators"
+                    />
+                @endif
 
                 <!-- Delete Button -->
-                <div class="mt-6 mb-4 pt-4 border-t border-red-100/60 dark:border-red-900/40">
-                    <div class="flex justify-end" x-data="{}">
-                        <flux:button
-                            variant="danger"
-                            @click="$wire.showDeleteConfirm = true"
-                        >
-                            Delete Task
-                        </flux:button>
+                @if($this->canDelete)
+                    <div class="mt-6 mb-4 pt-4 border-t border-red-100/60 dark:border-red-900/40">
+                        <div class="flex justify-end" x-data="{}">
+                            <flux:button
+                                variant="danger"
+                                @click="$wire.showDeleteConfirm = true"
+                            >
+                                Delete Task
+                            </flux:button>
+                        </div>
                     </div>
-                </div>
+                @endif
                 @endif
         </div>
     </flux:modal>

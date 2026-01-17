@@ -10,6 +10,11 @@
 
     $priorityValue = $task->priority?->value ?? null;
     $priorityBorderClass = $priorityValue ? ($priorityBorderColors[$priorityValue] ?? 'border-l-purple-500') : 'border-l-purple-500';
+
+    // Check if current user is not the owner (i.e., they're a collaborator)
+    $currentUser = auth()->user();
+    $isCollaboratedTask = $currentUser && $task->user_id !== $currentUser->id;
+    $ownerName = $task->user?->name ?? 'Unknown';
 @endphp
 
 <div
@@ -43,6 +48,14 @@
                 <span class="inline-flex items-center px-1.5 sm:px-2.5 py-0.5 sm:py-1 text-xs font-medium rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
                     Task
                 </span>
+                @if($isCollaboratedTask)
+                    <span class="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-medium rounded-md bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-600" title="Shared by {{ $ownerName }}">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        <span class="hidden sm:inline">Shared</span>
+                    </span>
+                @endif
                 @php
                     $statusColors = [
                         'to_do' => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600',

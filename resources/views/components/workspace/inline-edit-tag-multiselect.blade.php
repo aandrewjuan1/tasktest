@@ -6,6 +6,7 @@
     'dropdownClass' => 'w-64 max-h-60 overflow-y-auto',
     'triggerClass' => 'inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer text-sm font-medium',
     'simpleTrigger' => false,
+    'disabled' => false,
 ])
 
 <div
@@ -18,6 +19,7 @@
         newTagName: '',
         creatingTag: false,
         deletingTag: false,
+        disabled: @js($disabled),
         init() {
             // Listen for backend updates
             window.addEventListener('task-detail-field-updated', (event) => {
@@ -28,6 +30,9 @@
             });
         },
         toggleDropdown() {
+            if (this.disabled) {
+                return;
+            }
             this.open = !this.open;
         },
         closeDropdown() {
@@ -45,6 +50,9 @@
             }, 300);
         },
         toggleTag(tagId) {
+            if (this.disabled) {
+                return;
+            }
             const index = this.selectedTagIds.indexOf(tagId);
             if (index > -1) {
                 this.selectedTagIds.splice(index, 1);
@@ -57,6 +65,9 @@
             return this.selectedTagIds.includes(tagId);
         },
         updateTags() {
+            if (this.disabled) {
+                return;
+            }
             $wire.$dispatchTo('workspace.show-items', 'update-task-tags', {
                 itemId: {{ $itemId }},
                 itemType: '{{ $itemType }}',
@@ -73,7 +84,7 @@
             }));
         },
         async handleCreateTag() {
-            if (!this.newTagName.trim() || this.creatingTag) {
+            if (this.disabled || !this.newTagName.trim() || this.creatingTag) {
                 return;
             }
             this.creatingTag = true;
@@ -122,6 +133,9 @@
             this.deletingTag = false;
         },
         clearTags() {
+            if (this.disabled) {
+                return;
+            }
             this.selectedTagIds = [];
             this.updateTags();
         }
@@ -133,7 +147,8 @@
     <button
         type="button"
         @click.stop="toggleDropdown()"
-        class="{{ $triggerClass }}"
+        x-bind:class="disabled ? '{{ $triggerClass }} opacity-50 cursor-not-allowed' : '{{ $triggerClass }}'"
+        x-bind:disabled="disabled"
     >
         @if($simpleTrigger)
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

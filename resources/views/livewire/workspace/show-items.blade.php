@@ -215,6 +215,35 @@ new class extends Component {
         $this->deleteTaskComment($taskId, (int) $commentId);
     }
 
+    #[On('add-task-collaborator')]
+    public function handleAddTaskCollaborator($taskId = null, $email = null, $permission = null): void
+    {
+        if ($taskId === null || $email === null || $permission === null) {
+            return;
+        }
+
+        $this->addTaskCollaborator($taskId, (string) $email, (string) $permission);
+    }
+
+    #[On('update-task-collaborator-permission')]
+    public function handleUpdateTaskCollaboratorPermission($taskId = null, $collaborationId = null, $permission = null): void
+    {
+        if ($taskId === null || $collaborationId === null || $permission === null) {
+            return;
+        }
+
+        $this->updateTaskCollaboratorPermission($taskId, (int) $collaborationId, (string) $permission);
+    }
+
+    #[On('remove-task-collaborator')]
+    public function handleRemoveTaskCollaborator($taskId = null, $collaborationId = null): void
+    {
+        if ($taskId === null || $collaborationId === null) {
+            return;
+        }
+
+        $this->removeTaskCollaborator($taskId, (int) $collaborationId);
+    }
 
     #[On('reset-filters-sorts')]
     public function resetFiltersAndSorts(): void

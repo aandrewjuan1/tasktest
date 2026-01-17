@@ -1,3 +1,8 @@
+@php
+    $task = \App\Models\Task::find($taskId);
+    $canComment = $task ? $task->canUserComment(auth()->user()) : false;
+@endphp
+
 <div
     {{ $attributes->class('mt-4 border-t border-zinc-200 dark:border-zinc-800 pt-4') }}
     x-data="{

@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('collaboratable_type');
             $table->unsignedBigInteger('collaboratable_id');
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->string('permission', 20); // 'view', 'comment', 'edit'
+            $table->string('permission', 20); // 'view', 'edit'
             $table->timestamps();
 
             // Unique constraint: a user can only have one collaboration per item
