@@ -9,6 +9,8 @@
         editingContent: '',
         showInput: false,
         newComment: '',
+        showDeleteCommentConfirm: false,
+        commentIdToDelete: null,
         toggleInput() {
             if (!this.canComment) return;
             this.showInput = true;
@@ -84,8 +86,8 @@
         deleteComment(comment) {
             if (!comment.can_manage) return;
 
-            $wire.set('commentIdToDelete', comment.id);
-            $wire.set('showDeleteCommentConfirm', true);
+            this.commentIdToDelete = comment.id;
+            this.showDeleteCommentConfirm = true;
         },
         handleEditEnterKey(event, comment) {
             if (event.shiftKey) {
@@ -106,16 +108,6 @@
             this.addComment();
         }
     }"
-    x-init="
-        window.commentSectionDelete = (id) => {
-            comments = comments.filter(c => c.id !== id);
-            $wire.showDeleteCommentConfirm = false;
-            $wire.$dispatchTo('workspace.show-items', 'delete-task-comment', {
-                taskId: {{ $taskId }},
-                commentId: id,
-            });
-        }
-    "
 >
     <div class="flex items-center justify-between gap-2 mb-3">
         <flux:heading size="sm" class="flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
@@ -251,4 +243,40 @@
             You can view comments on this task but cannot add new ones.
         </p>
     </div>
+
+    <!-- Delete Comment Confirmation Modal -->
+    <flux:modal
+        x-model="showDeleteCommentConfirm"
+        class="max-w-md my-10 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl bg-white dark:bg-zinc-900"
+    >
+        <flux:heading size="lg" class="mb-2 text-red-600 dark:text-red-400">Delete Comment</flux:heading>
+        <p class="text-sm text-zinc-600 dark:text-zinc-400 mb-6">
+            Are you sure you want to delete this comment? This action cannot be undone.
+        </p>
+        <div class="flex justify-end gap-2">
+            <flux:button
+                variant="ghost"
+                @click="showDeleteCommentConfirm = false"
+            >
+                Cancel
+            </flux:button>
+            <flux:button
+                variant="danger"
+                @click="
+                    const id = commentIdToDelete;
+                    if (id) {
+                        comments = comments.filter(c => c.id !== id);
+                        showDeleteCommentConfirm = false;
+                        commentIdToDelete = null;
+                        $wire.$dispatchTo('workspace.show-items', 'delete-task-comment', {
+                            taskId: {{ $taskId }},
+                            commentId: id,
+                        });
+                    }
+                "
+            >
+                Delete
+            </flux:button>
+        </div>
+    </flux:modal>
 </div>

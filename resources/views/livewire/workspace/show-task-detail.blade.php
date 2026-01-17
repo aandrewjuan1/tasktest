@@ -24,10 +24,6 @@ new class extends Component
 
     public bool $canComment = false;
 
-    public bool $showDeleteCommentConfirm = false;
-
-    public ?int $commentIdToDelete = null;
-
     // Edit fields
     public string $title = '';
 
@@ -86,8 +82,6 @@ new class extends Component
         $this->isLoading = false;
         $this->canViewComments = false;
         $this->canComment = false;
-        $this->showDeleteCommentConfirm = false;
-        $this->commentIdToDelete = null;
         $this->resetValidation();
     }
 
@@ -1033,37 +1027,6 @@ new class extends Component
                         :comments="$commentsData"
                         :can-comment="$canComment"
                     />
-
-                    <!-- Delete Comment Confirmation Modal (kept here to use Livewire state) -->
-                    <flux:modal
-                        wire:model="showDeleteCommentConfirm"
-                        class="max-w-md my-10 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl bg-white dark:bg-zinc-900"
-                    >
-                        <flux:heading size="lg" class="mb-2 text-red-600 dark:text-red-400">Delete Comment</flux:heading>
-                        <p class="text-sm text-zinc-600 dark:text-zinc-400 mb-6">
-                            Are you sure you want to delete this comment? This action cannot be undone.
-                        </p>
-                        <div class="flex justify-end gap-2">
-                            <flux:button
-                                variant="ghost"
-                                @click="$wire.showDeleteCommentConfirm = false"
-                            >
-                                Cancel
-                            </flux:button>
-                            <flux:button
-                                variant="danger"
-                                x-data="{}"
-                                @click="
-                                    const id = $wire.commentIdToDelete;
-                                    if (id && window.commentSectionDelete) {
-                                        window.commentSectionDelete(id);
-                                    }
-                                "
-                            >
-                                Delete
-                            </flux:button>
-                        </div>
-                    </flux:modal>
                 @endif
 
                 <!-- Reminders -->
