@@ -72,9 +72,12 @@ class EventService
                     $parsedDate = Carbon::parse($instanceDate)->startOfDay();
                     $dateString = $parsedDate->format('Y-m-d');
 
-                    // Check if instance exists for this specific event_id and date
+                    // Check if instance exists for this specific event_id, recurring_event_id and date
+                    // Use latest() to get the most recent instance if duplicates exist
                     $existingInstance = EventInstance::where('event_id', $event->id)
+                        ->where('recurring_event_id', $event->recurringEvent->id)
                         ->whereDate('instance_date', $dateString)
+                        ->latest('id')
                         ->first();
 
                     if ($existingInstance) {
@@ -204,9 +207,12 @@ class EventService
                 $parsedDate = Carbon::parse($instanceDate)->startOfDay();
                 $dateString = $parsedDate->format('Y-m-d');
 
-                // Check if instance exists for this specific event_id and date
+                // Check if instance exists for this specific event_id, recurring_event_id and date
+                // Use latest() to get the most recent instance if duplicates exist
                 $existingInstance = EventInstance::where('event_id', $event->id)
+                    ->where('recurring_event_id', $event->recurringEvent->id)
                     ->whereDate('instance_date', $dateString)
+                    ->latest('id')
                     ->first();
 
                 if ($existingInstance) {
