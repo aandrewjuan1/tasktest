@@ -353,6 +353,14 @@ class Task extends Model
             return $exceptionDates->contains($date->format('Y-m-d'));
         });
 
+        // Filter out dates that are after the base task's due date (end_datetime)
+        if ($this->end_datetime) {
+            $baseDueDate = Carbon::parse($this->end_datetime)->startOfDay();
+            $validDates = $validDates->reject(function ($date) use ($baseDueDate) {
+                return $date->gt($baseDueDate);
+            });
+        }
+
         // Get existing TaskInstance records that might have modifications
         $existingInstances = TaskInstance::where('recurring_task_id', $recurringTask->id)
             ->whereBetween('instance_date', [$startDate, $endDate])
@@ -370,20 +378,9 @@ class Task extends Model
                 $virtualTask = $this->replicate();
                 $virtualTask->id = $this->id.'-'.$dateKey; // Unique ID for virtual instance
 
-                // Set datetime from base task if available, otherwise keep null
-                if ($this->end_datetime) {
-                    $baseEnd = Carbon::parse($this->end_datetime);
-                    $virtualTask->end_datetime = $date->copy()->setTime($baseEnd->hour, $baseEnd->minute, $baseEnd->second);
-                } else {
-                    $virtualTask->end_datetime = null;
-                }
-
-                if ($this->start_datetime) {
-                    $baseStart = Carbon::parse($this->start_datetime);
-                    $virtualTask->start_datetime = $date->copy()->setTime($baseStart->hour, $baseStart->minute, $baseStart->second);
-                } else {
-                    $virtualTask->start_datetime = null;
-                }
+                // Keep the base task's original datetime, don't change it to the occurrence date
+                $virtualTask->end_datetime = $this->end_datetime;
+                $virtualTask->start_datetime = $this->start_datetime;
 
                 $virtualTask->status = $existingInstance->status;
                 $virtualTask->completed_at = $existingInstance->completed_at;
@@ -397,20 +394,9 @@ class Task extends Model
             $virtualTask = $this->replicate();
             $virtualTask->id = $this->id.'-'.$dateKey; // Unique ID for virtual instance
 
-            // Set datetime from base task if available, otherwise keep null
-            if ($this->end_datetime) {
-                $baseEnd = Carbon::parse($this->end_datetime);
-                $virtualTask->end_datetime = $date->copy()->setTime($baseEnd->hour, $baseEnd->minute, $baseEnd->second);
-            } else {
-                $virtualTask->end_datetime = null;
-            }
-
-            if ($this->start_datetime) {
-                $baseStart = Carbon::parse($this->start_datetime);
-                $virtualTask->start_datetime = $date->copy()->setTime($baseStart->hour, $baseStart->minute, $baseStart->second);
-            } else {
-                $virtualTask->start_datetime = null;
-            }
+            // Keep the base task's original datetime, don't change it to the occurrence date
+            $virtualTask->end_datetime = $this->end_datetime;
+            $virtualTask->start_datetime = $this->start_datetime;
 
             $virtualTask->is_instance = true;
             $virtualTask->instance_date = $date;

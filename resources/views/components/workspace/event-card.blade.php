@@ -126,6 +126,7 @@
             <x-workspace.inline-edit-date-picker
                 field="startDatetime"
                 :item-id="$event->id"
+                item-type="event"
                 :value="$event->start_datetime?->toIso8601String()"
                 label="Start"
                 type="datetime-local"
@@ -135,6 +136,7 @@
             <x-workspace.inline-edit-date-picker
                 field="endDatetime"
                 :item-id="$event->id"
+                item-type="event"
                 :value="$event->end_datetime?->toIso8601String()"
                 label="End"
                 type="datetime-local"
@@ -144,13 +146,13 @@
     </div>
 
     {{-- Badges Section --}}
-    @if($event->recurringEvent)
-        <div class="flex flex-wrap gap-1.5 sm:gap-2" @click.stop>
-            <x-workspace.inline-edit-recurrence
-                :item-id="$event->id"
-                :recurring-event="$event->recurringEvent"
-                trigger-class="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/40 transition-colors cursor-pointer text-xs font-medium"
-            />
-        </div>
-    @endif
+    <div class="flex flex-wrap gap-1.5 sm:gap-2 mb-3 sm:mb-4" @click.stop>
+        {{-- Recurrence --}}
+        <x-workspace.inline-edit-recurrence
+            :item-id="$event->id"
+            item-type="event"
+            :recurring-event="$event->recurringEvent"
+            trigger-class="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/40 transition-colors cursor-pointer text-xs font-medium"
+        />
+    </div>
 </div>

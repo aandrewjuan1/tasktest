@@ -1,6 +1,8 @@
 @props([
     'itemId',
     'recurringTask' => null,
+    'recurringEvent' => null,
+    'itemType' => null, // 'task' or 'event' - auto-detected if not provided
     'dropdownClass' => 'w-96 p-4',
     'triggerClass' => 'inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/40 transition-colors cursor-pointer text-sm font-medium',
     'position' => 'bottom',
@@ -8,14 +10,18 @@
 ])
 
 @php
+    // Determine item type - use explicit prop if provided, otherwise default to task
+    $itemType = $itemType ?? 'task';
+    $recurringModel = $recurringEvent ?? $recurringTask;
+
     // Prepare initial recurrence data
     $initialData = [
-        'enabled' => $recurringTask !== null,
-        'type' => $recurringTask?->recurrence_type?->value ?? null,
-        'interval' => $recurringTask?->interval ?? 1,
-        'daysOfWeek' => $recurringTask?->days_of_week ? array_map('intval', explode(',', $recurringTask->days_of_week)) : [],
-        'startDatetime' => $recurringTask?->start_datetime?->toIso8601String() ?? null,
-        'endDatetime' => $recurringTask?->end_datetime?->toIso8601String() ?? null,
+        'enabled' => $recurringModel !== null,
+        'type' => $recurringModel?->recurrence_type?->value ?? null,
+        'interval' => $recurringModel?->interval ?? 1,
+        'daysOfWeek' => $recurringModel?->days_of_week ? array_map('intval', explode(',', $recurringModel->days_of_week)) : [],
+        'startDatetime' => $recurringModel?->start_datetime?->toIso8601String() ?? null,
+        'endDatetime' => $recurringModel?->end_datetime?->toIso8601String() ?? null,
     ];
 @endphp
 
@@ -35,10 +41,42 @@
                 this.recurrence.interval = 1;
             }
 
-            // Listen for backend updates
+            const itemType = '{{ $itemType }}';
+            const itemId = {{ $itemId }};
+
+            // Listen for backend updates (both task and event)
             window.addEventListener('task-detail-field-updated', (event) => {
                 const { field, value, taskId } = event.detail || {};
-                if (field === 'recurrence' && taskId === {{ $itemId }}) {
+                if (itemType === 'task' && field === 'recurrence' && taskId === itemId) {
+                    if (value === null || !value.enabled) {
+                        this.recurrence = {
+                            enabled: false,
+                            type: null,
+                            interval: 1,
+                            daysOfWeek: [],
+                            startDatetime: null,
+                            endDatetime: null,
+                        };
+                    } else {
+                        this.recurrence = {
+                            enabled: value.enabled ?? false,
+                            type: value.type ?? null,
+                            interval: value.interval ?? 1,
+                            daysOfWeek: value.daysOfWeek ?? [],
+                            startDatetime: value.startDatetime ?? null,
+                            endDatetime: value.endDatetime ?? null,
+                        };
+                        // Ensure default type if enabled but no type
+                        if (this.recurrence.enabled && !this.recurrence.type) {
+                            this.recurrence.type = 'daily';
+                        }
+                    }
+                }
+            });
+
+            window.addEventListener('event-detail-field-updated', (event) => {
+                const { field, value, eventId } = event.detail || {};
+                if (itemType === 'event' && field === 'recurrence' && eventId === itemId) {
                     if (value === null || !value.enabled) {
                         this.recurrence = {
                             enabled: false,
@@ -111,6 +149,9 @@
             if (this.disabled) {
                 return;
             }
+            const itemType = '{{ $itemType }}';
+            const itemId = {{ $itemId }};
+
             const value = this.recurrence.enabled ? {
                 enabled: this.recurrence.enabled,
                 type: this.recurrence.type,
@@ -120,20 +161,37 @@
                 endDatetime: this.recurrence.endDatetime,
             } : null;
 
-            $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
-                taskId: {{ $itemId }},
-                field: 'recurrence',
-                value: value,
-            });
-
-            // Notify listeners so UI stays in sync
-            window.dispatchEvent(new CustomEvent('task-detail-field-updated', {
-                detail: {
+            if (itemType === 'event') {
+                $wire.$dispatchTo('workspace.show-items', 'update-event-field', {
+                    eventId: itemId,
                     field: 'recurrence',
                     value: value,
-                    taskId: {{ $itemId }},
-                }
-            }));
+                });
+
+                // Notify listeners so UI stays in sync
+                window.dispatchEvent(new CustomEvent('event-detail-field-updated', {
+                    detail: {
+                        field: 'recurrence',
+                        value: value,
+                        eventId: itemId,
+                    }
+                }));
+            } else {
+                $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
+                    taskId: itemId,
+                    field: 'recurrence',
+                    value: value,
+                });
+
+                // Notify listeners so UI stays in sync
+                window.dispatchEvent(new CustomEvent('task-detail-field-updated', {
+                    detail: {
+                        field: 'recurrence',
+                        value: value,
+                        taskId: itemId,
+                    }
+                }));
+            }
         },
         toggleEnabled() {
             const wasEnabled = this.recurrence.enabled;
@@ -215,7 +273,7 @@
         <div class="space-y-4 px-3 pb-3 pt-1">
             <!-- Enable/Disable Toggle -->
             <div class="flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-zinc-700">
-                <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">Repeat Task</span>
+                <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $itemType === 'event' ? 'Repeat Event' : 'Repeat Task' }}</span>
                 <button
                     type="button"
                     @click="toggleEnabled()"

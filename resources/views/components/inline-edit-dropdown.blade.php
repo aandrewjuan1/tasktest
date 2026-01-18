@@ -37,11 +37,21 @@
         },
         init() {
             @if($useParent && $itemId)
-                // Listen for backend updates
+                const itemType = '{{ $itemType }}';
+                const itemId = {{ $itemId }};
+
+                // Listen for backend updates (both task and event)
                 window.addEventListener('task-detail-field-updated', (event) => {
                     const { field, value, taskId } = event.detail || {};
-                    if (field === '{{ $field }}' && taskId === {{ $itemId }}) {
-                        this.selectedValue = value ?? '';
+                    if (itemType === 'task' && field === '{{ $field }}' && taskId === itemId) {
+                        this.selectedValue = value ?? null;
+                    }
+                });
+
+                window.addEventListener('event-detail-field-updated', (event) => {
+                    const { field, value, eventId } = event.detail || {};
+                    if (itemType === 'event' && field === '{{ $field }}' && eventId === itemId) {
+                        this.selectedValue = value ?? null;
                     }
                 });
             @endif
@@ -121,15 +131,25 @@
                     @endif
                 @endif
 
-                // Notify any listeners in the task detail modal so header
+                // Notify any listeners in the detail modal so header
                 // pills and other UI can stay in sync with this dropdown.
-                window.dispatchEvent(new CustomEvent('task-detail-field-updated', {
-                    detail: {
-                        field: '{{ $field }}',
-                        value: value,
-                        taskId: {{ $itemId }},
-                    }
-                }));
+                @if($itemType === 'event')
+                    window.dispatchEvent(new CustomEvent('event-detail-field-updated', {
+                        detail: {
+                            field: '{{ $field }}',
+                            value: value,
+                            eventId: {{ $itemId }},
+                        }
+                    }));
+                @else
+                    window.dispatchEvent(new CustomEvent('task-detail-field-updated', {
+                        detail: {
+                            field: '{{ $field }}',
+                            value: value,
+                            taskId: {{ $itemId }},
+                        }
+                    }));
+                @endif
 
                 this.closeDropdown();
             @else

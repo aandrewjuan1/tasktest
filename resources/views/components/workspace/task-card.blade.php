@@ -155,6 +155,7 @@
         {{-- Recurrence --}}
         <x-workspace.inline-edit-recurrence
             :item-id="$task->id"
+            item-type="task"
             :recurring-task="$task->recurringTask"
             trigger-class="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/40 transition-colors cursor-pointer text-xs font-medium"
         />

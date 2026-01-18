@@ -296,6 +296,14 @@ class Event extends Model
             return $exceptionDates->contains($occurrence['start']->format('Y-m-d'));
         });
 
+        // Filter out occurrences that are after the base event's end date (end_datetime)
+        if ($this->end_datetime) {
+            $baseEndDate = Carbon::parse($this->end_datetime)->startOfDay();
+            $validOccurrences = $validOccurrences->reject(function ($occurrence) use ($baseEndDate) {
+                return $occurrence['start']->gt($baseEndDate);
+            });
+        }
+
         // Get existing EventInstance records that might have modifications
         $existingInstances = EventInstance::where('recurring_event_id', $recurringEvent->id)
             ->whereBetween('instance_date', [$startDate, $endDate])
@@ -312,19 +320,9 @@ class Event extends Model
                 // Create a virtual event object from the instance
                 $virtualEvent = $this->replicate();
                 $virtualEvent->id = $this->id.'-'.$dateKey;
-                // Set datetime from base event if available, otherwise use occurrence times
-                if ($this->start_datetime) {
-                    $baseStart = Carbon::parse($this->start_datetime);
-                    $virtualEvent->start_datetime = $occurrence['start']->copy()->setTime($baseStart->hour, $baseStart->minute, $baseStart->second);
-                } else {
-                    $virtualEvent->start_datetime = $occurrence['start'];
-                }
-                if ($this->end_datetime) {
-                    $baseEnd = Carbon::parse($this->end_datetime);
-                    $virtualEvent->end_datetime = $occurrence['end']->copy()->setTime($baseEnd->hour, $baseEnd->minute, $baseEnd->second);
-                } else {
-                    $virtualEvent->end_datetime = $occurrence['end'];
-                }
+                // Keep the base event's original datetime, don't change it to the occurrence date
+                $virtualEvent->start_datetime = $this->start_datetime;
+                $virtualEvent->end_datetime = $this->end_datetime;
                 $virtualEvent->status = $existingInstance->status ?? $this->status;
                 $virtualEvent->completed_at = $existingInstance->completed_at;
                 $virtualEvent->is_instance = true;
@@ -337,8 +335,9 @@ class Event extends Model
             // Create a virtual event object for this occurrence
             $virtualEvent = $this->replicate();
             $virtualEvent->id = $this->id.'-'.$dateKey;
-            $virtualEvent->start_datetime = $occurrence['start'];
-            $virtualEvent->end_datetime = $occurrence['end'];
+            // Keep the base event's original datetime, don't change it to the occurrence date
+            $virtualEvent->start_datetime = $this->start_datetime;
+            $virtualEvent->end_datetime = $this->end_datetime;
             $virtualEvent->is_instance = true;
             $virtualEvent->instance_date = $occurrence['start']->copy()->startOfDay();
 

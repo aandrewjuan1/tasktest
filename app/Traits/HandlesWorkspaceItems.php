@@ -549,12 +549,38 @@ trait HandlesWorkspaceItems
                 return;
             }
 
-            validator(
-                [$field => $value],
-                [$field => $validationRules],
-                [],
-                [$field => $field],
-            )->validate();
+            if ($field === 'recurrence') {
+                if ($value === null) {
+                    // Disabling recurrence, no validation needed.
+                } else {
+                    $rules = [
+                        'recurrence' => ['nullable', 'array'],
+                        'recurrence.enabled' => ['nullable', 'boolean'],
+                        'recurrence.type' => ['nullable', 'required_if:recurrence.enabled,true', 'string', 'in:daily,weekly,monthly,yearly'],
+                        'recurrence.interval' => ['nullable', 'required_if:recurrence.enabled,true', 'integer', 'min:1'],
+                        'recurrence.daysOfWeek' => ['nullable', 'array'],
+                        'recurrence.daysOfWeek.*' => ['integer', 'min:0', 'max:6'],
+                        'recurrence.startDatetime' => ['nullable', 'date'],
+                        'recurrence.endDatetime' => ['nullable', 'date', 'after_or_equal:recurrence.startDatetime'],
+                    ];
+                    validator(
+                        [$field => $value],
+                        $rules,
+                        [],
+                        [
+                            'recurrence.type' => 'recurrence type',
+                            'recurrence.interval' => 'recurrence interval',
+                        ],
+                    )->validate();
+                }
+            } else {
+                validator(
+                    [$field => $value],
+                    [$field => $validationRules],
+                    [],
+                    [$field => $field],
+                )->validate();
+            }
 
             $this->getEventService()->updateEventField($event, $field, $value, $instanceDate);
 
@@ -918,6 +944,7 @@ trait HandlesWorkspaceItems
             'startDatetime' => ['nullable', 'date'],
             'endDatetime' => ['nullable', 'date'],
             'status' => ['nullable', 'string', Rule::in($statusValues)],
+            'recurrence' => ['nullable', 'array'],
             default => [],
         };
     }

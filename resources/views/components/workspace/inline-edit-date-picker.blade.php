@@ -8,6 +8,7 @@
     'triggerClass' => 'inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer text-sm font-medium',
     'position' => 'bottom',
     'disabled' => false,
+    'itemType' => 'task', // 'task' or 'event'
 ])
 
 @php
@@ -28,6 +29,7 @@
 <x-inline-edit-dropdown
     field="{{ $field }}"
     :item-id="$itemId"
+    item-type="{{ $itemType }}"
     :use-parent="true"
     :value="$jsValue"
     dropdown-class="{{ $dropdownClass }}"
@@ -42,7 +44,61 @@
         <span class="text-sm font-medium">{{ $label }}</span>
         <span
             class="text-xs text-zinc-500 dark:text-zinc-400"
-            x-text="selectedValue ? (new Date(selectedValue).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' + new Date(selectedValue).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })) : 'Not set'"
+            x-data="{
+                initialValue: @js($jsValue),
+                getDisplayText() {
+                    // Use selectedValue if available and valid, otherwise fall back to initialValue
+                    const value = (selectedValue && selectedValue !== null && selectedValue !== '') ? selectedValue : this.initialValue;
+                    if (!value || value === null || value === '') {
+                        return 'Not set';
+                    }
+                    try {
+                        // Parse ISO string directly to avoid timezone conversion issues
+                        // Format: YYYY-MM-DDTHH:mm:ss or YYYY-MM-DDTHH:mm:ssZ
+                        let dateStr = value;
+                        if (dateStr.includes('T')) {
+                            const [datePart, timePart] = dateStr.split('T');
+                            const [year, month, day] = datePart.split('-').map(Number);
+
+                            // Parse time part (handle Z or timezone)
+                            let timeStr = timePart.replace(/Z$/, '').split(/[+-]/)[0];
+                            const [hours, minutes] = timeStr.split(':').map(Number);
+
+                            // Create date using UTC to preserve the original date
+                            const date = new Date(Date.UTC(year, month - 1, day, hours || 0, minutes || 0, 0));
+
+                            if (isNaN(date.getTime())) {
+                                return 'Not set';
+                            }
+
+                            // Format using UTC methods to preserve date
+                            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                            const monthName = months[date.getUTCMonth()];
+                            const dayNum = date.getUTCDate();
+                            const yearNum = date.getUTCFullYear();
+
+                            // Format time in 12-hour format
+                            let hour12 = date.getUTCHours();
+                            const minute = date.getUTCMinutes();
+                            const ampm = hour12 >= 12 ? 'PM' : 'AM';
+                            hour12 = hour12 % 12;
+                            hour12 = hour12 ? hour12 : 12; // 0 should be 12
+
+                            return `${monthName} ${dayNum}, ${yearNum} ${hour12}:${String(minute).padStart(2, '0')} ${ampm}`;
+                        } else {
+                            // Fallback to regular date parsing if format is different
+                            const date = new Date(value);
+                            if (isNaN(date.getTime())) {
+                                return 'Not set';
+                            }
+                            return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' + date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+                        }
+                    } catch(e) {
+                        return 'Not set';
+                    }
+                }
+            }"
+            x-text="getDisplayText()"
         >{{ $displayValue }}</span>
     </x-slot:trigger>
 
@@ -61,10 +117,29 @@
                 currentValue: @js($jsValue),
 
                 init() {
-                    // Listen for backend updates
+                    // Listen for backend updates (both task and event)
+                    const itemType = '{{ $itemType }}';
+                    const itemId = {{ $itemId }};
+
                     window.addEventListener('task-detail-field-updated', (event) => {
                         const { field, value, taskId } = event.detail || {};
-                        if (field === '{{ $field }}' && taskId === {{ $itemId }}) {
+                        if (itemType === 'task' && field === '{{ $field }}' && taskId === itemId) {
+                            this.currentValue = value ?? null;
+                            this.parseInitial(value);
+                            const baseDate = this.selectedDate ?? new Date();
+                            this.month = baseDate.getMonth();
+                            this.year = baseDate.getFullYear();
+                            if (this.type === 'datetime-local' && (!this.hour || !this.minute)) {
+                                const now = this.selectedDate ?? new Date();
+                                this.setTimeFromDate(now);
+                            }
+                            this.buildDays();
+                        }
+                    });
+
+                    window.addEventListener('event-detail-field-updated', (event) => {
+                        const { field, value, eventId } = event.detail || {};
+                        if (itemType === 'event' && field === '{{ $field }}' && eventId === itemId) {
                             this.currentValue = value ?? null;
                             this.parseInitial(value);
                             const baseDate = this.selectedDate ?? new Date();
@@ -97,7 +172,38 @@
                         return;
                     }
 
-                    const parsed = new Date(value);
+                    // Parse ISO string directly to avoid timezone conversion issues
+                    let parsed;
+                    try {
+                        if (typeof value === 'string' && value.includes('T')) {
+                            // Parse ISO 8601 format: YYYY-MM-DDTHH:mm:ss or YYYY-MM-DDTHH:mm:ssZ
+                            const [datePart, timePart] = value.split('T');
+                            const dateComponents = datePart.split('-').map(Number);
+
+                            if (dateComponents.length !== 3) {
+                                // Fallback to standard parsing
+                                parsed = new Date(value);
+                            } else {
+                                const [year, month, day] = dateComponents;
+
+                                // Parse time part (handle Z or timezone offset)
+                                let timeStr = timePart.replace(/Z$/, '').split(/[+-]/)[0];
+                                const timeComponents = timeStr.split(':').map(Number);
+                                const hours = timeComponents[0] || 0;
+                                const minutes = timeComponents[1] || 0;
+
+                                // Create date using local timezone to preserve the date components
+                                // This ensures Jan 13 in database shows as Jan 13, not Jan 18
+                                parsed = new Date(year, month - 1, day, hours, minutes, 0);
+                            }
+                        } else {
+                            // Fallback for non-ISO format
+                            parsed = new Date(value);
+                        }
+                    } catch (e) {
+                        // If parsing fails, try standard Date constructor
+                        parsed = new Date(value);
+                    }
 
                     if (isNaN(parsed.getTime())) {
                         return;
@@ -206,21 +312,41 @@
                     this.meridiem = 'AM';
                     this.currentValue = null;
 
-                    // Dispatch to parent to clear the date
-                    $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
-                        taskId: {{ $itemId }},
-                        field: '{{ $field }}',
-                        value: null,
-                    });
+                    const itemType = '{{ $itemType }}';
+                    const itemId = {{ $itemId }};
 
-                    // Notify listeners
-                    window.dispatchEvent(new CustomEvent('task-detail-field-updated', {
-                        detail: {
+                    // Dispatch to parent to clear the date
+                    if (itemType === 'event') {
+                        $wire.$dispatchTo('workspace.show-items', 'update-event-field', {
+                            eventId: itemId,
                             field: '{{ $field }}',
                             value: null,
-                            taskId: {{ $itemId }},
-                        }
-                    }));
+                        });
+
+                        // Notify listeners
+                        window.dispatchEvent(new CustomEvent('event-detail-field-updated', {
+                            detail: {
+                                field: '{{ $field }}',
+                                value: null,
+                                eventId: itemId,
+                            }
+                        }));
+                    } else {
+                        $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
+                            taskId: itemId,
+                            field: '{{ $field }}',
+                            value: null,
+                        });
+
+                        // Notify listeners
+                        window.dispatchEvent(new CustomEvent('task-detail-field-updated', {
+                            detail: {
+                                field: '{{ $field }}',
+                                value: null,
+                                taskId: itemId,
+                            }
+                        }));
+                    }
                 },
 
                 updateModel() {
@@ -265,21 +391,41 @@
 
                     this.currentValue = value;
 
-                    // Dispatch to parent component
-                    $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
-                        taskId: {{ $itemId }},
-                        field: '{{ $field }}',
-                        value: value,
-                    });
+                    const itemType = '{{ $itemType }}';
+                    const itemId = {{ $itemId }};
 
-                    // Notify listeners so UI stays in sync
-                    window.dispatchEvent(new CustomEvent('task-detail-field-updated', {
-                        detail: {
+                    // Dispatch to parent component
+                    if (itemType === 'event') {
+                        $wire.$dispatchTo('workspace.show-items', 'update-event-field', {
+                            eventId: itemId,
                             field: '{{ $field }}',
                             value: value,
-                            taskId: {{ $itemId }},
-                        }
-                    }));
+                        });
+
+                        // Notify listeners so UI stays in sync
+                        window.dispatchEvent(new CustomEvent('event-detail-field-updated', {
+                            detail: {
+                                field: '{{ $field }}',
+                                value: value,
+                                eventId: itemId,
+                            }
+                        }));
+                    } else {
+                        $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
+                            taskId: itemId,
+                            field: '{{ $field }}',
+                            value: value,
+                        });
+
+                        // Notify listeners so UI stays in sync
+                        window.dispatchEvent(new CustomEvent('task-detail-field-updated', {
+                            detail: {
+                                field: '{{ $field }}',
+                                value: value,
+                                taskId: itemId,
+                            }
+                        }));
+                    }
                 },
 
                 isSelected(day) {
