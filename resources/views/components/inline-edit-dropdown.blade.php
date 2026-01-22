@@ -22,6 +22,13 @@
         colorMap: @js($colorMap),
         defaultColorClass: @js($defaultColorClass),
         disabled: @js($disabled),
+        getValue() {
+            // If parent has optimistic UI state, use that
+            if (this.$parent && typeof this.$parent['{{ $field }}'] !== 'undefined') {
+                return this.$parent['{{ $field }}'];
+            }
+            return this.selectedValue;
+        },
         getTriggerClass() {
             const baseClass = '{{ $triggerClass }}';
             let classes = baseClass;
@@ -31,11 +38,21 @@
             if (!this.colorMap) {
                 return classes;
             }
-            const value = this.selectedValue || '';
+            const value = this.getValue() || '';
             const colorClass = value && this.colorMap[value] ? this.colorMap[value] : (this.defaultColorClass || '');
             return classes + (colorClass ? ' ' + colorClass : '');
         },
         init() {
+            // Watch parent state for changes and sync selectedValue
+            const fieldName = '{{ $field }}';
+            if (this.$parent && typeof this.$parent[fieldName] !== 'undefined') {
+                this.$watch(`$parent.${fieldName}`, (newValue) => {
+                    this.selectedValue = newValue ?? null;
+                });
+                // Sync initially
+                this.selectedValue = this.$parent[fieldName] ?? null;
+            }
+
             @if($useParent && $itemId)
                 const itemType = '{{ $itemType }}';
                 const itemId = {{ $itemId }};
@@ -45,6 +62,10 @@
                     const { field, value, taskId } = event.detail || {};
                     if (itemType === 'task' && field === '{{ $field }}' && taskId === itemId) {
                         this.selectedValue = value ?? null;
+                        // Also update parent if it has optimistic UI
+                        if (this.$parent && typeof this.$parent['{{ $field }}'] !== 'undefined') {
+                            this.$parent['{{ $field }}'] = value ?? null;
+                        }
                     }
                 });
 
@@ -52,6 +73,10 @@
                     const { field, value, eventId } = event.detail || {};
                     if (itemType === 'event' && field === '{{ $field }}' && eventId === itemId) {
                         this.selectedValue = value ?? null;
+                        // Also update parent if it has optimistic UI
+                        if (this.$parent && typeof this.$parent['{{ $field }}'] !== 'undefined') {
+                            this.$parent['{{ $field }}'] = value ?? null;
+                        }
                     }
                 });
             @endif
@@ -91,71 +116,56 @@
                 this.closeDropdown();
             }, 300);
         },
-        select(value) {
+        async select(value) {
             if (this.disabled) {
                 return;
             }
+
+            const originalValue = this.selectedValue;
+
+            // Update UI optimistically
             this.selectedValue = value;
+
+            // Close dropdown immediately (frontend state)
+            this.closeDropdown();
+
+            // Check if parent Alpine component has updateField method (optimistic UI pattern)
+            const parentHasOptimistic = this.$parent && typeof this.$parent.updateField === 'function';
+
             @if($useParent && $itemId)
-                @if(isset($instanceDate) && $instanceDate)
-                    // For recurring task/event instances
-                    @if($itemType === 'event')
-                        $wire.$dispatchTo('workspace.show-items', 'update-event-field', {
-                            eventId: {{ $itemId }},
-                            field: '{{ $field }}',
-                            value: value,
-                            instanceDate: @js($instanceDate),
-                        });
-                    @else
-                        $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
-                            taskId: {{ $itemId }},
-                            field: '{{ $field }}',
-                            value: value,
-                            instanceDate: @js($instanceDate),
-                        });
-                    @endif
-                @else
-                    // For regular tasks/events
-                    @if($itemType === 'event')
-                        $wire.$dispatchTo('workspace.show-items', 'update-event-field', {
-                            eventId: {{ $itemId }},
-                            field: '{{ $field }}',
-                            value: value,
-                        });
-                    @else
-                        $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
-                            taskId: {{ $itemId }},
-                            field: '{{ $field }}',
-                            value: value,
-                        });
-                    @endif
-                @endif
-
-                // Notify any listeners in the detail modal so header
-                // pills and other UI can stay in sync with this dropdown.
-                @if($itemType === 'event')
-                    window.dispatchEvent(new CustomEvent('event-detail-field-updated', {
-                        detail: {
-                            field: '{{ $field }}',
-                            value: value,
-                            eventId: {{ $itemId }},
-                        }
-                    }));
-                @else
-                    window.dispatchEvent(new CustomEvent('task-detail-field-updated', {
-                        detail: {
-                            field: '{{ $field }}',
-                            value: value,
-                            taskId: {{ $itemId }},
-                        }
-                    }));
-                @endif
-
-                this.closeDropdown();
+                try {
+                    if (parentHasOptimistic) {
+                        // Use parent's optimistic update method
+                        await this.$parent.updateField('{{ $field }}', value);
+                    } else {
+                        // Fallback to direct wire call
+                        @if(isset($instanceDate) && $instanceDate)
+                            @if($itemType === 'event')
+                                await $wire.$parent.call('updateEventField', {{ $itemId }}, '{{ $field }}', value, @js($instanceDate));
+                            @else
+                                await $wire.$parent.call('updateTaskField', {{ $itemId }}, '{{ $field }}', value, @js($instanceDate));
+                            @endif
+                        @else
+                            @if($itemType === 'event')
+                                await $wire.$parent.call('updateEventField', {{ $itemId }}, '{{ $field }}', value);
+                            @else
+                                await $wire.$parent.call('updateTaskField', {{ $itemId }}, '{{ $field }}', value);
+                            @endif
+                        @endif
+                    }
+                } catch (error) {
+                    // Rollback on error
+                    this.selectedValue = originalValue;
+                    console.error('Failed to update field:', error);
+                }
             @else
-                $wire.updateField('{{ $field }}', value).then(() => {
-                    this.closeDropdown();
-                });
+                try {
+                    await $wire.updateField('{{ $field }}', value);
+                } catch (error) {
+                    // Rollback on error
+                    this.selectedValue = originalValue;
+                    console.error('Failed to update field:', error);
+                }
             @endif
         }
     }"

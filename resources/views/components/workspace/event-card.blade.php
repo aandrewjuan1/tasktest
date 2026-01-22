@@ -1,6 +1,54 @@
 @props(['event'])
 
+@php
+    // Prepare initial state for Alpine
+    $initialState = [
+        'status' => $event->status?->value ?? 'scheduled',
+        'startDatetime' => $event->start_datetime?->toIso8601String() ?? null,
+        'endDatetime' => $event->end_datetime?->toIso8601String() ?? null,
+        'recurrence' => $event->recurringEvent ? [
+            'enabled' => true,
+            'type' => $event->recurringEvent->recurrence_type?->value ?? null,
+            'interval' => $event->recurringEvent->interval ?? 1,
+            'daysOfWeek' => $event->recurringEvent->days_of_week ? array_map('intval', explode(',', $event->recurringEvent->days_of_week)) : [],
+            'startDatetime' => $event->recurringEvent->start_datetime?->toIso8601String() ?? null,
+            'endDatetime' => $event->recurringEvent->end_datetime?->toIso8601String() ?? null,
+        ] : [
+            'enabled' => false,
+            'type' => null,
+            'interval' => 1,
+            'daysOfWeek' => [],
+            'startDatetime' => null,
+            'endDatetime' => null,
+        ],
+    ];
+@endphp
+
 <div
+    wire:ignore
+    x-data="{
+        eventId: {{ $event->id }},
+        instanceDate: @js(($event->is_instance ?? false) && isset($event->instance_date) ? $event->instance_date->format('Y-m-d') : null),
+        status: @js($initialState['status']),
+        startDatetime: @js($initialState['startDatetime']),
+        endDatetime: @js($initialState['endDatetime']),
+        recurrence: @js($initialState['recurrence']),
+        async updateField(field, value) {
+            const originalValue = this[field];
+
+            // Update UI optimistically
+            this[field] = value;
+
+            // Call backend
+            try {
+                await $wire.$parent.call('updateEventField', this.eventId, field, value, this.instanceDate);
+            } catch (error) {
+                // Rollback on error
+                this[field] = originalValue;
+                console.error('Failed to update field:', error);
+            }
+        }
+    }"
     class="@container bg-white dark:bg-zinc-800 rounded-lg rounded-br-lg border border-zinc-200 dark:border-zinc-700 p-2 sm:p-3 flex flex-col h-full"
     wire:click="$dispatch('view-event-detail', { id: {{ $event->id }} })"
     role="button"
@@ -67,7 +115,7 @@
                                 completed: 'Completed',
                                 cancelled: 'Cancelled',
                                 tentative: 'Tentative',
-                            }[selectedValue || 'scheduled']"
+                            }[getValue() || 'scheduled']"
                         >{{ match($event->status?->value ?? 'scheduled') {
                             'scheduled' => 'Scheduled',
                             'ongoing' => 'Ongoing',
@@ -82,37 +130,37 @@
                             Status
                         </div>
                         <button
-                            @click="select('scheduled')"
+                            @click.throttle="select('scheduled')"
                             class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                            :class="selectedValue === 'scheduled' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                            :class="getValue() === 'scheduled' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                         >
                             Scheduled
                         </button>
                         <button
-                            @click="select('ongoing')"
+                            @click.throttle="select('ongoing')"
                             class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                            :class="selectedValue === 'ongoing' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                            :class="getValue() === 'ongoing' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                         >
                             Ongoing
                         </button>
                         <button
-                            @click="select('completed')"
+                            @click.throttle="select('completed')"
                             class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                            :class="selectedValue === 'completed' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                            :class="getValue() === 'completed' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                         >
                             Completed
                         </button>
                         <button
-                            @click="select('cancelled')"
+                            @click.throttle="select('cancelled')"
                             class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                            :class="selectedValue === 'cancelled' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                            :class="getValue() === 'cancelled' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                         >
                             Cancelled
                         </button>
                         <button
-                            @click="select('tentative')"
+                            @click.throttle="select('tentative')"
                             class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                            :class="selectedValue === 'tentative' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                            :class="getValue() === 'tentative' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                         >
                             Tentative
                         </button>

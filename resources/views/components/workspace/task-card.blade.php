@@ -15,10 +15,76 @@
     $currentUser = auth()->user();
     $isCollaboratedTask = $currentUser && $task->user_id !== $currentUser->id;
     $ownerName = $task->user?->name ?? 'Unknown';
+
+    // Prepare initial state for Alpine
+    $initialState = [
+        'status' => $task->status?->value ?? 'to_do',
+        'priority' => $task->priority?->value ?? null,
+        'complexity' => $task->complexity?->value ?? null,
+        'duration' => $task->duration ?? null,
+        'startDatetime' => $task->start_datetime?->toIso8601String() ?? null,
+        'endDatetime' => $task->end_datetime?->toIso8601String() ?? null,
+        'recurrence' => $task->recurringTask ? [
+            'enabled' => true,
+            'type' => $task->recurringTask->recurrence_type?->value ?? null,
+            'interval' => $task->recurringTask->interval ?? 1,
+            'daysOfWeek' => $task->recurringTask->days_of_week ? array_map('intval', explode(',', $task->recurringTask->days_of_week)) : [],
+            'startDatetime' => $task->recurringTask->start_datetime?->toIso8601String() ?? null,
+            'endDatetime' => $task->recurringTask->end_datetime?->toIso8601String() ?? null,
+        ] : [
+            'enabled' => false,
+            'type' => null,
+            'interval' => 1,
+            'daysOfWeek' => [],
+            'startDatetime' => null,
+            'endDatetime' => null,
+        ],
+    ];
+
+    // Store original values for rollback
+    $originalState = $initialState;
 @endphp
 
 <div
-    class="@container bg-white dark:bg-zinc-800 rounded-lg border-l-4 {{ $priorityBorderClass }} border-r border-t border-b border-zinc-200 dark:border-zinc-700 p-3 sm:p-5 transition-all flex flex-col h-full"
+    wire:ignore
+    x-data="{
+        taskId: {{ $task->id }},
+        instanceDate: @js(($task->is_instance ?? false) && isset($task->instance_date) ? $task->instance_date->format('Y-m-d') : null),
+        status: @js($initialState['status']),
+        priority: @js($initialState['priority']),
+        complexity: @js($initialState['complexity']),
+        duration: @js($initialState['duration']),
+        startDatetime: @js($initialState['startDatetime']),
+        endDatetime: @js($initialState['endDatetime']),
+        recurrence: @js($initialState['recurrence']),
+        async updateField(field, value) {
+            const originalValue = this[field];
+
+            // Update UI optimistically
+            this[field] = value;
+
+            // Call backend
+            try {
+                await $wire.$parent.call('updateTaskField', this.taskId, field, value, this.instanceDate);
+            } catch (error) {
+                // Rollback on error
+                this[field] = originalValue;
+                console.error('Failed to update field:', error);
+            }
+        },
+        getPriorityBorderClass() {
+            const priority = this.priority || '';
+            const colors = {
+                'low': 'border-l-zinc-300 dark:border-l-zinc-500',
+                'medium': 'border-l-yellow-400 dark:border-l-yellow-500',
+                'high': 'border-l-orange-500 dark:border-l-orange-500',
+                'urgent': 'border-l-red-500 dark:border-l-red-500',
+            };
+            return colors[priority] || 'border-l-purple-500';
+        }
+    }"
+    class="@container bg-white dark:bg-zinc-800 rounded-lg border-l-4 border-r border-t border-b border-zinc-200 dark:border-zinc-700 p-3 sm:p-5 transition-all flex flex-col h-full"
+    :class="getPriorityBorderClass()"
 >
     {{-- Header Section --}}
     <div class="mb-4">
@@ -83,7 +149,7 @@
                                 to_do: 'To Do',
                                 doing: 'In Progress',
                                 done: 'Done',
-                            }[selectedValue || 'to_do']"
+                            }[getValue() || 'to_do']"
                         >{{ match($task->status?->value ?? 'to_do') {
                             'to_do' => 'To Do',
                             'doing' => 'In Progress',
@@ -96,21 +162,21 @@
                             Status
                         </div>
                         <button
-                            @click="select('to_do')"
+                            @click.throttle="select('to_do')"
                             class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             :class="selectedValue === 'to_do' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                         >
                             To Do
                         </button>
                         <button
-                            @click="select('doing')"
+                            @click.throttle="select('doing')"
                             class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             :class="selectedValue === 'doing' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                         >
                             In Progress
                         </button>
                         <button
-                            @click="select('done')"
+                            @click.throttle="select('done')"
                             class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             :class="selectedValue === 'done' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                         >
@@ -189,7 +255,7 @@
                         medium: 'Medium',
                         high: 'High',
                         urgent: 'Urgent'
-                    }[selectedValue || ''] || 'Priority'"
+                    }[getValue() || ''] || 'Priority'"
                 >{{ $task->priority ? ucfirst($task->priority->value) . ' Priority' : 'Priority' }}</span>
             </x-slot:trigger>
 
@@ -198,30 +264,30 @@
                     Priority
                 </div>
                 <button
-                    @click="select('low')"
+                    @click.throttle="select('low')"
                     class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                    :class="selectedValue === 'low' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                    :class="getValue() === 'low' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                 >
                     Low
                 </button>
                 <button
-                    @click="select('medium')"
+                    @click.throttle="select('medium')"
                     class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                    :class="selectedValue === 'medium' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                    :class="getValue() === 'medium' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                 >
                     Medium
                 </button>
                 <button
-                    @click="select('high')"
+                    @click.throttle="select('high')"
                     class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                    :class="selectedValue === 'high' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                    :class="getValue() === 'high' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                 >
                     High
                 </button>
                 <button
-                    @click="select('urgent')"
+                    @click.throttle="select('urgent')"
                     class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                    :class="selectedValue === 'urgent' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                    :class="getValue() === 'urgent' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                 >
                     Urgent
                 </button>
@@ -255,7 +321,7 @@
                         simple: 'Simple',
                         moderate: 'Moderate',
                         complex: 'Complex'
-                    }[selectedValue || ''] || 'Complexity'"
+                    }[getValue() || ''] || 'Complexity'"
                 >{{ $task->complexity ? ucfirst($task->complexity->value) : 'Complexity' }}</span>
             </x-slot:trigger>
 
@@ -264,23 +330,23 @@
                     Complexity
                 </div>
                 <button
-                    @click="select('simple')"
+                    @click.throttle="select('simple')"
                     class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                    :class="selectedValue === 'simple' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                    :class="getValue() === 'simple' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                 >
                     Simple
                 </button>
                 <button
-                    @click="select('moderate')"
+                    @click.throttle="select('moderate')"
                     class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                    :class="selectedValue === 'moderate' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                    :class="getValue() === 'moderate' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                 >
                     Moderate
                 </button>
                 <button
-                    @click="select('complex')"
+                    @click.throttle="select('complex')"
                     class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                    :class="selectedValue === 'complex' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                    :class="getValue() === 'complex' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                 >
                     Complex
                 </button>
@@ -301,7 +367,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span
-                    x-text="selectedValue ? (() => { const mins = parseInt(selectedValue); if (mins >= 60) { const hours = Math.floor(mins / 60); const remainingMins = mins % 60; if (remainingMins === 0) { return hours + (hours === 1 ? ' hour' : ' hours') + (mins >= 480 ? '+' : ''); } return hours + (hours === 1 ? ' hour' : ' hours') + ' ' + remainingMins + ' min'; } return mins + ' min'; })() : 'No duration'"
+                    x-text="getValue() ? (() => { const mins = parseInt(getValue()); if (mins >= 60) { const hours = Math.floor(mins / 60); const remainingMins = mins % 60; if (remainingMins === 0) { return hours + (hours === 1 ? ' hour' : ' hours') + (mins >= 480 ? '+' : ''); } return hours + (hours === 1 ? ' hour' : ' hours') + ' ' + remainingMins + ' min'; } return mins + ' min'; })() : 'No duration'"
                 >@php
                     if ($task->duration) {
                         $mins = $task->duration;
@@ -327,8 +393,8 @@
                     Duration
                 </div>
                 <button
-                    x-show="selectedValue !== null && selectedValue !== ''"
-                    @click="select(null)"
+                    x-show="getValue() !== null && getValue() !== ''"
+                    @click.throttle="select(null)"
                     class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 text-red-600 dark:text-red-400"
                 >
                     Clear
@@ -343,9 +409,9 @@
                         }
                     @endphp
                     <button
-                        @click="select({{ $minutes }})"
+                        @click.throttle="select({{ $minutes }})"
                         class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                        :class="selectedValue === {{ $minutes }} ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
+                        :class="getValue() === {{ $minutes }} ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''"
                     >
                         {{ $displayText }}
                     </button>

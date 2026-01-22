@@ -46,9 +46,19 @@
             class="text-xs text-zinc-500 dark:text-zinc-400"
             x-data="{
                 initialValue: @js($jsValue),
+                getValue() {
+                    // If parent has optimistic UI state, use that
+                    if (this.$parent && typeof this.$parent['{{ $field }}'] !== 'undefined') {
+                        return this.$parent['{{ $field }}'];
+                    }
+                    // Fallback to dropdown's selectedValue if available
+                    if (typeof selectedValue !== 'undefined' && selectedValue !== null && selectedValue !== '') {
+                        return selectedValue;
+                    }
+                    return this.initialValue;
+                },
                 getDisplayText() {
-                    // Use selectedValue if available and valid, otherwise fall back to initialValue
-                    const value = (selectedValue && selectedValue !== null && selectedValue !== '') ? selectedValue : this.initialValue;
+                    const value = this.getValue();
                     if (!value || value === null || value === '') {
                         return 'Not set';
                     }
@@ -115,56 +125,65 @@
                 meridiem: 'AM',
                 days: [],
                 currentValue: @js($jsValue),
+                updateModelTimer: null,
 
-                init() {
-                    // Listen for backend updates (both task and event)
-                    const itemType = '{{ $itemType }}';
-                    const itemId = {{ $itemId }};
+                getValue() {
+                    // If parent has optimistic UI state, use that
+                    if (this.$parent && typeof this.$parent['{{ $field }}'] !== 'undefined') {
+                        return this.$parent['{{ $field }}'];
+                    }
+                    return this.currentValue;
+                },
 
-                    window.addEventListener('task-detail-field-updated', (event) => {
-                        const { field, value, taskId } = event.detail || {};
-                        if (itemType === 'task' && field === '{{ $field }}' && taskId === itemId) {
-                            this.currentValue = value ?? null;
-                            this.parseInitial(value);
-                            const baseDate = this.selectedDate ?? new Date();
-                            this.month = baseDate.getMonth();
-                            this.year = baseDate.getFullYear();
-                            if (this.type === 'datetime-local' && (!this.hour || !this.minute)) {
-                                const now = this.selectedDate ?? new Date();
-                                this.setTimeFromDate(now);
-                            }
-                            this.buildDays();
-                        }
-                    });
-
-                    window.addEventListener('event-detail-field-updated', (event) => {
-                        const { field, value, eventId } = event.detail || {};
-                        if (itemType === 'event' && field === '{{ $field }}' && eventId === itemId) {
-                            this.currentValue = value ?? null;
-                            this.parseInitial(value);
-                            const baseDate = this.selectedDate ?? new Date();
-                            this.month = baseDate.getMonth();
-                            this.year = baseDate.getFullYear();
-                            if (this.type === 'datetime-local' && (!this.hour || !this.minute)) {
-                                const now = this.selectedDate ?? new Date();
-                                this.setTimeFromDate(now);
-                            }
-                            this.buildDays();
-                        }
-                    });
-
-                    this.parseInitial(@js($jsValue));
-
+                syncFromParent() {
+                    const value = this.getValue();
+                    // Always sync, even if value is the same, to ensure selectedDate is updated
+                    this.currentValue = value;
+                    if (value) {
+                        this.parseInitial(value);
+                    } else {
+                        this.selectedDate = null;
+                    }
+                    // Always ensure month/year are set for calendar display
                     const baseDate = this.selectedDate ?? new Date();
                     this.month = baseDate.getMonth();
                     this.year = baseDate.getFullYear();
-
-                    if (this.type === 'datetime-local' && (!this.hour || !this.minute)) {
+                    if (this.type === 'datetime-local' && value && (!this.hour || !this.minute)) {
                         const now = this.selectedDate ?? new Date();
                         this.setTimeFromDate(now);
                     }
-
                     this.buildDays();
+                },
+
+                init() {
+                    // Watch parent state for changes and sync
+                    const fieldName = '{{ $field }}';
+                    if (this.$parent && typeof this.$parent[fieldName] !== 'undefined') {
+                        this.$watch(`$parent.${fieldName}`, () => {
+                            this.syncFromParent();
+                        });
+                        // Sync initially
+                        this.syncFromParent();
+                    } else {
+                        // Initialize month/year from currentValue or use current date
+                        const initialValue = this.currentValue;
+                        if (initialValue) {
+                            this.parseInitial(initialValue);
+                        }
+
+                        // Always set month/year for calendar display
+                        const baseDate = this.selectedDate ?? new Date();
+                        this.month = baseDate.getMonth();
+                        this.year = baseDate.getFullYear();
+
+                        if (this.type === 'datetime-local' && initialValue && (!this.hour || !this.minute)) {
+                            const now = this.selectedDate ?? new Date();
+                            this.setTimeFromDate(now);
+                        }
+
+                        // Build days for calendar
+                        this.buildDays();
+                    }
                 },
 
                 parseInitial(value) {
@@ -260,6 +279,10 @@
                     }
 
                     this.selectedDate = new Date(this.year, this.month, day);
+                    // Close dropdown immediately
+                    if (this.$parent && typeof this.$parent.open !== 'undefined') {
+                        this.$parent.open = false;
+                    }
                     this.updateModel();
                 },
 
@@ -288,7 +311,13 @@
                 updateTime() {
                     this.normalizeHour();
                     this.normalizeMinute();
-                    this.updateModel();
+                    // Throttle updateModel to prevent rapid updates
+                    if (this.updateModelTimer) {
+                        clearTimeout(this.updateModelTimer);
+                    }
+                    this.updateModelTimer = setTimeout(() => {
+                        this.updateModel();
+                    }, 300);
                 },
 
                 selectToday() {
@@ -302,54 +331,60 @@
                     this.month = now.getMonth();
                     this.year = now.getFullYear();
                     this.buildDays();
+                    // updateModel will close the dropdown
                     this.updateModel();
                 },
 
-                clearSelection() {
+                async clearSelection() {
+                    const originalValue = this.currentValue;
                     this.selectedDate = null;
                     this.hour = '';
                     this.minute = '';
                     this.meridiem = 'AM';
                     this.currentValue = null;
 
+                    // Check if parent Alpine component has updateField method (optimistic UI pattern)
+                    const parentHasOptimistic = this.$parent && typeof this.$parent.updateField === 'function';
+                    const fieldName = '{{ $field }}';
+
+                    // Update parent state optimistically if available
+                    if (parentHasOptimistic && typeof this.$parent[fieldName] !== 'undefined') {
+                        this.$parent[fieldName] = null;
+                    }
+
+                    // Close parent dropdown immediately (frontend state) - set open to false directly
+                    if (this.$parent && typeof this.$parent.open !== 'undefined') {
+                        this.$parent.open = false;
+                    } else if (this.$parent && typeof this.$parent.closeDropdown === 'function') {
+                        this.$parent.closeDropdown();
+                    }
+
                     const itemType = '{{ $itemType }}';
                     const itemId = {{ $itemId }};
 
-                    // Dispatch to parent to clear the date
-                    if (itemType === 'event') {
-                        $wire.$dispatchTo('workspace.show-items', 'update-event-field', {
-                            eventId: itemId,
-                            field: '{{ $field }}',
-                            value: null,
-                        });
-
-                        // Notify listeners
-                        window.dispatchEvent(new CustomEvent('event-detail-field-updated', {
-                            detail: {
-                                field: '{{ $field }}',
-                                value: null,
-                                eventId: itemId,
+                    try {
+                        if (parentHasOptimistic) {
+                            // Use parent's optimistic update method
+                            await this.$parent.updateField(fieldName, null);
+                        } else {
+                            // Fallback to direct wire call
+                            if (itemType === 'event') {
+                                await $wire.$parent.call('updateEventField', itemId, fieldName, null);
+                            } else {
+                                await $wire.$parent.call('updateTaskField', itemId, fieldName, null);
                             }
-                        }));
-                    } else {
-                        $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
-                            taskId: itemId,
-                            field: '{{ $field }}',
-                            value: null,
-                        });
-
-                        // Notify listeners
-                        window.dispatchEvent(new CustomEvent('task-detail-field-updated', {
-                            detail: {
-                                field: '{{ $field }}',
-                                value: null,
-                                taskId: itemId,
-                            }
-                        }));
+                        }
+                    } catch (error) {
+                        // Rollback on error
+                        this.currentValue = originalValue;
+                        if (parentHasOptimistic && typeof this.$parent[fieldName] !== 'undefined') {
+                            this.$parent[fieldName] = originalValue;
+                        }
+                        console.error('Failed to clear field:', error);
                     }
                 },
 
-                updateModel() {
+                async updateModel() {
                     if (!this.selectedDate) {
                         return;
                     }
@@ -389,54 +424,83 @@
                         value += `T${hours24}:${minutes}`;
                     }
 
+                    const originalValue = this.currentValue;
                     this.currentValue = value;
+
+                    // Check if parent Alpine component has updateField method (optimistic UI pattern)
+                    const parentHasOptimistic = this.$parent && typeof this.$parent.updateField === 'function';
+                    const fieldName = '{{ $field }}';
+
+                    // Update parent state optimistically if available
+                    if (parentHasOptimistic && typeof this.$parent[fieldName] !== 'undefined') {
+                        this.$parent[fieldName] = value;
+                    }
+
+                    // Close parent dropdown immediately (frontend state) - set open to false directly
+                    if (this.$parent && typeof this.$parent.open !== 'undefined') {
+                        this.$parent.open = false;
+                    } else if (this.$parent && typeof this.$parent.closeDropdown === 'function') {
+                        this.$parent.closeDropdown();
+                    }
 
                     const itemType = '{{ $itemType }}';
                     const itemId = {{ $itemId }};
 
-                    // Dispatch to parent component
-                    if (itemType === 'event') {
-                        $wire.$dispatchTo('workspace.show-items', 'update-event-field', {
-                            eventId: itemId,
-                            field: '{{ $field }}',
-                            value: value,
-                        });
-
-                        // Notify listeners so UI stays in sync
-                        window.dispatchEvent(new CustomEvent('event-detail-field-updated', {
-                            detail: {
-                                field: '{{ $field }}',
-                                value: value,
-                                eventId: itemId,
+                    try {
+                        if (parentHasOptimistic) {
+                            // Use parent's optimistic update method
+                            await this.$parent.updateField(fieldName, value);
+                        } else {
+                            // Fallback to direct wire call
+                            if (itemType === 'event') {
+                                await $wire.$parent.call('updateEventField', itemId, fieldName, value);
+                            } else {
+                                await $wire.$parent.call('updateTaskField', itemId, fieldName, value);
                             }
-                        }));
-                    } else {
-                        $wire.$dispatchTo('workspace.show-items', 'update-task-field', {
-                            taskId: itemId,
-                            field: '{{ $field }}',
-                            value: value,
-                        });
-
-                        // Notify listeners so UI stays in sync
-                        window.dispatchEvent(new CustomEvent('task-detail-field-updated', {
-                            detail: {
-                                field: '{{ $field }}',
-                                value: value,
-                                taskId: itemId,
-                            }
-                        }));
+                        }
+                    } catch (error) {
+                        // Rollback on error
+                        this.currentValue = originalValue;
+                        if (parentHasOptimistic && typeof this.$parent[fieldName] !== 'undefined') {
+                            this.$parent[fieldName] = originalValue;
+                        }
+                        console.error('Failed to update field:', error);
                     }
                 },
 
                 isSelected(day) {
-                    if (!this.selectedDate || !day) {
+                    if (!day) {
+                        return false;
+                    }
+
+                    // Get current value from parent Alpine state
+                    const currentValue = this.getValue();
+                    if (!currentValue) {
+                        return false;
+                    }
+
+                    // Parse the current value to get the date
+                    let dateToCheck;
+                    try {
+                        if (typeof currentValue === 'string' && currentValue.includes('T')) {
+                            const [datePart, timePart] = currentValue.split('T');
+                            const [year, month, dayFromValue] = datePart.split('-').map(Number);
+                            dateToCheck = new Date(year, month - 1, dayFromValue);
+                        } else {
+                            dateToCheck = new Date(currentValue);
+                        }
+                    } catch (e) {
+                        return false;
+                    }
+
+                    if (isNaN(dateToCheck.getTime())) {
                         return false;
                     }
 
                     return (
-                        this.selectedDate.getFullYear() === this.year &&
-                        this.selectedDate.getMonth() === this.month &&
-                        this.selectedDate.getDate() === day
+                        dateToCheck.getFullYear() === this.year &&
+                        dateToCheck.getMonth() === this.month &&
+                        dateToCheck.getDate() === day
                     );
                 },
 
@@ -565,7 +629,7 @@
                         <button
                             type="button"
                             class="rounded-full px-3 py-1 text-xs font-medium text-pink-600 hover:bg-pink-50 dark:text-pink-400 dark:hover:bg-pink-900/20"
-                            @click.prevent="selectToday()"
+                            @click.throttle.prevent="selectToday()"
                         >
                             Today
                         </button>
@@ -574,7 +638,7 @@
                             type="button"
                             class="rounded-full px-3 py-1 text-xs text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
                             x-show="selectedDate"
-                            @click.prevent="clearSelection()"
+                            @click.throttle.prevent="clearSelection()"
                         >
                             Clear
                         </button>
